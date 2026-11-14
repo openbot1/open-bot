@@ -110,6 +110,11 @@ test('full registry: all v0.2 tool groups compose with unique names', () => {
     // watch_remove; defaults 25 → 35) = 165.
     // v0.97 (Team T6): + 5 git workflow (git_log/git_branch/git_branch_create/git_branch_delete/git_show)
     // + 1 search_files_deep = 171 (git_blame already existed in codeTools — extended with a line range, not duplicated).
+    // v1.03 (merge): + 16 ALL_TOOLS mới — 5 CodeAct/harness (Đội T1) +
+    // 7 workspace_* (Đội T4) + 4 fleet/marketplace v3 (Team T6);
+    // ALL_TOOLS 47 → 63, tổng hợp 183 → 199. (memory_v4_* của Đội T2
+    // và acp_host_* của Team T3 đăng ký qua coordinator, không qua
+    // createDefaultTools nên không có trong tổng hợp này.)
     // v1.02 (rescue): + 12 context/durable/orchestra/gateway/dream/substrate/ACP tools
     // (context_measure_budget, context_prune_history, durable_list_resumable, durable_resume_state,
     // orchestra_run, orchestra_list_sessions, gateway_status, gateway_send, dream_run,
@@ -122,7 +127,7 @@ test('full registry: all v0.2 tool groups compose with unique names', () => {
     // 'git_host_connect', 'pr_list', 'pr_create' and the rest come
     // via createIntegrationTools below.
     // (computer_local_tool is NOT in this registry — it lives in localBridge, exposed via the daemon path only.)
-    assert.equal(names.length, 183, `expected 183 tools, got ${names.length}: ${names.join(', ')}`);
+    assert.equal(names.length, 218, `expected 218 tools, got ${names.length}: ${names.join(', ')}`);
     assert.equal(new Set(names).size, names.length, 'duplicate tool names registered');
     for (const expected of [
       'read_file', 'web_search', // defaults
