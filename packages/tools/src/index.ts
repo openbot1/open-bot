@@ -109,6 +109,15 @@ export type { AstLanguage, AstSymbolKind, CodeSymbol, ParseCodeSymbolsResult } f
 export { createPlanTools, PLAN_TOOLS } from './planTools';
 export { createSubagentTools, SUBAGENT_TOOLS } from './subagentTools';
 export type { SubagentToolOptions } from './subagentTools';
+// v1.04 (Đội T4): delegation v2 — ủy quyền qua tool call, tracker + merge.
+export {
+  createDelegationTools,
+  classifySubagentOutput,
+  extractVerdictFromOutput,
+  DELEGATION_TOOLS,
+  DEFAULT_DELEGATION_TIMEOUT_MS,
+} from './delegationTools';
+export type { DelegationToolOptions } from './delegationTools';
 export {
   createNestedSubagentTools,
   formatSubagentTree,
@@ -116,6 +125,7 @@ export {
 } from './nestedSubagentTools';
 export { createMcpTools, MCP_TOOLS } from './mcpTools';
 export { createMcpV097Tools, MCP_V097_TOOLS } from './mcpV097Tools';
+export { createMcpV2Tools, MCP_V2_TOOLS } from './mcpV2Tools';
 export {
   addMcpAppListener,
   addMcpTaskListener,
@@ -301,6 +311,22 @@ export type { MemoryNotesToolOptions } from './memoryNotesTools';
 // --- v1.02 (Đội T2): memory v3 tools (fused search, one-pass ingest, temporal queries, sleep maintenance, blocks v2) ---
 export { createMemoryV3Tools, MEMORY_V3_TOOLS, MEMORY_V3_TOOL_NAMES } from './memoryV3Tools';
 export type { MemoryV3ToolOptions } from './memoryV3Tools';
+// --- v1.03 (Đội T2): memory v4 tools (shared-block groups, judge pipeline, scored dream, validity windows, scoped recall) ---
+export { createMemoryV4Tools, MEMORY_V4_TOOLS, MEMORY_V4_TOOL_NAMES } from './memoryV4Tools';
+export type { MemoryV4ToolOptions } from './memoryV4Tools';
+// --- v1.04 (Đội T1): memory v5 tools (ADD-only store, bi-temporal v2, ingestion, health, consolidation v2) ---
+export { createMemoryV5Tools, MEMORY_V5_TOOLS, MEMORY_V5_TOOL_NAMES } from './memoryV5Tools';
+export type { MemoryV5ToolOptions } from './memoryV5Tools';
+// --- v1.05 (Đội T1): memory v6 tools (add-only record store, multi-scope, fused retrieval, shared blocks, sleep-time compute, migration) ---
+export { createMemoryV6Tools, MEMORY_V6_TOOLS, MEMORY_V6_TOOL_NAMES } from './memoryV6Tools';
+export type { MemoryV6ToolOptions } from './memoryV6Tools';
+// --- v1.05 (Đội T5): voice realtime v4 tools (multi-session
+// manager, latency report, barge-in test, internal eval, log) ---
+export { createVoiceV4Tools, VOICE_V4_TOOLS, VOICE_V4_TOOL_NAMES, isVoiceV4ToolName } from './voiceV4Tools';
+export type { VoiceV4ToolOptions, VoiceV4ManagerLike, VoiceV4SessionLike } from './voiceV4Tools';
+// --- v1.05 (Đội T4): context v2 tools (tiered compaction, verified summaries, 1M window, per-bot policy, inspector, snapshots) ---
+export { createContextV2Tools, CONTEXT_V2_TOOLS, CONTEXT_V2_TOOL_NAMES } from './contextV2Tools';
+export type { ContextV2ToolOptions } from './contextV2Tools';
 export { createSessionHandoffTools, SESSION_HANDOFF_TOOLS, SESSION_HANDOFF_TOOL_NAMES } from './handoffTools';
 export type { SessionHandoffToolOptions } from './handoffTools';
 export { createA2aTools, A2A_TOOLS } from './a2aTools';
@@ -332,6 +358,16 @@ export { createCiTools, CI_TOOLS } from './ciTools';
 export type { CiToolOptions } from './ciTools';
 export { createHarnessV2Tools, HARNESS_V2_TOOLS } from './harnessV2Tools';
 export type { HarnessV2ToolOptions } from './harnessV2Tools';
+export {
+  HARNESS_V103_TOOL_NAMES,
+  HARNESS_V103_TOOLS,
+  createHarnessV103Tools,
+  executeCodeAct,
+  foldRunLog,
+} from './harnessV103Tools';
+export type { CodeActObservation, HarnessV103ToolOptions } from './harnessV103Tools';
+export { createAcpHostingTools, ACP_HOSTING_TOOLS } from './acpHostingTools';
+export type { AcpHostingToolOptions } from './acpHostingTools';
 export { createAgentDataTools, AGENT_DATA_TOOLS } from './agentDataTools';
 export type { AgentDataToolOptions } from './agentDataTools';
 // --- v0.53 (P1-7): tool-call replay history + computer-local bridge ---
@@ -470,3 +506,10 @@ export type {
 } from './internetData';
 // --- v1.02 (rescue port of v0.99/v1.00): context/durable/orchestra/gateway/dream/substrate/ACP tools ---
 export { createRescueV102Tools, RESCUE_V102_TOOLS, RESCUE_V102_TOOL_NAMES } from './rescueV102Tools';
+// --- v1.03 (Đội T4): workspace abstraction v3 tools ---
+export { WORKSPACE_TOOLS, WORKSPACE_TOOL_NAMES } from './workspaceTools';
+// --- v1.03 (Team T6): fleet overview/scheduling + marketplace v3 tools ---
+export { createFleetV103Tools, FLEET_V103_TOOLS, FLEET_V103_TOOL_NAMES } from './fleetV103Tools';
+// --- v1.05 (Đội T3): OpenMausBot parity — doctor, team YAML, model refresh, per-bot computer v2, headless status ---
+export { createOpenmausbotV105Tools, OPENMAUSBOT_V105_TOOLS, OPENMAUSBOT_V105_TOOL_NAMES } from './openmausbotV105Tools';
+export type { OpenmausbotV105ToolOptions } from './openmausbotV105Tools';

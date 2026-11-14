@@ -50,7 +50,18 @@ import { createInternetDataTools, extractReadableText, INTERNET_DATA_TOOLS } fro
 import type { WatchChangeEvent } from './internetData';
 // --- v1.02 (rescue port of v0.99/v1.00): context/durable/orchestra/gateway/dream/substrate/ACP tools ---
 import { RESCUE_V102_TOOLS } from './rescueV102Tools';
-
+// --- v1.03 (Đội T1): harness engine v2 — CodeAct + time-travel/fork/stuck/condenser tools ---
+import { HARNESS_V103_TOOLS } from './harnessV103Tools';
+// --- v1.03 (Đội T4): workspace abstraction v3 (local/container, quota, snapshot) ---
+import { WORKSPACE_TOOLS } from './workspaceTools';
+// --- v1.03 (Team T6): fleet overview/scheduling + marketplace v3 tools ---
+import { FLEET_V103_TOOLS, createFleetV103Tools } from './fleetV103Tools';
+// --- v1.05 (Đội T3): OpenMausBot parity — doctor, team YAML, model
+// refresh, per-bot computer v2, headless status (8 tools) ---
+import { OPENMAUSBOT_V105_TOOLS, createOpenmausbotV105Tools } from './openmausbotV105Tools';
+// --- v1.05 (Team T6): eval v3 (memory eval offline) + fleet v4
+// (priority scheduling, health + auto-restart, policy v4) tools ---
+import { EVAL_FLEET_V105_TOOLS, createEvalFleetV105Tools } from './evalFleetV105Tools';
 // Shared helper: MAX_TOOL_RESULT_CHARS nay song o ./truncate (cung gia tri
 // 20.000) — re-export de code import tu module nay khong phai sua.
 export { MAX_TOOL_RESULT_CHARS };
@@ -793,6 +804,18 @@ export const ALL_TOOLS: Tool[] = [
   // --- v1.02 (rescue port of v0.99/v1.00): context (2) + durable (2) +
   // orchestra (2) + gateway (2) + dream (1) + substrate (2) + ACP (1) = 12 ---
   ...RESCUE_V102_TOOLS,
+  // --- v1.03 (Đội T1): CodeAct (1) + run fork/replay/stuck/compact (4) = 5 ---
+  ...HARNESS_V103_TOOLS,
+  // --- v1.03 (Đội T4): workspace v3 (7: create/exec/list/quota +
+  // snapshot create/list/restore) ---
+  ...WORKSPACE_TOOLS,
+  // --- v1.03 (Team T6): fleet overview + scheduling + marketplace v3 (4) ---
+  ...FLEET_V103_TOOLS,
+  // --- v1.05 (Đội T3): OpenMausBot parity — doctor (1) + team YAML (3) +
+  // model refresh (1) + per-bot computer v2 (2) + headless status (1) = 8 ---
+  ...OPENMAUSBOT_V105_TOOLS,
+  // --- v1.05 (Team T6): eval v3 (6) + fleet v4 (5) = 11 ---
+  ...EVAL_FLEET_V105_TOOLS,
 ];
 
 export function createDefaultTools(opts?: {
@@ -815,9 +838,35 @@ export function createDefaultTools(opts?: {
   getInternetDataFile?: () => string | null | undefined;
   getBraveSearchApiKey?: () => string | null;
   onWatchChanged?: (event: WatchChangeEvent) => void;
+  /**
+   * v1.03 (Team T6): fleet/marketplace v3 wiring. When given, the 4
+   * fleet v3 placeholders in ALL_TOOLS are replaced by bound tools
+   * (same lazy pattern as internet-data) — never registered twice.
+   * `getFleetV103BaseDir` resolves the app userData dir (fleet root
+   * is `<userData>/fleet`, marketplace state `<userData>/marketplace`,
+   * plugins `<userData>/plugins`).
+   */
+  getFleetV103BaseDir?: () => string | null | undefined;
+  /**
+   * v1.05 (Đội T3): OpenMausBot-parity wiring. When given, the 8
+   * v1.05 placeholders in ALL_TOOLS are replaced by bound tools
+   * (same replace-in-place pattern as fleet v1.03) — same 8 names,
+   * never a duplicate. `getOpenmausbotV105BaseDir` resolves the app
+   * userData dir (team.json + team-computers.json live there).
+   */
+  getOpenmausbotV105BaseDir?: () => string | null | undefined;
+  /**
+   * v1.05 (Team T6): eval v3 / fleet v4 wiring. When given, the 11
+   * eval v3 + fleet v4 placeholders in ALL_TOOLS are replaced by
+   * bound tools (same replace-in-place pattern) — never registered
+   * twice. `getEvalFleetV105BaseDir` resolves the app userData dir
+   * (eval history `<userData>/eval-memory-history.json`, fleet root
+   * `<userData>/fleet`).
+   */
+  getEvalFleetV105BaseDir?: () => string | null | undefined;
 }): Tool[] {
-  if (!opts?.getDaemon && !opts?.getEgressPolicy && !opts?.getInternetDataFile && !opts?.getBraveSearchApiKey && !opts?.onWatchChanged) return [...ALL_TOOLS];
-  const tools = [...ALL_TOOLS];
+  if (!opts?.getDaemon && !opts?.getEgressPolicy && !opts?.getInternetDataFile && !opts?.getBraveSearchApiKey && !opts?.onWatchChanged && !opts?.getFleetV103BaseDir && !opts?.getOpenmausbotV105BaseDir && !opts?.getEvalFleetV105BaseDir) return [...ALL_TOOLS];
+  let tools = [...ALL_TOOLS];
   const idx = tools.indexOf(shellExecTool);
   if (idx !== -1) {
     tools[idx] = createShellExecTool(opts.getDaemon, { getEgressPolicy: opts.getEgressPolicy });
@@ -848,7 +897,48 @@ export function createDefaultTools(opts?: {
     if (firstIdx !== -1) {
       const kept = tools.filter((t) => !boundNames.has(t.definition.name));
       kept.splice(firstIdx, 0, ...bound);
-      return kept;
+      tools = kept;
+    }
+  }
+  // v1.03 (Team T6): bind the fleet/marketplace v3 tools when the host
+  // wires them (userData dir). Same replace-in-place pattern as
+  // internet-data above — same 4 names, never a duplicate.
+  if (opts?.getFleetV103BaseDir) {
+    const bound = createFleetV103Tools(opts.getFleetV103BaseDir, () =>
+      tools.map((t) => t.definition.name),
+    );
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
+  // v1.05 (Đội T3): bind the OpenMausBot-parity tools when the host
+  // wires them (userData dir). Same replace-in-place pattern — same 8
+  // names, never a duplicate.
+  if (opts?.getOpenmausbotV105BaseDir) {
+    const bound = createOpenmausbotV105Tools({ getDataDir: opts.getOpenmausbotV105BaseDir });
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
+  // v1.05 (Team T6): bind the eval v3 / fleet v4 tools when the host
+  // wires them (userData dir). Same replace-in-place pattern — same
+  // 11 names, never a duplicate.
+  if (opts?.getEvalFleetV105BaseDir) {
+    const bound = createEvalFleetV105Tools(opts.getEvalFleetV105BaseDir);
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
     }
   }
   return tools;
