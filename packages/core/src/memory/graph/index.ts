@@ -17,3 +17,7 @@ export * from './onePass';
 export * from './fusedRetrieval';
 export * from './temporalQuery';
 export * from './sleepTasks';
+export * from './validity';
+export * from './addOnly';
+export * from './biTemporal';
+export * from './ingest';

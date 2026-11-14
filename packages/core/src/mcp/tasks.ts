@@ -46,6 +46,19 @@ export type McpTaskSpecVersion = '2025-11-25' | '2026-07-28';
 /** Tên extension tasks chính thức ở spec 2026-07-28. */
 export const MCP_TASKS_EXTENSION_2026 = 'io.modelcontextprotocol/tasks';
 
+/**
+ * v1.04: suy phiên bản tasks từ protocol version đã thương lượng
+ * với server — cùng quy tắc phía server (`server.ts:
+ * effectiveTasksSpecVersion()`): chỉ client 2026-07-28 mới nói
+ * Tasks 2026; mọi version khác (kể cả chưa thương lượng xong,
+ * `undefined`) nói Tasks 2025 để không gọi method server cũ
+ * không hiểu. Dùng ở `clientAdapters.ts` để `TaskHandle` /
+ * `McpTaskManager` tự chọn đúng backend theo từng server.
+ */
+export function tasksSpecVersionForProtocol(protocolVersion: string | undefined): McpTaskSpecVersion {
+  return protocolVersion === '2026-07-28' ? '2026-07-28' : '2025-11-25';
+}
+
 /** Các method tasks theo spec 2025-11-25. */
 export const MCP_TASK_METHODS = {
   get: 'tasks/get',
@@ -100,6 +113,13 @@ export interface TaskHandleData {
    * qua `tasks/result`.
    */
   result?: unknown;
+  /**
+   * v1.05: tiến độ 0..1 (khi server báo trong `tasks/get` — server
+   * 2026-07-28 có thể trả kèm handle).
+   */
+  progress?: number;
+  /** v1.05: ghi chú tiến độ của server. */
+  progressMessage?: string;
 }
 
 /**
@@ -144,6 +164,14 @@ export function parseTaskHandle(value: unknown): TaskHandleData {
   // Extension 2026-07-28: `tasks/get` trả luôn kết quả cuối trong cùng
   // object — giữ lại để `waitForCompletion` dùng, không gọi `tasks/result`.
   if ('result' in value) out.result = value['result'];
+  // v1.05: tiến độ kèm handle (server báo trong tasks/get) — giữ lại
+  // để tracker/UI hiển thị, không làm rơi như trước.
+  if (typeof value['progress'] === 'number' && Number.isFinite(value['progress'])) {
+    out.progress = Math.max(0, Math.min(1, value['progress']));
+  }
+  if (typeof value['progressMessage'] === 'string') {
+    out.progressMessage = value['progressMessage'];
+  }
   return out;
 }
 

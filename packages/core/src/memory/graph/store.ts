@@ -148,6 +148,8 @@ export interface AddFactInput {
   scope: MemoryScope;
   provenance: FactProvenance;
   validFrom?: string;
+  /** Cửa sổ hiệu lực đóng sẵn (null = vẫn đúng tới nay). */
+  validUntil?: string | null;
   embedding?: number[];
 }
 
@@ -310,6 +312,28 @@ export class TemporalGraphStore {
     return entity;
   }
 
+  /**
+   * Xoá một entity mồ côi (v1.04, memory v5 — consolidation dọn
+   * dẹp): chỉ xoá được khi KHÔNG fact nào (mọi status) còn trỏ tới
+   * nó. Entity còn được fact superseded/deleted trỏ tới thì giữ
+   * lại — lịch sử vẫn cần tên để hiển thị. Trả false khi không
+   * tìm thấy entity.
+   */
+  removeEntity(entityId: string): boolean {
+    this.assertWritable();
+    const entity = this.getEntity(entityId);
+    if (!entity) return false;
+    const referenced = this.file.facts.some(
+      (f) => f.subjectId === entityId || f.objectId === entityId,
+    );
+    if (referenced) {
+      throw new GraphStoreError('Entity vẫn còn fact trỏ tới — không xoá được.');
+    }
+    this.file.entities = this.file.entities.filter((e) => e.id !== entityId);
+    this.persist();
+    return true;
+  }
+
   // ---- Episodes -------------------------------------------------------
 
   /** Ghi một episode (turn hội thoại) vào đồ thị. */
@@ -425,7 +449,7 @@ export class TemporalGraphStore {
       ...(objectId ? { objectId } : {}),
       objectText: objectText.slice(0, 1000),
       validFrom: input.validFrom ?? now,
-      validUntil: null,
+      validUntil: input.validUntil ?? null,
       confidence: clampConfidence(input.confidence ?? 0.8),
       status: 'active',
       scope: { ...input.scope },
@@ -470,6 +494,37 @@ export class TemporalGraphStore {
     fact.status = 'deleted';
     fact.validUntil = now;
     fact.updatedAt = now;
+    this.persist();
+    return fact;
+  }
+
+  /**
+   * Đặt / sửa cửa sổ hiệu lực của một fact (v1.03, Memory v4 —
+   * temporal validity windows): đổi validFrom / validUntil mà không
+   * động tới status hay chuỗi supersession. validUntil phải >=
+   * validFrom (nếu cả hai đều đặt). Trả về fact đã cập nhật.
+   */
+  setFactValidity(
+    factId: string,
+    window: { validFrom?: string; validUntil?: string | null },
+  ): GraphFact {
+    this.assertWritable();
+    const fact = this.getFact(factId);
+    if (!fact) throw new GraphStoreError('Không tìm thấy fact.');
+    const nextFrom = window.validFrom ?? fact.validFrom;
+    const nextUntil = window.validUntil === undefined ? fact.validUntil : window.validUntil;
+    if (window.validFrom !== undefined && Number.isNaN(Date.parse(window.validFrom))) {
+      throw new GraphStoreError('validFrom không phải ngày ISO hợp lệ.');
+    }
+    if (nextUntil !== null && Number.isNaN(Date.parse(nextUntil))) {
+      throw new GraphStoreError('validUntil không phải ngày ISO hợp lệ.');
+    }
+    if (nextUntil !== null && Date.parse(nextUntil) < Date.parse(nextFrom)) {
+      throw new GraphStoreError('validUntil phải >= validFrom.');
+    }
+    fact.validFrom = nextFrom;
+    fact.validUntil = nextUntil;
+    fact.updatedAt = nowIso();
     this.persist();
     return fact;
   }

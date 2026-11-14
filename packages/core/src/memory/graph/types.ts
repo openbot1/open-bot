@@ -252,7 +252,7 @@ export interface CandidateFact {
 }
 
 /** Quyết định consolidation cho một fact ứng viên. */
-export type ConsolidationDecision = 'ADD' | 'UPDATE' | 'DELETE' | 'QUARANTINE' | 'SKIP';
+export type ConsolidationDecision = 'ADD' | 'UPDATE' | 'DELETE' | 'QUARANTINE' | 'SKIP' | 'NOISE';
 
 /** Một quyết định đã áp dụng trong một lần consolidate. */
 export interface ConsolidationAction {

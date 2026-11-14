@@ -33,7 +33,7 @@ import { VOICE_CALL_TOOL_DEFINITIONS } from './types';
 export const VOICE_CALL_TOOL_NAMES: readonly VoiceCallToolName[] =
   VOICE_CALL_TOOL_DEFINITIONS.map((d) => d.name);
 
-/** True when `name` is one of the ten voice-call tools. */
+/** True when `name` is one of the twelve voice-call tools. */
 export function isVoiceCallToolName(name: unknown): name is VoiceCallToolName {
   return (
     typeof name === 'string' &&
@@ -135,7 +135,7 @@ export type VoiceCallToolHandlers = {
 };
 
 export interface VoiceCallToolSet {
-  /** The ten definitions, for the realtime `session.update` tools list. */
+  /** The twelve definitions, for the realtime `session.update` tools list. */
   readonly definitions: readonly VoiceCallToolDefinition[];
   /** True when `name` is a voice-call tool. */
   has(name: string): boolean;

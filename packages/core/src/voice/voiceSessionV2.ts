@@ -295,6 +295,15 @@ export class VoiceSessionV2 {
     return turn;
   }
 
+  /**
+   * Record a final model turn (v1.03: a media answer, or any model
+   * text the wrapper produced without the session). Does not touch
+   * the transport — the text is already spoken / shown.
+   */
+  noteModelTurn(text: string, mediaIds?: string[]): VoiceTurn | null {
+    return this.longSession.addTurn('model', text, mediaIds ? { mediaIds } : {});
+  }
+
   /** Transcribe with the local stack, then record the user turn. */
   async transcribeLocal(pcm16: Uint8Array): Promise<string> {
     if (!this.localStack) {

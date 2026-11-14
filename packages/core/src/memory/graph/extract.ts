@@ -120,6 +120,15 @@ const PATTERNS: Pattern[] = [
   { re: /(?:tôi|mình|em)\s+có\s+(?:một\s+)?(?:cái\s+)?(.{2,80})/iu, predicate: 'owns', subjectName: 'user', kind: 'person', objectIsEntity: false, confidence: 0.7, clean: stripTrailing },
   { re: /(?:nhớ\s+rằng|hãy\s+nhớ|remember\s+that)\s+(.{2,200})/iu, predicate: 'states', subjectName: 'user', kind: 'person', objectIsEntity: false, confidence: 0.85, clean: stripTrailing },
   { re: /(?:sinh\s+nhật\s+(?:của\s+)?(?:tôi|mình)\s+(?:là\s+)?|my\s+birthday\s+is\s+)(.{2,40})/iu, predicate: 'birthday', subjectName: 'user', kind: 'person', objectIsEntity: false, confidence: 0.9, clean: stripTrailing },
+  // --- v1.03 (Memory v4, judge pipeline): mẫu PHỦ ĐỊNH — không có
+  // chúng, extractor không bao giờ rút được ứng viên DELETE ("không
+  // còn thích ... nữa") và đường DELETE của judge/consolidation
+  // không bao giờ chạy end-to-end. sourceText giữ nguyên câu phủ
+  // định để isNegationText() nhận ra ở tầng judge.
+  { re: /(?:tôi|mình|em|anh|chị|tớ)\s+không\s+còn\s+thích\s+(?:ăn\s+)?(.{2,80})/iu, predicate: 'likes', subjectName: 'user', kind: 'person', objectIsEntity: true, confidence: 0.9, clean: stripTrailing },
+  { re: /\bi\s+(?:no\s+longer|don'?t|do\s+not)\s+(?:really\s+)?like\s+(.{2,80})/iu, predicate: 'likes', subjectName: 'user', kind: 'person', objectIsEntity: true, confidence: 0.9, clean: stripTrailing },
+  { re: /(?:tôi|mình|em|anh|chị|tớ)\s+không\s+còn\s+sống\s+(?:ở|tại)\s+(.{2,80})/iu, predicate: 'lives_in', subjectName: 'user', kind: 'person', objectIsEntity: true, confidence: 0.92, clean: (s) => stripTrailing(stripLeadingPrep(s)) },
+  { re: /\bi\s+no\s+longer\s+live\s+in\s+(.{2,80})/iu, predicate: 'lives_in', subjectName: 'user', kind: 'person', objectIsEntity: true, confidence: 0.92, clean: stripTrailing },
 ];
 
 /** Chuẩn hoá object: bỏ từ thừa, giới hạn độ dài, bỏ object rỗng/vô nghĩa. */

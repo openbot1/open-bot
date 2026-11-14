@@ -308,6 +308,30 @@ export class McpTaskStore {
     return this.getOrThrow(taskId);
   }
 
+  /**
+   * Restore one task record into the store (v1.05: used by the
+   * persistent snapshot loader in `taskStorePersistent.ts`).
+   * The record comes from a previous process run, so it has no
+   * runner, abort controller or input waiter — it is stored as-is
+   * (terminal tasks stay queryable; a `working` record restored
+   * here is the caller's responsibility — the persistent loader
+   * marks interrupted tasks `failed` before restoring).
+   * Restoring over an existing id replaces it. Expired records
+   * are skipped (returns false). Returns true when stored.
+   */
+  restore(record: Omit<StoredMcpTask, 'createdAtMs' | 'updatedAtMs'> & {
+    createdAtMs: number;
+    updatedAtMs: number;
+  }): boolean {
+    const now = this.nowMs();
+    if (record.expiresAtMs !== undefined && record.expiresAtMs <= now) return false;
+    if (this.tasks.size >= this.maxTasks && !this.tasks.has(record.taskId)) {
+      this.evictOldestFinished();
+    }
+    this.tasks.set(record.taskId, { ...record });
+    return true;
+  }
+
   /** List tasks, newest first, optionally filtered by status. */
   list(status?: ServerTaskStatus): StoredMcpTask[] {
     this.sweepExpired();

@@ -134,6 +134,23 @@ export interface MediaAnswer {
   at: number;
 }
 
+/** One media item as restored from a checkpoint: everything a
+ *  checkpoint keeps (metadata + description), no bytes. */
+export interface RestorableMediaItem {
+  id: string;
+  kind: VoiceMediaKind;
+  mimeType: string;
+  name?: string;
+  caption?: string;
+  durationSec?: number;
+  turnSeq?: number;
+  description: string;
+  describedAt: number;
+  status: 'pending' | 'described' | 'failed';
+  error?: string;
+  addedAt: number;
+}
+
 export interface VoiceMediaContextOptions {
   /** Describer used for `describe()` / `askAboutMedia()`.
    *  Defaults to `MockMediaDescriber` (no network, no key). */
@@ -389,6 +406,59 @@ export class VoiceMediaContext {
   clear(): void {
     this.items = [];
     this.answers = [];
+  }
+
+  /** Copies of the items (bytes included — the caller strips
+   *  them when the snapshot leaves the call, e.g. checkpoints). */
+  snapshotItems(): VoiceMediaItem[] {
+    return this.items.map((i) => ({ ...i }));
+  }
+
+  /**
+   * Rehydrate items from a checkpoint: descriptions and statuses
+   * survive, raw bytes do not (the checkpoint never stored them).
+   * Items whose shape is wrong are skipped, never applied
+   * half-way; the id counter moves past the restored ids so new
+   * attaches cannot collide. Returns the count restored.
+   */
+  restoreItems(items: RestorableMediaItem[]): number {
+    if (!Array.isArray(items)) return 0;
+    let restored = 0;
+    for (const raw of items) {
+      if (
+        !raw ||
+        typeof raw !== 'object' ||
+        typeof raw.id !== 'string' ||
+        (raw.kind !== 'image' && raw.kind !== 'video') ||
+        typeof raw.mimeType !== 'string' ||
+        typeof raw.description !== 'string' ||
+        typeof raw.describedAt !== 'number' ||
+        (raw.status !== 'pending' && raw.status !== 'described' && raw.status !== 'failed') ||
+        typeof raw.addedAt !== 'number'
+      ) {
+        continue;
+      }
+      if (this.items.some((i) => i.id === raw.id)) continue;
+      this.items.push({
+        id: raw.id,
+        kind: raw.kind,
+        mimeType: raw.mimeType,
+        ...(raw.name ? { name: raw.name } : {}),
+        ...(raw.caption ? { caption: raw.caption } : {}),
+        ...(typeof raw.durationSec === 'number' ? { durationSec: raw.durationSec } : {}),
+        ...(typeof raw.turnSeq === 'number' ? { turnSeq: raw.turnSeq } : {}),
+        description: raw.description,
+        describedAt: raw.describedAt,
+        status: raw.status,
+        ...(raw.error ? { error: raw.error } : {}),
+        addedAt: raw.addedAt,
+      });
+      const n = Number(raw.id.replace(/^media-/, ''));
+      if (Number.isFinite(n) && n > this.seq) this.seq = n;
+      restored += 1;
+    }
+    while (this.items.length > this.maxItems) this.items.shift();
+    return restored;
   }
 
   /**

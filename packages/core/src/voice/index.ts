@@ -52,6 +52,7 @@ export type {
   MediaDescriber,
   AttachMediaResult,
   MediaAnswer,
+  RestorableMediaItem,
   VoiceMediaContextOptions,
 } from './mediaContext';
 export {
@@ -69,6 +70,132 @@ export type {
   VoiceSessionV2EventSink,
   VoiceSessionV2Options,
 } from './voiceSessionV2';
+export { VoiceSessionV3 } from './voiceSessionV3';
+export type {
+  VoiceSessionV3Event,
+  VoiceSessionV3EventSink,
+  VoiceSessionV3Options,
+  VoiceSessionV3Stats,
+} from './voiceSessionV3';
+export {
+  SessionCheckpointer,
+  MemoryCheckpointStore,
+  FileCheckpointStore,
+  checkpointMediaItem,
+  isVoiceSessionCheckpoint,
+  defaultVoiceCheckpointsDir,
+  VOICE_CHECKPOINT_VERSION,
+  VOICE_CHECKPOINT_EVERY_TURNS,
+  VOICE_CHECKPOINT_EVERY_MS,
+  VOICE_CHECKPOINT_MAX_HISTORY,
+  VOICE_CHECKPOINT_DEFAULT_MAX_AGE_MS,
+  VOICE_CHECKPOINT_DEFAULT_MAX_FILES,
+} from './sessionCheckpoint';
+export type {
+  VoiceCheckpointReason,
+  CheckpointMediaItem,
+  VoiceSessionCheckpoint,
+  CheckpointStore,
+  CheckpointSources,
+  FileCheckpointStoreOptions,
+  SessionCheckpointerOptions,
+  SessionCheckpointerStats,
+} from './sessionCheckpoint';
+export {
+  ReconnectController,
+  ResilientDialer,
+  buildResumeInstructions,
+  RESILIENCE_DEFAULT_MAX_ATTEMPTS,
+  RESILIENCE_DEFAULT_BASE_DELAY_MS,
+  RESILIENCE_DEFAULT_MAX_DELAY_MS,
+  RESILIENCE_GOAWAY_SOON_SEC,
+  RESILIENCE_GOAWAY_SOON_DELAY_MS,
+  RESILIENCE_GOAWAY_LATER_DELAY_MS,
+} from './sessionResilience';
+export type {
+  ReconnectState,
+  ReconnectEvent,
+  ReconnectEventSink,
+  ReconnectStats,
+  ReconnectControllerOptions,
+  ResilientDialerOptions,
+  ResilientDialResult,
+} from './sessionResilience';
+export {
+  MediaConversation,
+  MockAudioTranscriber,
+  LocalSttAudioTranscriber,
+  createMockAudioTranscriber,
+  audioMediaBytes,
+  stripWavHeader,
+  base64ToBytes,
+  VOICE_AUDIO_MIME_TYPES,
+  VOICE_AUDIO_MAX_BYTES,
+  VOICE_VIDEO_MAX_FRAMES,
+  MEDIA_CONVERSATION_DEFAULT_BUDGET_CHARS,
+  MEDIA_CONVERSATION_MAX_ANSWERS_PER_ITEM,
+} from './mediaConversation';
+export type {
+  VoiceAudioMediaItem,
+  VoiceAudioMediaInput,
+  VoiceVideoFrame,
+  AudioTranscriber,
+  AttachAudioResult,
+  MediaReference,
+  MediaReferenceMatch,
+  MediaConversationOptions,
+  MediaConversationSnapshot,
+} from './mediaConversation';
+export {
+  LocalVoiceEngineRegistry,
+  VoskSttEngine,
+  PiperTtsEngine,
+  CommandSttEngine,
+  CommandTtsEngine,
+  FallbackSttEngine,
+  FallbackTtsEngine,
+  createDefaultLocalVoiceRegistry,
+  detectLocalVoiceEngines,
+  findBinaryOnPath,
+  probeBinaryEngine,
+  defaultCommandRunner,
+  LOCAL_VOICE_ENGINE_TIMEOUT_MS,
+  LOCAL_VOICE_TTS_TIMEOUT_MS,
+  PIPER_PLAYER_CANDIDATES,
+  SYSTEM_TTS_ENGINE_IDS,
+} from './localVoiceEngines';
+export type {
+  VoiceEngineKind,
+  VoiceEngineProbe,
+  VoiceEngineDescriptor,
+  FallbackAttempt,
+  CommandRunResult,
+  CommandRunner,
+  VoskSttEngineOptions,
+  PiperTtsEngineOptions,
+  CommandSttEngineOptions,
+  CommandTtsEngineOptions,
+  LocalVoiceEnginesReport,
+} from './localVoiceEngines';
+export {
+  BargeInV3Controller,
+  isBackchannelTranscript,
+  buildResumePrompt,
+  BACKCHANNEL_WORDS,
+  BARGE_IN_V3_DEFAULT_CONFIRM_MS,
+  BARGE_IN_V3_DEFAULT_BACKCHANNEL_MAX_MS,
+  BARGE_IN_V3_GRACE_STEP_MS,
+  BARGE_IN_V3_GRACE_MIN_MS,
+  BARGE_IN_V3_REPEAT_WINDOW_MS,
+  BARGE_IN_V3_REPEATS_PER_STEP,
+} from './bargeInV3';
+export type {
+  BargeInV3Action,
+  BargeInV3Reason,
+  BargeInV3Decision,
+  BargeInV3Stats,
+  BargeInV3Options,
+} from './bargeInV3';
 export {
   RealtimeClient,
   DEFAULT_MAX_RECONNECT_ATTEMPTS,
@@ -455,3 +582,177 @@ export type {
   WebSocketFactory,
   WebSocketLike,
 } from './types';
+export {
+  validateVoiceProfile,
+  getBuiltinProfile,
+  resolveProfileTtsOptions,
+  resolveProfileSttLanguage,
+  pickProfileForLang,
+  MemoryVoiceProfileStore,
+  FileVoiceProfileStore,
+  defaultVoiceProfilesPath,
+  DEFAULT_VOICE_PROFILES,
+  VOICE_PROFILE_MIN_RATE,
+  VOICE_PROFILE_MAX_RATE,
+  VOICE_PROFILE_MIN_VOLUME,
+  VOICE_PROFILE_MAX_VOLUME,
+  VOICE_PROFILE_MIN_PITCH,
+  VOICE_PROFILE_MAX_PITCH,
+  VOICE_PROFILE_ID_RE,
+  VOICE_PROFILE_LANG_RE,
+  VOICE_PROFILE_MAX_PER_USER,
+} from './voiceProfiles';
+export type {
+  VoiceProfile,
+  VoiceProfileValidationResult,
+  VoiceProfileStoreStats,
+  FileVoiceProfileStoreOptions,
+} from './voiceProfiles';
+export {
+  LiveTranscriptionStream,
+  normalizeTranscriptText,
+  countTranscriptWords,
+  mergeInterimText,
+  LIVE_TRANSCRIPTION_DEFAULT_TURN_GAP_MS,
+  LIVE_TRANSCRIPTION_DEFAULT_MAX_TURN_CHARS,
+  LIVE_TRANSCRIPTION_DEFAULT_MAX_SEGMENTS_PER_TURN,
+} from './liveTranscription';
+export type {
+  LiveTranscriptInput,
+  LiveTranscriptTurn,
+  LiveTranscriptionEvent,
+  LiveTranscriptionEventSink,
+  LiveTranscriptionStats,
+  LiveTranscriptionOptions,
+} from './liveTranscription';
+export {
+  VoiceToolCommander,
+  parseVoiceCommand,
+  isBlockedVoiceIntent,
+  describeVoiceCommand,
+  buildConfirmationPrompt,
+  parseConfirmationAnswer,
+  classifyVoiceToolRisk,
+  isVoiceCallableTool,
+  getVoiceCallableTool,
+  VOICE_TOOL_RISK,
+  VOICE_BLOCKED_INTENT_RES,
+  VOICE_COMMAND_PATTERNS,
+  CONFIRM_YES_WORDS,
+  CONFIRM_NO_WORDS,
+  CONFIRM_HESITATION_PHRASES,
+  VOICE_COMMANDER_DEFAULT_CONFIRM_TIMEOUT_MS,
+  VOICE_COMMANDER_MAX_AUDIT_ENTRIES,
+} from './voiceToolCommander';
+export type {
+  VoiceToolRisk,
+  VoiceToolCommand,
+  VoiceCommandOutcome,
+  VoiceConfirmationOutcome,
+  VoiceToolExecutionResult,
+  VoiceToolExecutor,
+  VoiceToolAuditEntry,
+  VoiceToolCommanderOptions,
+  VoiceToolCommanderStats,
+} from './voiceToolCommander';
+export {
+  FullDuplexVoiceLoop,
+  FULL_DUPLEX_DEFAULT_VAD_THRESHOLD,
+  FULL_DUPLEX_DEFAULT_VAD_HANGOVER_MS,
+  FULL_DUPLEX_DEFAULT_SAMPLE_RATE_HZ,
+  FULL_DUPLEX_DEFAULT_BARGE_IN_ENERGY_THRESHOLD,
+  FULL_DUPLEX_DEFAULT_MAX_USER_SPEECH_MS,
+  FULL_DUPLEX_TOOL_SUMMARY_MAX_CHARS,
+} from './fullDuplexLoop';
+export type {
+  VoiceLoopState,
+  FullDuplexVoiceLoopEvent,
+  FullDuplexVoiceLoopEventSink,
+  FullDuplexVoiceLoopStats,
+  FullDuplexVoiceLoopOptions,
+} from './fullDuplexLoop';
+export {
+  VoiceLatencyPipeline,
+  AdaptiveJitterBuffer,
+  isVoiceLatencyMode,
+  voiceLatencyReportMarkdown,
+  VOICE_LATENCY_STAGES,
+  VOICE_LATENCY_MODES,
+  LATENCY_HISTOGRAM_EDGES_MS,
+  LatencyHistogram,
+} from './latencyPipeline';
+export type {
+  VoiceLatencyStage,
+  VoiceLatencyMode,
+  VoiceLatencyModeConfig,
+  LatencyHistogramSummary,
+  VoiceLatencyStageReport,
+  VoiceLatencyReport,
+  VoiceLatencyPipelineOptions,
+  AdaptiveJitterBufferOptions,
+} from './latencyPipeline';
+export {
+  BargeInV4Controller,
+  buildResumeUtterance,
+  BARGE_IN_V4_DEFAULT_ENERGY_THRESHOLD,
+  BARGE_IN_V4_DEFAULT_DEBOUNCE_FRAMES,
+  BARGE_IN_V4_DEFAULT_DEBOUNCE_WINDOW_MS,
+  BARGE_IN_V4_STOP_BUDGET_MS,
+  BARGE_IN_V4_MAX_PARTIAL_CHARS,
+} from './bargeInV4';
+export type {
+  BargeInV4State,
+  BargeInV4IgnoreReason,
+  BargeInV4Action,
+  BargeInV4Decision,
+  BargeInV4InterruptResult,
+  BargeInV4PartialUtterance,
+  BargeInV4Stats,
+  BargeInV4Options,
+} from './bargeInV4';
+export {
+  VoiceSessionV4,
+  createMockVoiceSessionV4,
+  VOICE_V4_MOCK_REPLY_DELAY_MS,
+} from './voiceSessionV4';
+export type {
+  VoiceV4TurnHistoryEntry,
+  VoiceSessionV4Event,
+  VoiceSessionV4EventSink,
+  VoiceSessionV4Stats,
+  VoiceSessionV4Options,
+} from './voiceSessionV4';
+export {
+  VoiceSessionManagerV2,
+  MemoryVoiceSessionLogStore,
+  FileVoiceSessionLogStore,
+  defaultVoiceSessionLogDir,
+  VOICE_MANAGER_DEFAULT_MAX_CONCURRENT,
+  VOICE_MANAGER_DEFAULT_MAX_RECONNECTS,
+} from './voiceSessionManagerV2';
+export type {
+  ManagedVoiceSessionStatus,
+  VoiceSessionLogKind,
+  VoiceSessionLogEntry,
+  VoiceSessionLogStore,
+  ManagedVoiceSession,
+  VoiceSessionManagerV2Options,
+  VoiceSessionManagerEvent,
+  ManagedVoiceSessionRecord,
+  VoiceSessionManagerStats,
+} from './voiceSessionManagerV2';
+export {
+  runVoiceEval,
+  scoreBargeInLatency,
+  voiceEvalReportMarkdown,
+  VOICE_EVAL_FIXTURE_CASES,
+  VOICE_EVAL_DEFAULT_WER_THRESHOLD,
+  VOICE_EVAL_DEFAULT_STOP_BUDGET_MS,
+} from './voiceEval';
+export type {
+  VoiceEvalCase,
+  VoiceEvalCaseResult,
+  VoiceEvalBargeInReport,
+  VoiceEvalReport,
+  VoiceEvalOptions,
+} from './voiceEval';

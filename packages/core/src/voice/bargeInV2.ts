@@ -295,6 +295,23 @@ export class BargeInController {
     return { measurement, partial };
   }
 
+  /**
+   * Roll back an interrupt decision that was never acted on (v3
+   * soft-interrupt: the user stopped talking during the duck, so
+   * no cancel was ever sent). The in-flight measurement is dropped
+   * without recording it, the interrupt count is unwound, and the
+   * model keeps speaking — as if the decision never happened.
+   * Returns false when no interrupt was in flight.
+   */
+  cancelPendingInterrupt(): boolean {
+    if (!this.interrupting) return false;
+    this.interrupting = false;
+    this.interruptReplyAgeMs = null;
+    this.interruptCount = Math.max(0, this.interruptCount - 1);
+    this.meter.cancel();
+    return true;
+  }
+
   /** Take (and clear) the latest partial turn, if any. */
   takePartialTurn(): PartialModelTurn | null {
     const p = this.partialTurns.pop();

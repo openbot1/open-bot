@@ -247,7 +247,8 @@ export function isVoiceSurface(value: unknown): value is VoiceSurface {
  *  different interaction (short spoken turns, no screen to show a file
  *  diff on), so the model gets this small set — nudge the working agent,
  *  peek at agents/runs/changes, recall/search past text, stay silent,
- *  switch agent, transfer, or hang up. */
+ *  switch agent, transfer, hang up, save a checkpoint, or recall
+ *  attached media. */
 export type VoiceCallToolName =
   | 'nudge'
   | 'peek_agents'
@@ -258,7 +259,9 @@ export type VoiceCallToolName =
   | 'stay_silent'
   | 'switch_agent'
   | 'transfer'
-  | 'end_call';
+  | 'end_call'
+  | 'save_checkpoint'
+  | 'recall_media';
 
 /** Max total chars across all string arguments of one voice-call tool
  *  request. The realtime connection cannot carry large tool results,
@@ -339,6 +342,23 @@ export const VOICE_CALL_TOOL_DEFINITIONS: readonly VoiceCallToolDefinition[] = [
     name: 'end_call',
     description: 'End the voice call.',
     parameters: { reason: { charLimit: 200 } },
+    maxRequestChars: VOICE_CALL_REQUEST_CHAR_LIMIT,
+  },
+  {
+    name: 'save_checkpoint',
+    description:
+      'Save a progress checkpoint of this voice call (transcript, attached media, barge-in history) so the call can resume from here if the connection drops.',
+    parameters: { reason: { charLimit: 200 } },
+    maxRequestChars: VOICE_CALL_REQUEST_CHAR_LIMIT,
+  },
+  {
+    name: 'recall_media',
+    description:
+      'Recall what was shown or played in this call: describe an attached photo, video, or recording by reference ("this photo", "the second image", "that recording").',
+    parameters: {
+      reference: { charLimit: 500, required: true },
+      question: { charLimit: 500 },
+    },
     maxRequestChars: VOICE_CALL_REQUEST_CHAR_LIMIT,
   },
 ];

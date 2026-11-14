@@ -116,8 +116,13 @@ export interface McpServerConfig {
    * per server; default false keeps the legacy handshake. A server
    * that does not know `server/discover` still works — every later
    * request carries `_meta` and needs no session.
+   *
+   * v1.04: `'auto'` (recommended for servers of unknown age) tries
+   * `server/discover` first and falls back to the `initialize`
+   * handshake when the server is pre-2.0 (2025-11-25 or older) —
+   * see `mcp/statelessClient.ts: negotiateStatelessConnection`.
    */
-  stateless?: boolean;
+  stateless?: boolean | 'auto';
   /**
    * v0.40 (P0-4): cấu hình reconnect / resilience từng phần — gộp lên
    * mặc định Grok (`DEFAULT_MCP_RECONNECT_CONFIG` trong client.ts:
@@ -381,6 +386,37 @@ export interface McpClient {
    * `onProgress`) and cancellation via `signal`.
    */
   callTool(name: string, args?: Record<string, unknown>, options?: McpCallToolOptions): Promise<string>;
+  /**
+   * v1.04 (MCP 2.0, MRTR): `tools/call` through as many round trips
+   * as the server asks for (`resultType: needs_input` /
+   * `needs_sampling` / `needs_elicitation` / `needs_roots` /
+   * `needs_confirmation`). Returns the parsed final result plus
+   * how many rounds it took. Optional so minimal clients keep
+   * working; a legacy server answers in one round.
+   */
+  callToolMrtr?(
+    name: string,
+    args?: Record<string, unknown>,
+    handlers?: import('./mrtr').MrtrHandlers,
+    options?: { maxRounds?: number; outputSchema?: unknown },
+  ): Promise<{
+    result: McpToolCallResult;
+    rounds: number;
+    roundTripId?: string;
+    history: import('./mrtr').MrtrRoundRecord[];
+  }>;
+  /**
+   * v1.04: true when this client is speaking stateless MCP 2.0
+   * (every request carries its own `_meta`); false after a
+   * handshake fallback. Set by `connectMcp`, read by the UI.
+   */
+  statelessActive?: boolean;
+  /**
+   * v1.04: how the connection was negotiated (`stateless` vs
+   * `handshake`, which protocol version, whether `'auto'` fell
+   * back). Null before `connectMcp` finishes.
+   */
+  statelessNegotiation?: import('./statelessClient').StatelessNegotiation | null;
   /**
    * MCP `tools/call` with the full structured result (v0.13, W5a):
    * text + validated `structuredContent` + `resourceLinks`.

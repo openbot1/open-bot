@@ -53,6 +53,11 @@ export interface TrackTaskMeta {
   specVersion?: McpTaskSpecVersion;
   /** Khoảng poll mặc định khi server không gợi ý. */
   pollIntervalMs?: number;
+  /**
+   * v1.05: nguồn gốc task — 'client' (mặc định) hay
+   * 'server-directed' (server yêu cầu client tạo task).
+   */
+  origin?: 'client' | 'server-directed';
 }
 
 /** Snapshot hiển thị được của một task (đi qua IPC ra renderer). */
@@ -77,6 +82,18 @@ export interface TaskSnapshot {
   result?: unknown;
   /** Thông báo lỗi (failed / cancelled / timeout / chờ input). */
   error?: string;
+  /**
+   * v1.05: tiến độ 0..1 (khi server báo trong `tasks/get`) — UI
+   * hiện thanh tiến độ.
+   */
+  progress?: number;
+  /** v1.05: ghi chú tiến độ của server. */
+  progressMessage?: string;
+  /**
+   * v1.05: task do client tạo hay do server yêu cầu
+   * (server-directed, xem taskProgress.ts).
+   */
+  origin?: 'client' | 'server-directed';
 }
 
 export type TaskChangeListener = (tasks: TaskSnapshot[]) => void;
@@ -181,6 +198,7 @@ export class McpTaskManager {
         timeoutMs: meta.timeoutMs,
         timedOut: false,
         pollIntervalMs: handle.pollIntervalMs,
+        origin: meta.origin ?? 'client',
       },
       controller: new AbortController(),
       done: Promise.resolve(),
@@ -205,6 +223,12 @@ export class McpTaskManager {
             status,
             pollIntervalMs: data.pollInterval ?? handle.pollIntervalMs,
             ...(data.result !== undefined ? { result: data.result } : {}),
+            // v1.05: tiến độ kèm tasks/get — snapshot giữ lại để UI
+            // hiện thanh tiến độ (data.progress có từ parseTaskHandle).
+            ...(data.progress !== undefined ? { progress: data.progress } : {}),
+            ...(data.progressMessage !== undefined
+              ? { progressMessage: data.progressMessage }
+              : {}),
           });
         },
       });
