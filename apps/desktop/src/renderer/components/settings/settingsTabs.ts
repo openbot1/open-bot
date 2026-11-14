@@ -46,7 +46,8 @@ export type SettingsSectionId =
   | 'crashReports'
   | 'risk'
   | 'notifications'
-  | 'profile';
+  | 'profile'
+  | 'doctor';
 
 export interface SettingsTab {
   id: SettingsTabId;
@@ -82,7 +83,7 @@ export const SETTINGS_TABS: SettingsTab[] = [
   {
     id: 'advanced',
     labelKey: 'settings.tab.advanced',
-    sections: ['dream', 'perf', 'plugins', 'hooks', 'api'],
+    sections: ['dream', 'perf', 'plugins', 'hooks', 'api', 'doctor'],
   },
 ];
 
@@ -123,6 +124,7 @@ export const SECTION_KEYWORDS: Record<SettingsSectionId, string[]> = {
   plugins: ['plugin', 'tiện ích', 'template', 'plugin'],
   hooks: ['hook', 'hooks'],
   api: ['api', 'local api', 'token', 'webhook', 'webhooks', 'port', 'cổng'],
+  doctor: ['doctor', 'sức khoẻ', 'suc khoe', 'kiểm tra', 'health', 'hệ thống', 'he thong', 'chẩn đoán'],
   engines: ['engine', 'engines', 'cli', 'codex', 'claude', 'opencode', 'cursor', 'gemini cli', 'grok', 'acp'],
   providers: ['provider', 'api key', 'khóa api', 'openai', 'anthropic', 'gemini', 'xai', 'ollama', 'base url', 'model', 'deepseek', 'moonshot', 'kimi', 'qwen', 'mistral', 'groq', 'together', 'cohere'],
   mediaKeys: ['media', 'media keys', 'khóa media', 'ảnh', 'video', 'image', 'video generation', 'stability', 'replicate', 'runway', 'luma', 'pika', 'sora'],

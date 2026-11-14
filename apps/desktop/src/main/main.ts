@@ -197,6 +197,7 @@ import {
   loadTeamConfig,
   migrateCredentials,
   ModelRegistry,
+  ModelRefreshService,
   MODELS_FILE,
   newOAuthState,
   OAUTH_PROVIDERS,
@@ -285,10 +286,15 @@ import {
   // Đội D (fleet): tầng fleet đa người dùng — registry + service +
   // audit/decision/usage theo workspace (core vẫn single-user).
   FleetManager,
+  FleetOrchestrator,
   currentOsUser,
   // v1.02 (Team T6): fleet console v2 + per-bot quotas + bot
   // marketplace v2 + plugin catalog (all local-first).
   FleetConsole,
+  BUILTIN_MEMORY_EVAL_DATASET,
+  BUILTIN_MEMORY_EVAL_DATASETS,
+  getBuiltinMemoryEvalDataset,
+  InMemoryMockRetriever,
   addEvalCase,
   bucketEventStream,
   buildFleetBotOverview,
@@ -297,9 +303,11 @@ import {
   cancelPlacement,
   checkBotQuotas,
   checkEntryCompatibility,
+  checkMemoryEvalRegression,
   checkPluginDependencies,
   checkPluginUpdates as checkPluginUpdatesV3,
   claimPlacement,
+  compareMemoryEvalReports,
   createEvalSuite,
   createMarketplaceCollection,
   enqueuePlacement,
@@ -311,10 +319,12 @@ import {
   listMarketplaceEntryVersions,
   listMarketplaceInstalls,
   listMarketplaceInstallsForWorkspace,
+  listMemoryEvalHistory,
   listPluginInstallQueue,
   listPluginRollbacks,
   listPluginRollbacksFor,
   loadBotQuotas,
+  loadFleetPolicyV4,
   loadScheduleQueue,
   mergePluginCatalog,
   planPlacement,
@@ -329,6 +339,8 @@ import {
   removeBotQuota,
   reviewPluginPermissions,
   runEvalSuite,
+  runMemoryEvalSuite,
+  saveFleetPolicyV4,
   scanInstalledPlugins,
   scanPluginTemplatesAsCatalog,
   scoreEvalCase,
@@ -341,6 +353,19 @@ import {
 } from '@open-bot/core';
 // v0.95d4 (Đội D4): user profile + long-term memory (local-first) cho IPC.
 import { loadLocalProfile, LongTermMemory, OllamaEmbeddings, updateLocalProfile } from '@open-bot/core';
+// v1.05 (Đội T3): model refresh + per-bot computer v2 status.
+import {
+  buildBotComputerStatusView,
+  createAnthropicModelFetcher,
+  createGeminiModelFetcher,
+  createOllamaRefreshService,
+  createOpenAiCompatibleModelFetcher,
+  emptyBotComputerUsage,
+  loadBotComputerQuotas,
+  measureDirSizeMb,
+  runDoctorChecks,
+} from '@open-bot/core';
+import type { BotComputerStatusView, DoctorReport, ModelRefreshStatus } from '@open-bot/core';
 // v1.01 (Đội T4): verbatim memory (nguyên văn, local-first) cho IPC `verbatim-memory:*`.
 import {
   openVerbatimStoreForWorkspace,
@@ -388,6 +413,15 @@ import {
   BlockConflictStore,
   findContradictionsBetween,
   formatContradiction,
+} from '@open-bot/core';
+// v1.04 (Đội T1): memory v5 cho IPC `memory-v5:*` — health
+// dashboard + consolidation v2.
+import {
+  computeMemoryHealth,
+  contradictionGroupSummary,
+  queryFactsAtBiTemporal,
+  readConsolidationV2Log,
+  runConsolidationV2,
 } from '@open-bot/core';
 import type { GraphFact } from '@open-bot/core';
 // v1.01 (Đội T5): evolving notes cho IPC `memory-notes:*`.
@@ -1113,6 +1147,29 @@ function initModelRegistry(userDataDir: string): void {
     logger: { warn: (msg: string) => console.warn(`[models] ${msg}`) },
   });
   modelRegistry.load();
+}
+
+// ---------------------------------------------------------------------------
+// v1.05 (Đội T3): Model refresh service — cache + TTL + refresh nền.
+// Tạo lười khi registry đã có; Ollama refresh xong thì model đã pull
+// được đưa vào registry (nhãn "(local)") để picker thấy ngay.
+// ---------------------------------------------------------------------------
+
+let modelRefreshService: ModelRefreshService | null = null;
+let modelAutoRefreshStarted = false;
+
+function getModelRefreshService(): ModelRefreshService | null {
+  if (!modelRegistry) return null;
+  if (!modelRefreshService) {
+    modelRefreshService = createOllamaRefreshService(modelRegistry);
+    // v1.05: tự làm mới danh sách Ollama nền mỗi 30 phút để picker
+    // thấy model mới pull mà không cần mở lại app hay bấm refresh.
+    if (!modelAutoRefreshStarted) {
+      modelAutoRefreshStarted = true;
+      modelRefreshService.startAutoRefresh(['ollama']);
+    }
+  }
+  return modelRefreshService;
 }
 
 // ---------------------------------------------------------------------------
@@ -6397,6 +6454,69 @@ function registerIpc(): void {
     },
   );
 
+  // v1.04 (Đội T1): memory v5 IPC — health dashboard (read) +
+  // consolidation v2 (write: dedupe + ranking supersession + sweep +
+  // dream). Không fact/embedding nào trả về renderer ngoài điểm số
+  // và text đã tổng hợp.
+  ipcMain.handle('memory-v5:health', (_event: unknown, payload: { botId: string }) => {
+    const bot = settings.bots.find((b) => b.id === requireId(payload?.botId, 'botId'));
+    if (!bot) throw new Error('Không tìm thấy bot.');
+    const store = temporalGraphStoreForBot(payload?.botId);
+    const scope = graphScope(payload?.botId);
+    return {
+      health: computeMemoryHealth(store, scope),
+      contradictionGroups: contradictionGroupSummary(store, scope),
+      recentConsolidationRuns: readConsolidationV2Log(workspaceDirFor(bot), 5),
+    };
+  });
+  ipcMain.handle(
+    'memory-v5:consolidate',
+    async (_event: unknown, payload: { botId: string; skipDream?: boolean }) => {
+      const bot = settings.bots.find((b) => b.id === requireId(payload?.botId, 'botId'));
+      if (!bot) throw new Error('Không tìm thấy bot.');
+      const workspaceDir = workspaceDirFor(bot);
+      const store = temporalGraphStoreForBot(payload?.botId);
+      const report = await runConsolidationV2(store, {
+        scope: graphScope(payload?.botId),
+        workspaceDir,
+        actor: 'user:memory-v5-ui',
+        blocksStore: blocksStoreForBot(payload?.botId),
+        ...(payload?.skipDream === true ? { skipDream: true } : {}),
+      });
+      return {
+        healthSummary: report.healthSummary,
+        duplicatesMerged: report.duplicatesMerged,
+        losersSuperseded: report.losersSuperseded,
+        losersDeferred: report.losersDeferred,
+        expiredSwept: report.expiredSwept,
+        orphanEntitiesPruned: report.orphanEntitiesPruned,
+        dreamPromoted: report.dreamPromoted,
+        scoreBefore: report.healthBefore.score,
+        scoreAfter: report.healthAfter.score,
+      };
+    },
+  );
+  ipcMain.handle(
+    'memory-v5:bitemporal',
+    (_event: unknown, payload: { botId: string; at: string; recordedAt?: string }) => {
+      const store = temporalGraphStoreForBot(payload?.botId);
+      const rows = queryFactsAtBiTemporal(store, requireString(payload?.at, 'at'), {
+        scope: graphScope(payload?.botId),
+        ...(payload?.recordedAt ? { recordedAt: payload.recordedAt } : {}),
+        limit: 100,
+      });
+      return rows.map((r) => ({
+        factId: r.fact.id,
+        subjectName: r.subjectName,
+        predicate: r.fact.predicate,
+        objectText: r.fact.objectText ?? '',
+        validFrom: r.fact.validFrom,
+        validUntil: r.fact.validUntil,
+        currentAtRecordTime: r.currentAtRecordTime,
+      }));
+    },
+  );
+
   ipcMain.handle(
     'team:add-member',
     (_event: unknown, payload: { userId: string; name: string; role: TeamRole }) => {
@@ -9620,6 +9740,95 @@ function registerIpc(): void {
     return names;
   });
 
+  // v1.05 (Đội T3): model list tự refresh — picker làm mới danh sách
+  // từ provider mà không cần update app. Ollama qua refresh service
+  // (cache + TTL, model đã pull vào registry); provider API
+  // OpenAI-compatible qua /v1/models khi vault có key (key chỉ dùng
+  // trong main, không bao giờ gửi xuống renderer).
+  ipcMain.handle(
+    'models:refresh',
+    async (
+      _event: unknown,
+      payload?: { providerId?: string },
+    ): Promise<ModelRefreshStatus> => {
+      const providerId = typeof payload?.providerId === 'string' && payload.providerId.trim() !== '' ? payload.providerId.trim() : 'ollama';
+      if (providerId === 'ollama') {
+        const service = getModelRefreshService();
+        if (!service) throw new Error('Model registry chưa khởi động.');
+        await service.refresh('ollama');
+        return service.getStatus('ollama');
+      }
+      const meta = PROVIDERS.find((p) => p.id === providerId);
+      if (!meta) throw new Error(`Provider không rõ "${providerId}".`);
+      const apiKey = vault.getSecret('provider', providerId);
+      if (!apiKey) throw new Error(`Provider "${providerId}" chưa có API key trong Vault.`);
+      // v1.05: Gemini + Anthropic có endpoint riêng; các provider còn
+      // lại dùng /v1/models OpenAI-compatible.
+      const fetcher =
+        providerId === 'gemini'
+          ? createGeminiModelFetcher(meta.defaultBaseUrl, apiKey)
+          : providerId === 'anthropic'
+            ? createAnthropicModelFetcher(apiKey)
+            : createOpenAiCompatibleModelFetcher(meta.defaultBaseUrl, apiKey);
+      const tmp = new ModelRefreshService({
+        fetchers: { [providerId]: fetcher },
+        source: 'provider-api',
+      });
+      await tmp.refresh(providerId);
+      return tmp.getStatus(providerId);
+    },
+  );
+
+  ipcMain.handle(
+    'models:refresh-status',
+    (_event: unknown, payload?: { providerIds?: string[] }): ModelRefreshStatus[] => {
+      const service = getModelRefreshService();
+      const ids = Array.isArray(payload?.providerIds) && payload.providerIds.length > 0 ? payload.providerIds : ['ollama'];
+      return ids.map((id) => (service ? service.getStatus(id) : {
+        providerId: id,
+        modelCount: 0,
+        updatedAt: null,
+        stale: true,
+        refreshing: false,
+      }));
+    },
+  );
+
+  // v1.05 (Đội T3): trạng thái máy-tính-bot theo bot — quota đã đặt
+  // (team-computers.json trong userData) + đĩa workspace đo thật.
+  // Không probe toàn máy ở đây (chậm): levelFeasible = null.
+  ipcMain.handle(
+    'computers:status',
+    (_event: unknown, payload: { botId: string; workspaceDir?: string }): BotComputerStatusView => {
+      if (!payload || typeof payload.botId !== 'string' || payload.botId.trim() === '') {
+        throw new Error('computers:status cần botId.');
+      }
+      const botId = payload.botId.trim();
+      const userDataDir = app.getPath('userData');
+      let quota = null;
+      try {
+        quota = loadBotComputerQuotas(userDataDir).find((q) => q.botId === botId) ?? null;
+      } catch {
+        quota = null;
+      }
+      const workspaceDir = typeof payload.workspaceDir === 'string' && payload.workspaceDir.trim() !== '' ? payload.workspaceDir.trim() : '';
+      const usage = {
+        ...emptyBotComputerUsage(botId),
+        diskMb: workspaceDir ? measureDirSizeMb(workspaceDir) : null,
+      };
+      return buildBotComputerStatusView(botId, quota, usage, null);
+    },
+  );
+
+  // v1.05 (Đội T3): doctor trong app — cùng checks với CLI
+  // (`open-bot doctor`), chạy với userData + Vault thật của desktop.
+  ipcMain.handle('doctor:run', async (): Promise<DoctorReport> => {
+    return runDoctorChecks({
+      dataDir: app.getPath('userData'),
+      hasVaultSecret: (providerId: string) => vault.hasSecret('provider', providerId),
+    });
+  });
+
   ipcMain.handle(
     'models:ollama-pull',
     (_event: unknown, payload: unknown): { ok: boolean; error?: string } => {
@@ -10538,6 +10747,91 @@ function registerIpc(): void {
       if (state) statesByCaseId[caseId] = state;
     }
     return runEvalSuite(suite, statesByCaseId);
+  });
+
+  // v1.05 (Team T6): memory eval v3 — dataset fixture offline + mock
+  // embedding, chạy local, lưu lịch sử vào
+  // <userData>/eval-memory-history.json.
+  ipcMain.handle('memoryEval:history', () => {
+    const history = listMemoryEvalHistory(app.getPath('userData'));
+    const latest = history.length > 0 ? history[history.length - 1] : null;
+    return {
+      runs: history.length,
+      latest,
+      history: history.map((r) => ({
+        at: r.at,
+        retrieverVersion: r.retrieverVersion,
+        f1: r.overall.f1,
+        recall: r.overall.recall,
+        temporalAccuracy: r.overall.temporalAccuracy,
+        multiHopScore: r.overall.multiHopScore,
+        judgeScore: r.overall.judgeScore,
+      })),
+      regressionAlerts: checkMemoryEvalRegression(history),
+    };
+  });
+
+  ipcMain.handle('memoryEval:datasets', () =>
+    BUILTIN_MEMORY_EVAL_DATASETS.map((d) => ({
+      id: d.id,
+      name: d.name,
+      version: d.version,
+      facts: d.facts.length,
+      questions: d.questions.length,
+    })),
+  );
+
+  ipcMain.handle('memoryEval:run', async (_event: unknown, payload: unknown) => {
+    const rec = (payload ?? {}) as Record<string, unknown>;
+    const datasetId = typeof rec.datasetId === 'string' && rec.datasetId.trim() !== '' ? rec.datasetId.trim() : BUILTIN_MEMORY_EVAL_DATASET.id;
+    const dataset = getBuiltinMemoryEvalDataset(datasetId);
+    if (!dataset) throw new Error(`unknown eval dataset: ${datasetId}`);
+    const retriever = new InMemoryMockRetriever(dataset.facts);
+    return runMemoryEvalSuite(app.getPath('userData'), dataset, retriever, {
+      retrieverVersion:
+        typeof rec.retrieverVersion === 'string' && rec.retrieverVersion.trim() !== ''
+          ? rec.retrieverVersion.trim()
+          : 'mock-embedding-v1',
+      ...(typeof rec.topK === 'number' ? { topK: rec.topK } : {}),
+    });
+  });
+
+  ipcMain.handle('memoryEval:compare', (_event: unknown, payload: unknown) => {
+    const rec = (payload ?? {}) as Record<string, unknown>;
+    const history = listMemoryEvalHistory(app.getPath('userData'));
+    if (history.length < 2) {
+      throw new Error(`need at least 2 eval runs to compare (history has ${history.length}).`);
+    }
+    const pick = (idx: number): (typeof history)[number] => {
+      const i = idx < 0 ? history.length + idx : idx;
+      if (!Number.isInteger(i) || i < 0 || i >= history.length) {
+        throw new Error(`no eval run at index ${idx} (history has ${history.length} runs).`);
+      }
+      return history[i];
+    };
+    const baselineIndex = typeof rec.baselineIndex === 'number' ? Math.trunc(rec.baselineIndex) : -2;
+    const currentIndex = typeof rec.currentIndex === 'number' ? Math.trunc(rec.currentIndex) : -1;
+    return compareMemoryEvalReports(pick(baselineIndex), pick(currentIndex));
+  });
+
+  // v1.05 (Team T6): fleet policy v4 — đọc/ghi
+  // <userData>/fleet/fleet-policy-v4.json.
+  ipcMain.handle('fleetV4:policy-get', () =>
+    loadFleetPolicyV4(path.join(app.getPath('userData'), 'fleet')),
+  );
+
+  ipcMain.handle('fleetV4:policy-set', (_event: unknown, payload: unknown) => {
+    const fleetRoot = path.join(app.getPath('userData'), 'fleet');
+    const current = loadFleetPolicyV4(fleetRoot);
+    return saveFleetPolicyV4(fleetRoot, { ...current, ...((payload ?? {}) as Record<string, unknown>) });
+  });
+
+  // v1.05 (Team T6): fleet task queue v4 — durable queue file.
+  ipcMain.handle('fleetV4:tasks-list', () => {
+    const fleetRoot = path.join(app.getPath('userData'), 'fleet');
+    const orchestrator = new FleetOrchestrator({ fleetRoot, policy: loadFleetPolicyV4(fleetRoot) });
+    orchestrator.loadTasks();
+    return orchestrator.listTasks();
   });
 
   // v1.03 (Team T6): event stream — cross-run filter/summary/timeline

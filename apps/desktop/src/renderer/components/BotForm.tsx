@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { AgentTemplateLike, BotConfigLike, ProviderRailView } from '../types';
 import ModelPicker from './ModelPicker';
+import ComputerStatusPanel from './ComputerStatusPanel';
 import { BOT_COLORS, botColor } from './botColors';
 import { useT } from '../i18n/useT';
 
@@ -261,6 +262,12 @@ export default function BotForm({ initial, onSave, onCancel, onOpenEngines }: Pr
             placeholder={t('botForm.workspacePlaceholder')}
           />
         </div>
+
+        {initial?.id && (
+          <div className="field">
+            <ComputerStatusPanel botId={initial.id} workspaceDir={workspaceDir} />
+          </div>
+        )}
 
         <div className="field">
           <label className="row" style={{ gap: 8 }}>

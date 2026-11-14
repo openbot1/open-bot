@@ -93,6 +93,11 @@ import type {
   MemoryV3ConflictView,
   MemoryV3ContradictionView,
   MemoryV3BlockVersionView,
+  // v1.04 (Đội T1): memory v5 views.
+  MemoryV5HealthView,
+  MemoryV5ContradictionGroupView,
+  MemoryV5ConsolidationRunView,
+  MemoryV5BiTemporalRowView,
   // v1.01 (Đội T5): evolving notes views.
   NoteView,
   NoteSearchHitView,
@@ -850,6 +855,54 @@ export interface OpenBotApi {
   setFeatureFlag(payload: { name: string; enabled: boolean }): Promise<unknown>;
   listOllamaModels(): Promise<string[]>;
   pullOllamaModel(model: string): Promise<{ ok: boolean; error?: string }>;
+  // v1.05 (Đội T3): model list tự refresh + trạng thái máy-tính-bot + doctor.
+  refreshModels(payload?: { providerId?: string }): Promise<{
+    providerId: string;
+    modelCount: number;
+    updatedAt: number | null;
+    stale: boolean;
+    refreshing: boolean;
+    lastError?: string;
+  }>;
+  getModelRefreshStatus(payload?: { providerIds?: string[] }): Promise<Array<{
+    providerId: string;
+    modelCount: number;
+    updatedAt: number | null;
+    stale: boolean;
+    refreshing: boolean;
+    lastError?: string;
+  }>>;
+  runDoctor(): Promise<{
+    ok: boolean;
+    summary: { ok: number; warn: number; fail: number };
+    checks: Array<{ id: string; label: string; status: 'ok' | 'warn' | 'fail'; detail: string; hint?: string }>;
+    checkedAt: string;
+    durationMs: number;
+  }>;
+  getComputerStatus(payload: { botId: string; workspaceDir?: string }): Promise<{
+    botId: string;
+    level: string | null;
+    quota: {
+      botId: string;
+      level?: string;
+      cpuCores?: number;
+      memoryMb?: number;
+      diskMb?: number;
+      maxProcesses?: number;
+    } | null;
+    usage: {
+      botId: string;
+      cpuCores: number | null;
+      memoryMb: number | null;
+      diskMb: number | null;
+      processes: number | null;
+      measuredAt: string;
+    };
+    warnings: Array<{ field: string; severity: string; ratio: number; message: string }>;
+    status: 'ok' | 'warn' | 'over';
+    levelFeasible: boolean | null;
+    levelNote?: string;
+  }>;
   // M1: detected CLI engines (Settings → Engines).
   listEngines(): Promise<DetectedEnginesView>;
   redetectEngines(): Promise<DetectedEnginesView>;
@@ -985,6 +1038,10 @@ export interface OpenBotApi {
   listMemoryV3Conflicts(payload: { botId: string; action: string; conflictId?: string; resolution?: string; resolvedText?: string; blockId?: string }): Promise<MemoryV3ConflictView[] | MemoryV3ConflictView>;
   findMemoryV3Contradictions(payload: { botId: string; windowAFrom: string; windowATo: string; windowBFrom: string; windowBTo: string }): Promise<MemoryV3ContradictionView[]>;
   getMemoryV3BlockHistory(payload: { botId: string; action: string; block?: string; version?: number }): Promise<MemoryV3BlockVersionView[] | { id: string; label: string; version: number; content: string }>;
+  // v1.04 (Đội T1): memory v5 — health dashboard + consolidation v2.
+  getMemoryV5Health(payload: { botId: string }): Promise<{ health: MemoryV5HealthView; contradictionGroups: MemoryV5ContradictionGroupView[]; recentConsolidationRuns: MemoryV5ConsolidationRunView[] }>;
+  runMemoryV5Consolidation(payload: { botId: string; skipDream?: boolean }): Promise<{ healthSummary: string; duplicatesMerged: number; losersSuperseded: number; losersDeferred: number; expiredSwept: number; orphanEntitiesPruned: number; dreamPromoted: number; scoreBefore: number; scoreAfter: number }>;
+  queryMemoryV5BiTemporal(payload: { botId: string; at: string; recordedAt?: string }): Promise<MemoryV5BiTemporalRowView[]>;
   // v1.01 (Đội T5): evolving notes.
   listMemoryNotes(payload: { botId: string; status?: string; kind?: string; tag?: string; orphans?: boolean; limit?: number }): Promise<{ notes: NoteView[]; stats: NotesStatsView } | { orphans: NoteView[] }>;
   searchMemoryNotes(payload: { botId: string; query: string; topK?: number }): Promise<{ hits: NoteSearchHitView[] }>;

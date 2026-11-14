@@ -9,6 +9,7 @@
  */
 import TemplatePluginModal from './TemplatePluginModal';
 import HookCommandSection from './HookCommandSection';
+import DoctorPanel from './DoctorPanel';
 import { WEBHOOK_EVENTS } from './SettingsView';
 import type { SettingsSectionId } from './settings/settingsTabs';
 import type { SettingsShared } from './settings/settingsShared';
@@ -328,6 +329,12 @@ export default function SettingsAdvancedTab({ s, onlySections }: Props) {
             ))}
           </div>
           <button className="btn secondary" onClick={() => void addWebhook()}>{t('settings.apiWebhookAdd')}</button>
+        </section>
+      )}
+      {show('doctor') && (
+        <section data-section="doctor" className="card">
+          <h3>{t('settings.doctorTitle')}</h3>
+          <DoctorPanel />
         </section>
       )}
     </>

@@ -47,6 +47,17 @@ import {
   openVerbatimStoreForWorkspace,
   RiskAnalyzer,
   RiskRuleStore,
+  V6RecordStore,
+  exportV6Markdown,
+  exportV6Store,
+  fusedRetrieveV6,
+  getScopedMemory,
+  importV6Store,
+  parseV6ExportFile,
+  recordTimeline,
+  retireRecord,
+  runConsolidationV6,
+  statsMarkdown,
   decideConfirmation,
   getTeamConfigPath,
   loadHeadlessJobFile,
@@ -66,8 +77,30 @@ import {
   validateTeamConfig,
   validateHookCommandEntry,
   validateVisionAttachments,
+  // v1.05 (Đội T3): doctor + team YAML + headless + model refresh.
+  DOCTOR_HEADLESS_PORT,
+  HEADLESS_LOG_FILE,
+  ModelRefreshService,
+  PROVIDERS,
+  applyTeamFile,
+  createAnthropicModelFetcher,
+  createGeminiModelFetcher,
+  createOllamaModelFetcher,
+  createOpenAiCompatibleModelFetcher,
+  diffTeamYaml,
+  diffTeamConfig,
+  doctorExitCode,
+  exportTeamYaml,
+  headlessPidStatus,
+  probeHeadlessHealth,
+  removePidFile,
+  renderDoctorReport,
+  runDoctorChecks,
+  startHeadlessServer,
+  writePidFile,
 } from '@open-bot/core';
 import { createHarnessV2Tools } from '@open-bot/tools';
+import { cmdContext } from './contextCommand';
 import type {
   AgentEvent,
   BotConfig,
@@ -92,6 +125,12 @@ DÙNG:
   open-bot run --job <file.json> [--json] [--export FILE]
   open-bot query --prompt "..." [--provider <id>] [--model <model>] [--system-prompt "..."] [--max-turns N] [--auto-approve] [--mock-response "..."] [--json]
   open-bot team apply <file.json> [--json]
+  open-bot team apply <file.yaml> [--dry-run] [--json]
+  open-bot team export [--out file.yaml] [--json]
+  open-bot team diff <file.yaml|json> [--json]
+  open-bot doctor [--json]
+  open-bot headless start|stop|status|logs [--port N] [--tail N] [--json]
+  open-bot models refresh [--provider <id>|--all] [--json]
   open-bot harness routines list [--json]
   open-bot harness health [--bot <id>] [--json]
   open-bot harness webhook-status [--json]
@@ -122,11 +161,23 @@ DÙNG:
   open-bot memory backfill [--workspace DIR]
   open-bot memory wakeup [--workspace DIR] [--wing W] [--query Q] [--json]
   open-bot memory prune --older-than-days N [--workspace DIR] [--keep-tag TAG] [--json]
+  open-bot memory-v6 append <text> [--kind K] [--key KEY] [--scope run|agent|user|app] [--user U] [--agent A] [--run R] [--app APP] [--json]
+  open-bot memory-v6 search <query> [--limit N] [--user U] [--agent A] [--run R] [--app APP] [--embed] [--json]
+  open-bot memory-v6 recall <key> [--user U] [--agent A] [--run R] [--app APP] [--json]
+  open-bot memory-v6 forget <id> --reason "..." [--json]
+  open-bot memory-v6 stats [--workspace DIR] [--json]
+  open-bot memory-v6 sleep [--max-records N] [--json]
+  open-bot memory-v6 export [--out FILE] [--md] [--workspace DIR]
+  open-bot memory-v6 import <file.json> [--workspace DIR] [--json]
+  open-bot memory-v6 history <id> [--workspace DIR] [--json]
   open-bot hooks list [--json]
   open-bot hooks test <name> [--event <Event>] [--json]
   open-bot hooks log [--limit N] [--summary] [--json]
   open-bot hooks gate [--json]
   open-bot hooks validate [--json]  open-bot --help
+  open-bot context status [--bot <id>] [--workspace DIR] [--json]
+  open-bot context policy [--bot <id>] [--workspace DIR] [--preset NAME] [--set key=value ...] [--json]
+  open-bot context inspect|export|assemble|schedule|restore [--bot <id>] [--workspace DIR] [--json]
 
 LỆNH:
   run           Chạy 1 prompt qua 1 bot, in kết quả ra stdout.
@@ -149,8 +200,27 @@ LỆNH:
                 <dataDir>/routines-v2.json), health (probe CPU/RAM/
                 đĩa/process/heartbeat của computer bot), webhook-status
                 (tóm tắt log delivery webhook đã ký).
-  team apply    Áp dụng cấu hình team từ file JSON: validate rồi ghi
-                <dataDir>/team.json (ghi đè file cũ).
+  team apply    Áp dụng cấu hình team từ file JSON hoặc YAML (v1.05):
+                validate rồi ghi <dataDir>/team.json (ghi đè file cũ).
+                YAML version 1 còn ghi quota máy-tính-bot vào
+                team-computers.json; --dry-run chỉ validate, không ghi.
+  team export   Xuất team hiện có ra YAML (kèm quota computer nếu có),
+                in ra stdout hoặc ghi file với --out.
+  team diff     So sánh file team (YAML/JSON) với team hiện có: liệt kê
+                thành viên/bot/quota thêm, bớt, đổi (chỉ đọc, không ghi).
+  doctor        (v1.05) Kiểm tra sức khoẻ hệ thống: Node, provider đã
+                cấu hình, Ollama local, MCP servers, RAM, ổ đĩa, port
+                headless. Exit 0 khi không có lỗi (cảnh báo vẫn 0),
+                1 khi có check lỗi. --json xuất JSON máy đọc được.
+  headless      (v1.05) Chạy core không cần UI desktop: start (spawn
+                daemon loopback 127.0.0.1:8799, log ra
+                <dataDir>/headless.log), stop, status, logs (in N dòng
+                cuối của log, mặc định 50). Endpoint /health và /status;
+                dừng bằng SIGTERM qua pid file.
+  models refresh (v1.05) Làm mới danh sách model từ provider: Ollama
+                local qua /api/tags; provider OpenAI-compatible qua
+                /v1/models khi có key trong env. Không có key thì bỏ
+                qua provider đó, không fail cả lệnh.
   fleet         Quản lý tầng fleet đa người dùng (đội D): mỗi workspace
                 1 OS user + 1 service + 1 port loopback + thư mục riêng,
                 dữ liệu ở <dataDir>/fleet. Service chỉ bind 127.0.0.1.
@@ -200,6 +270,18 @@ LỆNH:
                 theo từng hook); gate: cấu hình test gate (lệnh kiểm
                 tra chạy khi subagent dừng); validate: kiểm tra cả 2
                 file cấu hình hook và báo mọi lỗi (exit 1 khi có lỗi).
+  context       Context engineering v2 (v1.05): xem/sửa chính sách nén
+                theo bot, xem cây window 1M token, xuất snapshot, ráp
+                prompt từ window, xem lịch nén. State ở
+                <workspace>/context-v2/ (cùng chỗ desktop dùng).
+                status: stats window + policy + lịch nén + báo cáo nén
+                gần nhất. policy: xem policy; --preset chat/coding/
+                long-run/minimal hoặc --set key=value (triggerRatio,
+                maxTier, keepRecentTurns, frequency, keepAnchorKinds).
+                inspect: cây window theo kind. export: snapshot JSON
+                (stdout hoặc --out FILE). assemble: prompt đã ráp
+                (--budget N). schedule: trạng thái scheduler. restore:
+                nạp tiers đã lưu vào window. Không gọi model.
 CỜ CHUNG:
   --data-dir DIR   Thư mục dữ liệu (mặc định env OPENBOT_DATA_DIR, nếu không
                    thì ~/.open-bot). bots.json / team.json / group-chats.json
@@ -744,46 +826,414 @@ async function cmdHarness(sub: string | undefined, positional: string[], flags: 
   return 0;
 }
 
+/**
+ * v1.05 (Đội T3): `open-bot team apply <file.json|yaml> [--dry-run]`.
+ * JSON giữ hành vi cũ; YAML (version 1) apply qua applyTeamFile —
+ * ghi team.json + quota máy-tính-bot (team-computers.json).
+ */
 function cmdTeamApply(positional: string[], flags: CliFlags): number {
   const file = positional[0];
-  if (!file) fail('team apply cần đường dẫn file JSON: open-bot team apply <file.json>.');
+  if (!file) fail('team apply cần đường dẫn file: open-bot team apply <file.json|yaml>.');
   const dataDir = resolveDataDir(flags);
   const asJson = flags['json'] === true;
-  let text: string;
+  const dryRun = flags['dry-run'] === true;
+  let result;
   try {
-    text = fs.readFileSync(path.resolve(file), 'utf8');
+    result = applyTeamFile(path.resolve(file), dataDir, { dryRun });
   } catch (err) {
-    fail(`Không đọc được file team "${file}": ${err instanceof Error ? err.message : String(err)}`);
+    fail(`Không áp dụng được team từ "${file}": cấu hình team không hợp lệ: ${err instanceof Error ? err.message : String(err)}`);
   }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch (err) {
-    fail(`File team "${file}" không phải JSON hợp lệ: ${err instanceof Error ? err.message : String(err)}`);
-  }
-  let team;
-  try {
-    team = validateTeamConfig(parsed);
-  } catch (err) {
-    fail(`Cấu hình team không hợp lệ: ${err instanceof Error ? err.message : String(err)}`);
-  }
-  saveTeamConfig(dataDir, team);
   const output = {
     ok: true,
-    id: team.id,
-    name: team.name,
-    members: team.members.length,
-    sharedBots: team.sharedBots.length,
-    path: getTeamConfigPath(dataDir),
+    dryRun,
+    id: result.team.id,
+    name: result.team.name,
+    members: result.team.members.length,
+    sharedBots: result.team.sharedBots.length,
+    computerQuotas: result.computerQuotas,
+    path: result.teamPath,
   };
   if (asJson) {
     process.stdout.write(`${JSON.stringify(output)}\n`);
   } else {
     process.stdout.write(
-      `Đã áp dụng team "${team.name}" (id ${team.id}): ${team.members.length} thành viên, ${team.sharedBots.length} bot chia sẻ → ${output.path}\n`,
+      dryRun
+        ? `Dry-run OK: team "${result.team.name}" (id ${result.team.id}) hợp lệ — ${result.team.members.length} thành viên, ${result.team.sharedBots.length} bot, ${result.computerQuotas} quota computer (chưa ghi gì).\n`
+        : `Đã áp dụng team "${result.team.name}" (id ${result.team.id}): ${result.team.members.length} thành viên, ${result.team.sharedBots.length} bot chia sẻ, ${result.computerQuotas} quota computer → ${output.path}\n`,
     );
   }
   return 0;
+}
+
+/**
+ * v1.05 (Đội T3): `open-bot team diff <file.yaml|json> [--json]`.
+ * So sánh file team với team hiện có (chỉ đọc, không ghi).
+ */
+function cmdTeamDiff(positional: string[], flags: CliFlags): number {
+  const file = positional[0];
+  if (!file) fail('team diff cần đường dẫn file: open-bot team diff <file.yaml|json>.');
+  const dataDir = resolveDataDir(flags);
+  const asJson = flags['json'] === true;
+  const resolved = path.resolve(file);
+  let text: string;
+  try {
+    text = fs.readFileSync(resolved, 'utf8');
+  } catch (err) {
+    fail(`Không đọc được file team "${file}": ${err instanceof Error ? err.message : String(err)}`);
+  }
+  let diff;
+  try {
+    const lower = resolved.toLowerCase();
+    if (lower.endsWith('.yaml') || lower.endsWith('.yml')) {
+      diff = diffTeamYaml(text, dataDir);
+    } else {
+      const team = validateTeamConfig(JSON.parse(text) as unknown);
+      diff = diffTeamConfig(team, [], dataDir);
+    }
+  } catch (err) {
+    fail(`Không so sánh được team từ "${file}": ${err instanceof Error ? err.message : String(err)}`);
+  }
+  if (asJson) {
+    process.stdout.write(`${JSON.stringify(diff, null, 2)}\n`);
+    return 0;
+  }
+  if (!diff.changed) {
+    process.stdout.write('Team giống hệt team hiện có — không có thay đổi.\n');
+    return 0;
+  }
+  const lines: string[] = ['Thay đổi so với team hiện có:'];
+  for (const m of diff.membersAdded) lines.push(`  + thành viên ${m.userId} (${m.name}, ${m.role})`);
+  for (const m of diff.membersRemoved) lines.push(`  - thành viên ${m.userId} (${m.name}, ${m.role})`);
+  for (const c of diff.membersChanged) {
+    lines.push(`  ~ thành viên ${c.userId}: ${c.before.name}/${c.before.role} → ${c.after.name}/${c.after.role}`);
+  }
+  for (const b of diff.botsAdded) lines.push(`  + bot ${b.botId} (sharedBy ${b.sharedBy ?? ''})`);
+  for (const b of diff.botsRemoved) lines.push(`  - bot ${b.botId}`);
+  for (const c of diff.botsChanged) lines.push(`  ~ bot ${c.botId}: ${c.changes.join('; ')}`);
+  for (const q of diff.quotasAdded) lines.push(`  + quota computer ${q.botId} (${JSON.stringify(q)})`);
+  for (const q of diff.quotasRemoved) lines.push(`  - quota computer ${q.botId}`);
+  for (const c of diff.quotasChanged) lines.push(`  ~ quota computer ${c.botId}: ${c.changes.join('; ')}`);
+  process.stdout.write(`${lines.join('\n')}\n`);
+  return 0;
+}
+
+/**
+ * v1.05 (Đội T3): `open-bot team export [--out file.yaml] [--json]`.
+ * Xuất team hiện có ra YAML (kèm quota computer nếu có).
+ */
+function cmdTeamExport(positional: string[], flags: CliFlags): number {
+  const dataDir = resolveDataDir(flags);
+  const asJson = flags['json'] === true;
+  let yaml: string;
+  try {
+    yaml = exportTeamYaml(dataDir);
+  } catch (err) {
+    fail(`Không xuất được team: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  const outFile = positional[0] ?? (typeof flags['out'] === 'string' ? flags['out'] : undefined);
+  if (outFile) {
+    const target = path.resolve(outFile);
+    try {
+      fs.writeFileSync(target, yaml, 'utf8');
+    } catch (err) {
+      fail(`Không ghi được file "${target}": ${err instanceof Error ? err.message : String(err)}`);
+    }
+    if (asJson) {
+      process.stdout.write(`${JSON.stringify({ ok: true, path: target })}\n`);
+    } else {
+      process.stdout.write(`Đã xuất team ra ${target}\n`);
+    }
+    return 0;
+  }
+  if (asJson) {
+    process.stdout.write(`${JSON.stringify({ ok: true, yaml })}\n`);
+  } else {
+    process.stdout.write(yaml);
+  }
+  return 0;
+}
+
+/**
+ * v1.05 (Đội T3): `open-bot doctor [--json]`.
+ * Chạy kiểm tra sức khoẻ, in báo cáo có màu, exit 0 khi không có
+ * check nào fail, 1 khi có fail (warn vẫn exit 0).
+ */
+async function cmdDoctor(flags: CliFlags): Promise<number> {
+  const asJson = flags['json'] === true;
+  const dataDir = resolveDataDir(flags);
+  const report = await runDoctorChecks({ dataDir });
+  if (asJson) {
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  } else {
+    const useColor = process.stdout.isTTY === true;
+    process.stdout.write(`${renderDoctorReport(report, useColor)}\n`);
+  }
+  return doctorExitCode(report);
+}
+
+/**
+ * v1.05 (Đội T3): `open-bot headless start|stop|status|serve`.
+ * - start: spawn daemon detached (chạy `headless serve`), ghi pid file,
+ *   chờ /health tối đa 5s rồi báo URL.
+ * - serve: (nội bộ, daemon tự chạy) start server loopback + log file.
+ * - stop: SIGTERM theo pid file, chờ tối đa 5s, xoá pid file.
+ * - status: pid còn sống không + /health có trả không.
+ */
+function headlessPort(flags: CliFlags): number {
+  const raw = flags['port'];
+  if (typeof raw !== 'string') return DOCTOR_HEADLESS_PORT;
+  const n = Number.parseInt(raw, 10);
+  return Number.isInteger(n) && n > 0 && n < 65536 ? n : DOCTOR_HEADLESS_PORT;
+}
+
+function headlessLogFile(dataDir: string, flags: CliFlags): string {
+  const raw = flags['log'];
+  if (typeof raw === 'string' && raw.trim() !== '') return path.resolve(raw.trim());
+  return path.join(dataDir, HEADLESS_LOG_FILE);
+}
+
+async function waitForHealth(port: number, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const health = await probeHeadlessHealth('127.0.0.1', port, 1000);
+    if (health) return true;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return false;
+}
+
+async function cmdHeadlessServe(flags: CliFlags): Promise<number> {
+  const dataDir = resolveDataDir(flags);
+  const port = headlessPort(flags);
+  const logFile = headlessLogFile(dataDir, flags);
+  let handle;
+  try {
+    handle = await startHeadlessServer({ port, logFile });
+  } catch (err) {
+    fail(`Không start được headless server: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  writePidFile(dataDir, process.pid);
+  const shutdown = async (): Promise<void> => {
+    await handle.close();
+    removePidFile(dataDir);
+    process.exit(0);
+  };
+  process.on('SIGTERM', () => void shutdown());
+  process.on('SIGINT', () => void shutdown());
+  // Giữ process sống: server http giữ event loop; thêm interval unref
+  // để process không thoát khi không còn connection nào.
+  setInterval(() => undefined, 60_000).unref();
+  return new Promise<number>(() => {
+    // Không resolve — daemon chạy tới khi nhận signal.
+  });
+}
+
+async function cmdHeadless(sub: string | undefined, positional: string[], flags: CliFlags): Promise<number> {
+  const dataDir = resolveDataDir(flags);
+  const asJson = flags['json'] === true;
+  const out = (obj: unknown, text: string): void => {
+    process.stdout.write(asJson ? `${JSON.stringify(obj)}\n` : text);
+  };
+  switch (sub) {
+    case 'serve': {
+      return cmdHeadlessServe(flags);
+    }
+    case 'logs': {
+      const logFile = headlessLogFile(dataDir, flags);
+      const rawTail = flags['tail'];
+      const tailN =
+        typeof rawTail === 'string' && Number.isInteger(Number(rawTail)) && Number(rawTail) > 0
+          ? Number(rawTail)
+          : 50;
+      let text: string;
+      try {
+        text = fs.readFileSync(logFile, 'utf8');
+      } catch {
+        fail(`Chưa có log headless (${logFile}) — server chưa từng chạy.`);
+      }
+      const lines = text.split('\n').filter((l) => l !== '');
+      const tail = lines.slice(-tailN);
+      if (asJson) {
+        process.stdout.write(`${JSON.stringify({ ok: true, path: logFile, lines: tail })}\n`);
+      } else {
+        process.stdout.write(tail.length === 0 ? '(log trống)\n' : `${tail.join('\n')}\n`);
+      }
+      return 0;
+    }
+    case 'start': {
+      const status = headlessPidStatus(dataDir);
+      if (status.status === 'running') {
+        out(
+          { ok: true, alreadyRunning: true, pid: status.pid },
+          `Headless server đã chạy (pid ${status.pid}).\n`,
+        );
+        return 0;
+      }
+      if (status.status === 'stale') removePidFile(dataDir);
+      const port = headlessPort(flags);
+      const logFile = headlessLogFile(dataDir, flags);
+      const script = process.argv[1] ?? path.join(process.cwd(), 'dist', 'cli.js');
+      const { spawn } = await import('node:child_process');
+      const child = spawn(process.execPath, [script, 'headless', 'serve', '--port', String(port), '--log', logFile, '--data-dir', dataDir], {
+        detached: true,
+        stdio: 'ignore',
+      });
+      child.unref();
+      if (!child.pid) fail('Không spawn được headless server.');
+      writePidFile(dataDir, child.pid);
+      // Daemon import cả core (nặng) nên boot có thể mất > 5s trên máy
+      // yếu — chờ tối đa 30s.
+      const up = await waitForHealth(port, 30_000);
+      if (!up) {
+        fail(`Headless server đã spawn (pid ${child.pid}) nhưng không trả /health sau 30s — xem log ${logFile}.`);
+      }
+      out(
+        { ok: true, pid: child.pid, url: `http://127.0.0.1:${port}`, logFile },
+        `Headless server đang chạy: http://127.0.0.1:${port} (pid ${child.pid}, log ${logFile})\n`,
+      );
+      return 0;
+    }
+    case 'stop': {
+      const status = headlessPidStatus(dataDir);
+      if (status.status === 'stopped') {
+        out({ ok: true, stopped: false }, 'Headless server không chạy.\n');
+        return 0;
+      }
+      if (status.status === 'stale') {
+        removePidFile(dataDir);
+        out({ ok: true, stopped: false, stale: true }, `PID file cũ (pid ${status.pid} đã chết) — đã dọn.\n`);
+        return 0;
+      }
+      const pid = status.pid as number;
+      try {
+        process.kill(pid, 'SIGTERM');
+      } catch (err) {
+        fail(`Không dừng được headless server (pid ${pid}): ${err instanceof Error ? err.message : String(err)}`);
+      }
+      const deadline = Date.now() + 5000;
+      let alive = true;
+      while (Date.now() < deadline) {
+        try {
+          process.kill(pid, 0);
+        } catch {
+          alive = false;
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+      removePidFile(dataDir);
+      if (alive) fail(`Headless server (pid ${pid}) không dừng sau 5s — thử kill tay: kill ${pid}.`);
+      out({ ok: true, stopped: true, pid }, `Đã dừng headless server (pid ${pid}).\n`);
+      return 0;
+    }
+    case 'status': {
+      const port = headlessPort(flags);
+      const status = headlessPidStatus(dataDir);
+      const health = await probeHeadlessHealth('127.0.0.1', port);
+      const result = {
+        ok: true,
+        pidStatus: status.status,
+        pid: status.pid,
+        port,
+        running: health !== null,
+        health,
+      };
+      out(
+        result,
+        health
+          ? `Headless server đang chạy: http://127.0.0.1:${port} (pid ${health.pid}, uptime ${health.uptimeSeconds}s, version ${health.version})\n`
+          : status.status === 'running'
+            ? `Headless server có pid ${status.pid} nhưng không trả /health trên port ${port} (có thể chạy port khác — thử --port).\n`
+            : 'Headless server không chạy.\n',
+      );
+      return 0;
+    }
+    case undefined:
+      fail('headless cần subcommand: start | stop | status | logs.');
+      break;
+    default:
+      fail(`Không rõ lệnh headless "${sub}".`);
+      break;
+  }
+  return 0;
+}
+
+/**
+ * v1.05 (Đội T3): `open-bot models refresh [--provider <id>|--all] [--json]`.
+ * Làm mới danh sách model: Ollama local qua /api/tags; provider
+ * OpenAI-compatible qua /v1/models khi có key trong env
+ * (OPENBOT_<PROVIDER>_API_KEY). Provider không có key thì báo skip,
+ * không fail cả lệnh. Không gọi API nào trong test (CLI test dùng
+ * provider mock — xem models-refresh test).
+ */
+const MODELS_REFRESH_COMPATIBLE: readonly string[] = [
+  'openai',
+  'xai',
+  'deepseek',
+  'moonshot',
+  'qwen',
+  'mistral',
+  'groq',
+  'together',
+  'cohere',
+  // v1.05: Gemini + Anthropic có endpoint riêng (không phải /v1/models
+  // OpenAI-compatible) — xử lý riêng dưới đây khi có key.
+  'gemini',
+  'anthropic',
+];
+
+async function cmdModelsRefresh(flags: CliFlags): Promise<number> {
+  const asJson = flags['json'] === true;
+  const requested = typeof flags['provider'] === 'string' ? flags['provider'].trim() : '';
+  const refreshAll = flags['all'] === true || requested === '';
+  const providers = refreshAll ? ['ollama', ...MODELS_REFRESH_COMPATIBLE] : [requested];
+  const fetchers: Record<string, ReturnType<typeof createOllamaModelFetcher>> = {
+    ollama: createOllamaModelFetcher(),
+  };
+  const skipped: string[] = [];
+  for (const providerId of providers) {
+    if (providerId === 'ollama') continue;
+    const meta = PROVIDERS.find((p) => p.id === providerId);
+    if (!meta) {
+      if (!refreshAll) fail(`Provider không rõ "${providerId}".`);
+      skipped.push(providerId);
+      continue;
+    }
+    const apiKey = apiKeyFromEnv(providerId);
+    if (!apiKey) {
+      skipped.push(providerId);
+      continue;
+    }
+    if (providerId === 'gemini') {
+      fetchers[providerId] = createGeminiModelFetcher(meta.defaultBaseUrl, apiKey);
+    } else if (providerId === 'anthropic') {
+      fetchers[providerId] = createAnthropicModelFetcher(apiKey);
+    } else {
+      fetchers[providerId] = createOpenAiCompatibleModelFetcher(meta.defaultBaseUrl, apiKey);
+    }
+  }
+  const service = new ModelRefreshService({ fetchers, source: 'provider-api' });
+  const results = await service.refreshAll(providers.filter((p) => !skipped.includes(p)));
+  const output = {
+    ok: results.every((r) => r.ok),
+    refreshed: results,
+    skipped,
+  };
+  if (asJson) {
+    process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
+  } else {
+    for (const r of results) {
+      if (r.ok) {
+        process.stdout.write(`✓ ${r.providerId}: ${r.models?.length ?? 0} model (đã cập nhật lúc ${new Date().toISOString()})\n`);
+      } else {
+        process.stdout.write(`✗ ${r.providerId}: ${r.error}\n`);
+      }
+    }
+    for (const s of skipped) {
+      process.stdout.write(`- ${s}: bỏ qua (chưa có key OPENBOT_${s.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_API_KEY)\n`);
+    }
+  }
+  return output.ok ? 0 : 1;
 }
 
 /**
@@ -1061,6 +1511,287 @@ async function cmdMemory(sub: string | undefined, positional: string[], flags: C
   } finally {
     await opened.store.close();
   }
+}
+
+/**
+ * Lệnh `memory-v6` (v1.05, Đội T1) — quản lý kho memory v6 từ terminal.
+ * Chỉ đọc/ghi local, không cần key. Semantic search mặc định dùng
+ * TF-IDF local; `--embed` thì dùng Ollama khi chạy (không chạy thì
+ * cảnh báo và fallback về TF-IDF, không fail).
+ *
+ *   open-bot memory-v6 append <text> [--kind K] [--key KEY]
+ *     [--scope run|agent|user|app] [--user U] [--agent A] [--run R]
+ *     [--app APP] [--json]
+ *   open-bot memory-v6 search <query> [--limit N] [--user U]
+ *     [--agent A] [--run R] [--app APP] [--embed] [--json]
+ *   open-bot memory-v6 recall <key> [--user U] [--agent A] [--run R]
+ *     [--app APP] [--json]
+ *   open-bot memory-v6 forget <id> --reason "..." [--json]
+ *   open-bot memory-v6 stats [--json]
+ *   open-bot memory-v6 sleep [--max-records N] [--json]
+ *   open-bot memory-v6 export [--out FILE] [--md]
+ *   open-bot memory-v6 import <file.json> [--json]
+ *   open-bot memory-v6 history <id> [--json]
+ *
+ * `--json` xuất JSON máy đọc được; mặc định in text ngắn gọn.
+ * Ghi (append/forget/sleep/import) hỏi xác nhận? KHÔNG — CLI là
+ * công cụ của user trên máy mình, user gõ lệnh là đã quyết; forget
+ * vẫn cần --reason để audit (add-only: bản ghi không mất, chỉ retire).
+ */
+async function cmdMemoryV6(sub: string | undefined, positional: string[], flags: CliFlags): Promise<number> {
+  const workspaceRaw = flags['workspace'];
+  const workspaceDir =
+    typeof workspaceRaw === 'string' && workspaceRaw.trim() !== ''
+      ? path.resolve(workspaceRaw.trim())
+      : process.cwd();
+  const asJson = flags['json'] === true;
+  const store = V6RecordStore.fromWorkspace(workspaceDir);
+  const flagStr = (name: string): string | undefined => {
+    const value = flags[name];
+    return typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined;
+  };
+  const flagInt = (name: string, def: number, min: number, max: number): number => {
+    const raw = flags[name];
+    if (typeof raw !== 'string') return def;
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+      fail(`--${name} phải là số nguyên ${min}..${max}.`);
+    }
+    return parsed;
+  };
+  const scopeQuery = () => ({
+    ...(flagStr('user') ? { userId: flagStr('user') as string } : {}),
+    ...(flagStr('agent') ? { agentId: flagStr('agent') as string } : {}),
+    ...(flagStr('run') ? { runId: flagStr('run') as string } : {}),
+    ...(flagStr('app') ? { appId: flagStr('app') as string } : {}),
+  });
+  const scopeLevels = ['run', 'agent', 'user', 'app'] as const;
+  const recordKinds = ['fact', 'preference', 'summary', 'episode', 'note'] as const;
+
+  switch (sub) {
+    case 'append': {
+      const text = positional[0];
+      if (text === undefined || text.trim() === '') {
+        fail('memory-v6 append cần text: open-bot memory-v6 append <text>.');
+      }
+      const kindRaw = flagStr('kind') ?? 'fact';
+      if (!(recordKinds as readonly string[]).includes(kindRaw)) {
+        fail(`--kind phải là một trong ${recordKinds.join(', ')}, got "${kindRaw}".`);
+      }
+      const levelRaw = flagStr('scope') ?? 'agent';
+      if (!(scopeLevels as readonly string[]).includes(levelRaw)) {
+        fail(`--scope phải là một trong ${scopeLevels.join(', ')}, got "${levelRaw}".`);
+      }
+      const userId = flagStr('user') ?? '';
+      const agentId = flagStr('agent') ?? '';
+      const runId = flagStr('run') ?? '';
+      const appId = flagStr('app') ?? '';
+      const scope =
+        levelRaw === 'run'
+          ? { userId, agentId, runId, appId }
+          : levelRaw === 'agent'
+            ? { userId, agentId, runId: '', appId }
+            : levelRaw === 'user'
+              ? { userId, agentId: '', runId: '', appId }
+              : { userId: '', agentId: '', runId: '', appId };
+      const view = store.append({
+        kind: kindRaw as (typeof recordKinds)[number],
+        ...(flagStr('key') ? { key: flagStr('key') as string } : {}),
+        text: text.trim(),
+        scope,
+        source: { type: 'tool', ref: 'cli:memory-v6-append', sourceText: text.trim() },
+      });
+      if (asJson) {
+        process.stdout.write(`${JSON.stringify(view, null, 2)}\n`);
+      } else {
+        process.stdout.write(
+          `Đã ghi memory v6: ${view.id} (v${view.version}, scope ${levelRaw}, ${view.status}).\n`,
+        );
+      }
+      return 0;
+    }
+    case 'search': {
+      const query = positional[0];
+      if (query === undefined || query.trim() === '') {
+        fail('memory-v6 search cần query: open-bot memory-v6 search <query>.');
+      }
+      const limit = flagInt('limit', 10, 1, 50);
+      let embedder: OllamaEmbeddings | undefined;
+      if (flags['embed'] === true) {
+        embedder = new OllamaEmbeddings();
+        if (!(await embedder.isAvailable())) {
+          process.stderr.write('open-bot: cảnh báo: Ollama chưa chạy — tìm bằng TF-IDF local.\n');
+          embedder = undefined;
+        }
+      }
+      const hits = await fusedRetrieveV6(store, query.trim(), {
+        scope: scopeQuery(),
+        topK: limit,
+        ...(embedder !== undefined ? { embedder } : {}),
+      });
+      if (asJson) {
+        process.stdout.write(
+          `${JSON.stringify(
+            hits.map((h) => ({
+              id: h.record.id,
+              text: h.record.text,
+              kind: h.record.kind,
+              scopeLevel: h.scopeLevel,
+              bucket: h.temporal.bucket,
+              score: h.breakdown.final,
+              breakdown: h.breakdown,
+            })),
+            null,
+            2,
+          )}\n`,
+        );
+      } else if (hits.length === 0) {
+        process.stdout.write('Không tìm thấy memory v6 nào.\n');
+      } else {
+        for (const hit of hits) {
+          process.stdout.write(
+            `• [${hit.breakdown.final.toFixed(3)}] ${hit.scopeLevel}/${hit.temporal.bucket} — ${hit.record.text}\n`,
+          );
+        }
+      }
+      return 0;
+    }
+    case 'recall': {
+      const key = positional[0];
+      if (key === undefined || key.trim() === '') {
+        fail('memory-v6 recall cần key: open-bot memory-v6 recall <key>.');
+      }
+      const winner = getScopedMemory(store, scopeQuery(), key.trim());
+      if (!winner) {
+        if (asJson) {
+          process.stdout.write(`${JSON.stringify({ key: key.trim(), found: false }, null, 2)}\n`);
+        } else {
+          process.stdout.write(`Không có memory v6 nào cho key "${key.trim()}".\n`);
+        }
+        return 0;
+      }
+      if (asJson) {
+        process.stdout.write(`${JSON.stringify(winner, null, 2)}\n`);
+      } else {
+        process.stdout.write(`${winner.text}\n(scope ${winner.scope.agentId !== '' ? 'agent' : winner.scope.userId !== '' ? 'user' : 'app'}, v${winner.version})\n`);
+      }
+      return 0;
+    }
+    case 'forget': {
+      const id = positional[0];
+      if (id === undefined || id.trim() === '') {
+        fail('memory-v6 forget cần id: open-bot memory-v6 forget <id> --reason "...".');
+      }
+      const reason = flagStr('reason');
+      if (!reason) {
+        fail('memory-v6 forget cần --reason "..." (để audit — bản ghi không mất, chỉ retire).');
+      }
+      const event = retireRecord(store, id.trim(), 'cli:memory-v6-forget', reason);
+      if (asJson) {
+        process.stdout.write(
+          `${JSON.stringify({ id: id.trim(), status: 'retired', eventSeq: event.seq }, null, 2)}\n`,
+        );
+      } else {
+        process.stdout.write(`Đã retire memory v6 ${id.trim()} (lịch sử vẫn còn).\n`);
+      }
+      return 0;
+    }
+    case 'stats': {
+      const stats = store.stats();
+      if (asJson) {
+        process.stdout.write(`${JSON.stringify(stats, null, 2)}\n`);
+      } else {
+        process.stdout.write(statsMarkdown(store, stats));
+        process.stdout.write('\n');
+      }
+      return 0;
+    }
+    case 'sleep': {
+      const maxRecords = flagInt('max-records', 500, 1, 100000);
+      const report = runConsolidationV6(store, {
+        config: { maxRecordsPerRun: maxRecords },
+        actor: 'cli:memory-v6-sleep',
+      });
+      if (asJson) {
+        process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+      } else {
+        process.stdout.write(
+          `Sleep v6: xem ${report.examined} bản, dedupe chính xác ${report.dedupedExact}, ` +
+            `near-dup ${report.dedupedNear}, tóm tắt ${report.summarizedClusters} cụm, ` +
+            `quarantine ${report.quarantined} (${report.durationMs}ms${report.stoppedByBudget ? ', dừng sớm vì hết ngân sách' : ''}).\n`,
+        );
+      }
+      return 0;
+    }
+    case 'export': {
+      const outRaw = flagStr('out');
+      if (flags['md'] === true) {
+        const md = exportV6Markdown(store);
+        if (outRaw) {
+          fs.writeFileSync(path.resolve(outRaw), md, 'utf8');
+          process.stdout.write(`Đã export Markdown memory v6 ra ${path.resolve(outRaw)}.\n`);
+        } else {
+          process.stdout.write(`${md}\n`);
+        }
+        return 0;
+      }
+      const data = exportV6Store(store);
+      if (outRaw) {
+        fs.writeFileSync(path.resolve(outRaw), JSON.stringify(data, null, 2), 'utf8');
+        process.stdout.write(`Đã export memory v6 ra ${path.resolve(outRaw)} (${data.recordCount} bản ghi, ${data.eventCount} event).\n`);
+      } else {
+        process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
+      }
+      return 0;
+    }
+    case 'import': {
+      const fileRaw = positional[0];
+      if (fileRaw === undefined || fileRaw.trim() === '') {
+        fail('memory-v6 import cần file: open-bot memory-v6 import <file.json>.');
+      }
+      const raw = fs.readFileSync(path.resolve(fileRaw.trim()), 'utf8');
+      const data = parseV6ExportFile(raw);
+      const report = importV6Store(store, data);
+      if (asJson) {
+        process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+      } else {
+        process.stdout.write(
+          `Import memory v6: đọc ${report.readRecords} bản ghi, import ${report.importedRecords}, ` +
+            `trùng ${report.skippedDuplicateRecords}, không hợp lệ ${report.skippedInvalidRecords}; ` +
+            `event import ${report.importedEvents}, bỏ qua ${report.skippedOrphanEvents}.\n`,
+        );
+        if (report.errors.length > 0) {
+          process.stdout.write(`Lỗi: ${report.errors.slice(0, 5).join('; ')}\n`);
+        }
+      }
+      return 0;
+    }
+    case 'history': {
+      const id = positional[0];
+      if (id === undefined || id.trim() === '') {
+        fail('memory-v6 history cần id: open-bot memory-v6 history <id>.');
+      }
+      const steps = recordTimeline(store, id.trim());
+      if (steps.length === 0) {
+        fail(`Không tìm thấy bản ghi memory v6: ${id.trim()}.`);
+      }
+      if (asJson) {
+        process.stdout.write(`${JSON.stringify({ id: id.trim(), steps }, null, 2)}\n`);
+      } else {
+        for (const step of steps) {
+          process.stdout.write(`• [${step.at.slice(0, 19)}] ${step.kind} — ${step.label}\n`);
+        }
+      }
+      return 0;
+    }
+    case undefined:
+      fail('memory-v6 cần subcommand: append | search | recall | forget | stats | sleep | export | import | history.');
+      break;
+    default:
+      fail(`Không rõ lệnh memory-v6 "${sub}".`);
+      break;
+  }
+  return 0;
 }
 
 /**
@@ -1379,14 +2110,38 @@ async function main(argv: string[]): Promise<number> {
   if (cmd === 'team' && sub === 'apply') {
     return cmdTeamApply(positional.slice(2), flags);
   }
+  if (cmd === 'team' && sub === 'export') {
+    return cmdTeamExport(positional.slice(2), flags);
+  }
+  if (cmd === 'team' && sub === 'diff') {
+    return cmdTeamDiff(positional.slice(2), flags);
+  }
   if (cmd === 'team') {
-    fail('team chỉ hỗ trợ "apply": open-bot team apply <file.json>.');
+    fail('team chỉ hỗ trợ "apply", "export" và "diff": open-bot team apply <file.json|yaml> | open-bot team export [--out file.yaml] | open-bot team diff <file.yaml|json>.');
+  }
+  if (cmd === 'doctor') {
+    return cmdDoctor(flags);
+  }
+  if (cmd === 'headless') {
+    return cmdHeadless(sub, positional.slice(2), flags);
+  }
+  if (cmd === 'models' && sub === 'refresh') {
+    return cmdModelsRefresh(flags);
+  }
+  if (cmd === 'models') {
+    fail('models chỉ hỗ trợ "refresh": open-bot models refresh [--provider <id>|--all] [--json].');
   }
   if (cmd === 'memory-mcp') {
     return cmdMemoryMcp(flags);
   }
   if (cmd === 'memory') {
     return cmdMemory(sub, positional.slice(2), flags);
+  }
+  if (cmd === 'memory-v6') {
+    return cmdMemoryV6(sub, positional.slice(2), flags);
+  }
+  if (cmd === 'context') {
+    return cmdContext(sub, flags);
   }
   process.stdout.write(HELP);
   return fail(`Không rõ lệnh "${cmd}".`, 1);

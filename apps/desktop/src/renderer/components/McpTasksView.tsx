@@ -15,6 +15,16 @@ const STATUS_KEYS: Record<McpTaskStatusView, string> = {
   cancelled: 'mcpTasks.status.cancelled',
 };
 
+const ORIGIN_KEYS: Record<NonNullable<McpTaskViewLike['origin']>, string> = {
+  client: 'mcpTasks.origin.client',
+  'server-directed': 'mcpTasks.origin.serverDirected',
+};
+
+function formatProgress(task: McpTaskViewLike): string | null {
+  if (task.progress === undefined) return null;
+  return `${Math.round(Math.max(0, Math.min(1, task.progress)) * 100)}%`;
+}
+
 function isActive(task: McpTaskViewLike): boolean {
   return task.status === 'working' || task.status === 'input_required';
 }
@@ -124,7 +134,37 @@ export default function McpTasksView({ onBack }: Props) {
                 {t('mcpTasks.method', { name: task.method })} ·{' '}
                 {t('mcpTasks.elapsed', { time: formatElapsed(task, now) })} ·{' '}
                 {t('mcpTasks.pollInterval', { ms: String(task.pollIntervalMs) })}
+                {task.origin !== undefined ? ` · ${t(ORIGIN_KEYS[task.origin])}` : ''}
               </p>
+              {formatProgress(task) !== null && (
+                <div style={{ marginTop: 8 }}>
+                  <div
+                    style={{
+                      height: 8,
+                      borderRadius: 4,
+                      background: 'var(--bg-dim)',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: '100%',
+                        width: formatProgress(task) as string,
+                        background: 'var(--accent, #4a90d9)',
+                      }}
+                    />
+                  </div>
+                  <p style={{ margin: '4px 0 0', color: 'var(--text-dim)' }}>
+                    {t('mcpTasks.progress', { percent: formatProgress(task) as string })}
+                    {task.progressMessage ? ` — ${task.progressMessage}` : ''}
+                  </p>
+                </div>
+              )}
+              {task.status === 'input_required' && (
+                <p style={{ margin: '6px 0 0', color: 'var(--text-dim)' }}>
+                  {t('mcpTasks.inputRequiredHint')}
+                </p>
+              )}
               <p style={{ margin: '4px 0 0', color: 'var(--text-dim)' }}>
                 {task.timeoutMs !== undefined
                   ? t('mcpTasks.timeout', { seconds: String(Math.round(task.timeoutMs / 1000)) })

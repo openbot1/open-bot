@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { PermissionReviewView, PluginCatalogEntryView } from '../types';
+import type {
+  PermissionReviewView,
+  PluginCatalogEntryView,
+  PluginDependencyCheckView,
+  PluginUpdateInfoView,
+  QueuedPluginInstallView,
+} from '../types';
 import { useT } from '../i18n/useT';
 
 /**
@@ -55,20 +61,35 @@ export default function PluginMarketplaceView({ onBack }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // v1.03 (Team T6): updates, dependency checks, install queue.
+  const [updates, setUpdates] = useState<PluginUpdateInfoView[]>([]);
+  const [depChecks, setDepChecks] = useState<PluginDependencyCheckView[]>([]);
+  const [queue, setQueue] = useState<QueuedPluginInstallView[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const catalog = await callOpenBot<PluginCatalogEntryView[]>(
-        'plugin-marketplace:catalog',
-        'listPluginMarketplaceCatalog',
-      );
+      const [catalog, ups, deps, q] = await Promise.all([
+        callOpenBot<PluginCatalogEntryView[]>(
+          'plugin-marketplace:catalog',
+          'listPluginMarketplaceCatalog',
+        ),
+        callOpenBot<PluginUpdateInfoView[]>('plugin-marketplace-v3:updates', 'listPluginUpdates'),
+        callOpenBot<PluginDependencyCheckView[]>(
+          'plugin-marketplace-v3:dependencies',
+          'listPluginDependencyChecks',
+        ),
+        callOpenBot<QueuedPluginInstallView[]>('plugin-marketplace-v3:queue', 'listPluginInstallQueue'),
+      ]);
       if (!catalog) {
         setError(t('pluginMarketplace.loadError'));
         return;
       }
       setEntries(catalog);
+      if (ups) setUpdates(ups);
+      if (deps) setDepChecks(deps);
+      if (q) setQueue(q);
     } catch (err) {
       setError((err as Error).message || t('pluginMarketplace.loadError'));
     } finally {
@@ -177,6 +198,46 @@ export default function PluginMarketplaceView({ onBack }: Props) {
       {notice && <p style={{ color: '#080' }}>{notice}</p>}
       {actionError && <p style={{ color: '#c00' }}>{actionError}</p>}
 
+      {!loading && !error && updates.some((u) => u.updateAvailable) && (
+        <div style={{ border: '1px solid #c80', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+          <strong>{t('pluginMarketplace.updatesAvailable')}</strong>
+          {updates
+            .filter((u) => u.updateAvailable)
+            .map((u) => (
+              <div key={u.entryId} style={{ fontSize: 14, marginTop: 4 }}>
+                {u.name}: v{u.installedVersion} → v{u.latestVersion}
+              </div>
+            ))}
+        </div>
+      )}
+
+      {!loading && !error && depChecks.some((d) => !d.satisfied) && (
+        <div style={{ border: '1px solid #c00', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+          <strong>{t('pluginMarketplace.missingDeps')}</strong>
+          {depChecks
+            .filter((d) => !d.satisfied)
+            .map((d) => (
+              <div key={d.entryId} style={{ fontSize: 14, marginTop: 4 }}>
+                {d.entryId}: {t('pluginMarketplace.missingDepsDetail', { deps: d.missing.join(', ') })}
+              </div>
+            ))}
+        </div>
+      )}
+
+      {!loading && !error && queue.filter((q) => q.status === 'queued' || q.status === 'installing').length > 0 && (
+        <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+          <strong>{t('pluginMarketplace.installQueue')}</strong>
+          {queue
+            .filter((q) => q.status === 'queued' || q.status === 'installing')
+            .map((q) => (
+              <div key={q.id} style={{ fontSize: 14, marginTop: 4 }}>
+                {q.pluginId} — {q.status}
+                {q.error ? ` (${q.error})` : ''}
+              </div>
+            ))}
+        </div>
+      )}
+
       {!loading && !error && filtered.length === 0 && <p>{t('pluginMarketplace.noResults')}</p>}
       {!loading &&
         !error &&
@@ -197,6 +258,12 @@ export default function PluginMarketplaceView({ onBack }: Props) {
               <span style={{ color: '#666', fontSize: 13 }}>
                 {t('pluginMarketplace.version', { version: entry.version })} ·{' '}
                 {entry.source === 'installed' ? t('pluginMarketplace.installed') : t('pluginMarketplace.available')}
+                {(() => {
+                  const update = updates.find((u) => u.entryId === entry.id && u.updateAvailable);
+                  return update
+                    ? ` · ${t('pluginMarketplace.updateAvailableShort', { version: update.latestVersion })}`
+                    : '';
+                })()}
               </span>
             </div>
             <p style={{ margin: '4px 0', color: '#444' }}>{entry.description}</p>

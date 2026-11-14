@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { BotConfigLike, MarketplaceV2EntryView } from '../types';
+import type {
+  BotConfigLike,
+  FleetStatusView,
+  MarketplaceCollectionView,
+  MarketplaceEntryVersionView,
+  MarketplaceV2EntryView,
+} from '../types';
 import { useT } from '../i18n/useT';
 
 /**
@@ -52,17 +58,33 @@ export default function BotMarketplaceView({ onBack, onBotInstalled }: Props) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [ratingId, setRatingId] = useState<string | null>(null);
+  // v1.03 (Team T6): collections, version history, install to a fleet workspace.
+  const [collections, setCollections] = useState<MarketplaceCollectionView[]>([]);
+  const [workspaces, setWorkspaces] = useState<FleetStatusView[]>([]);
+  const [installWorkspaceId, setInstallWorkspaceId] = useState('');
+  const [versionsByEntry, setVersionsByEntry] = useState<Record<string, MarketplaceEntryVersionView[]>>({});
+  const [expandedVersionsId, setExpandedVersionsId] = useState<string | null>(null);
+  const [installingCollectionId, setInstallingCollectionId] = useState<string | null>(null);
 
   const loadCatalog = useCallback(async () => {
     try {
-      const catalog = await callOpenBot<MarketplaceV2EntryView[]>('marketplace-v2:catalog', 'listMarketplaceV2');
+      const [catalog, cols, fleet] = await Promise.all([
+        callOpenBot<MarketplaceV2EntryView[]>('marketplace-v2:catalog', 'listMarketplaceV2'),
+        callOpenBot<MarketplaceCollectionView[]>('marketplace-v3:collections', 'listMarketplaceCollections'),
+        callOpenBot<FleetStatusView[]>('fleet:list', 'listFleet'),
+      ]);
       if (catalog) {
         setCategories([...new Set(catalog.map((e) => e.category))].sort());
+      }
+      if (cols) setCollections(cols);
+      if (fleet) {
+        setWorkspaces(fleet);
+        if (!installWorkspaceId && fleet.length > 0) setInstallWorkspaceId(fleet[0].workspace.id);
       }
     } catch {
       // Categories are best-effort; search still works without them.
     }
-  }, []);
+  }, [installWorkspaceId]);
 
   const search = useCallback(async () => {
     setLoading(true);
@@ -135,6 +157,69 @@ export default function BotMarketplaceView({ onBack, onBotInstalled }: Props) {
     }
   }
 
+  async function handleToggleVersions(entry: MarketplaceV2EntryView) {
+    if (expandedVersionsId === entry.id) {
+      setExpandedVersionsId(null);
+      return;
+    }
+    setExpandedVersionsId(entry.id);
+    if (versionsByEntry[entry.id]) return;
+    try {
+      const versions = await callOpenBot<MarketplaceEntryVersionView[]>(
+        'marketplace-v3:versions',
+        'listMarketplaceEntryVersions',
+        entry.id,
+      );
+      if (versions) setVersionsByEntry((prev) => ({ ...prev, [entry.id]: versions }));
+    } catch {
+      setVersionsByEntry((prev) => ({ ...prev, [entry.id]: [] }));
+    }
+  }
+
+  async function handleInstallToWorkspace(entry: MarketplaceV2EntryView) {
+    if (!installWorkspaceId) return;
+    setActionError(null);
+    setNotice(null);
+    setInstallingId(entry.id);
+    try {
+      const result = await callOpenBot<{ config: BotConfigLike }>(
+        'marketplace-v3:install-to-workspace',
+        'installMarketplaceToWorkspace',
+        { entryId: entry.id, workspaceId: installWorkspaceId },
+      );
+      if (!result) throw new Error(t('botMarketplace.installError'));
+      setNotice(t('marketplace.installedOk', { name: entry.name }));
+      onBotInstalled(result.config);
+      await search();
+    } catch (err) {
+      setActionError((err as Error).message || t('botMarketplace.installError'));
+    } finally {
+      setInstallingId(null);
+    }
+  }
+
+  async function handleInstallCollection(collection: MarketplaceCollectionView) {
+    setActionError(null);
+    setNotice(null);
+    setInstallingCollectionId(collection.id);
+    try {
+      let installed = 0;
+      for (const entryId of collection.entryIds) {
+        const bot = await callOpenBot<BotConfigLike>('marketplace-v2:install', 'installMarketplaceV2', entryId);
+        if (bot) {
+          installed += 1;
+          onBotInstalled(bot);
+        }
+      }
+      setNotice(t('botMarketplace.collectionInstalled', { name: collection.name, count: installed }));
+      await search();
+    } catch (err) {
+      setActionError((err as Error).message || t('botMarketplace.installError'));
+    } finally {
+      setInstallingCollectionId(null);
+    }
+  }
+
   return (
     <div>
       <div className="row" style={{ alignItems: 'center', gap: 8 }}>
@@ -147,6 +232,32 @@ export default function BotMarketplaceView({ onBack, onBotInstalled }: Props) {
         </button>
       </div>
       <p style={{ color: '#666', marginTop: 4 }}>{t('botMarketplace.subtitle')}</p>
+
+      {collections.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <h3 style={{ margin: '0 0 8px' }}>{t('botMarketplace.collections')}</h3>
+          {collections.map((collection) => (
+            <div key={collection.id} style={{ border: '1px solid #ddd', borderRadius: 8, padding: 10, marginBottom: 8 }}>
+              <div className="row" style={{ justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                <div>
+                  <strong>{collection.name}</strong>{' '}
+                  <span style={{ color: '#666', fontSize: 13 }}>
+                    {t('botMarketplace.collectionEntries', { count: collection.entryIds.length })}
+                    {collection.description ? ` — ${collection.description}` : ''}
+                  </span>
+                </div>
+                <button
+                  className="btn secondary"
+                  disabled={installingCollectionId === collection.id}
+                  onClick={() => void handleInstallCollection(collection)}
+                >
+                  {t('botMarketplace.installCollection')}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="row" style={{ gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <input
@@ -227,6 +338,43 @@ export default function BotMarketplaceView({ onBack, onBotInstalled }: Props) {
                 </button>
               ))}
             </div>
+            <div className="row" style={{ gap: 8, marginTop: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <button className="btn secondary" onClick={() => void handleToggleVersions(entry)}>
+                {t('botMarketplace.versions')}
+              </button>
+              {workspaces.length > 0 && (
+                <>
+                  <label style={{ fontSize: 13 }}>
+                    {t('botMarketplace.installToWorkspace')}{' '}
+                    <select value={installWorkspaceId} onChange={(e) => setInstallWorkspaceId(e.target.value)}>
+                      {workspaces.map((ws) => (
+                        <option key={ws.workspace.id} value={ws.workspace.id}>
+                          {ws.workspace.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    className="btn secondary"
+                    disabled={installingId === entry.id || !installWorkspaceId}
+                    onClick={() => void handleInstallToWorkspace(entry)}
+                  >
+                    {t('botMarketplace.installToWorkspaceButton')}
+                  </button>
+                </>
+              )}
+            </div>
+            {expandedVersionsId === entry.id && (
+              <div style={{ marginTop: 8, fontSize: 13, color: '#555' }}>
+                {(versionsByEntry[entry.id] ?? []).length === 0 && <div>{t('botMarketplace.noVersions')}</div>}
+                {(versionsByEntry[entry.id] ?? []).map((v) => (
+                  <div key={v.version}>
+                    <strong>v{v.version}</strong> · {new Date(v.at).toLocaleDateString()}
+                    {v.changelog ? ` — ${v.changelog}` : ''}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ))}
     </div>

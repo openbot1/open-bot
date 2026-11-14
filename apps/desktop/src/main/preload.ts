@@ -5,7 +5,7 @@
  * KHÔNG expose ipcRenderer trực tiếp, KHÔNG expose API key hay Node API.
  */
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AppliedPluginTemplate, A2aPersistStatus, AppSnapshot, AgUiEvent, AgUiRunState, AppStatusView, AuditEvent, AuditVerifyResult, AutoApproveRule, AutoApproveRuleInput, BotConfig, BotQuota, CanvasDocument, CanvasSummary, Channel, ChannelKind, ChannelMessage, ChannelResponderRules, ComposioPollStatus, ComposioStateView, ComposioToolkitConnection, ComputerBackend, ComputerPlan, ComputerSchedulerState, ComputerStatusView, CreateFleetWorkspaceInput, CreatePluginTemplateInput, CrashReport, CrashReportSummary, DeepLinkRoute, FleetBotOverview, FleetCapacityCheck, FleetConsoleRole, FleetConsoleUser, FleetDecision, FleetRole, FleetStatusView, FleetUsageSummary, FleetWorkspace, GroupBotInterruptedEntry, GroupBotStatusEntry, GroupChat, GroupMessage, GuestAgentHealth, HarnessEvent, HarnessStatusResult, HarnessThreadLogResult, ListBotSkillsResult, ListBotToolsResult, LocalProfile, LongTermMemoryEntry, MachineProfile, MarketplaceV2Entry, McpAppDefinition, MemoryBlock, OnePasswordBrokerStatus, OpenAppInput, PermissionReview, PluginCatalogEntry, PluginTemplate, QuotaAlert, SetBotSkillEnabledResult, SetBotToolEnabledResult, TaskSnapshot, TeamBundle, ThreadItem, ThreadSearchHit, VerbatimRecord, VisionAttachment, RouterConfig, RouterStats, RouterTarget, RoutingDecision, RouterCliStatus, GetRouterConfigResult, GetRouterDecisionsResult, GetRouterStatsResult, GetRouterTargetsResult, RunLogMeta, RunEventQuery, RunLogVerification, AuditIntegrityReport, PauseResumeResult, ForkRunResult, ReplayedRunState, AnyRunEvent, FleetOverview, PlacementPlan, QueuedPlacement, MarketplaceCollection, MarketplaceEntryVersion, MarketplaceInstallRecord, PluginUpdateInfo, PluginDependencyCheck, QueuedPluginInstall, PluginRollbackRecord, EvalSuite, EvalCase, EvalCheck, EvalSuiteReport, EvalCaseResult, EventStreamSummary, EventStreamBucket } from '@open-bot/core';
+import type { AppliedPluginTemplate, A2aPersistStatus, AppSnapshot, AgUiEvent, AgUiRunState, AppStatusView, AuditEvent, AuditVerifyResult, AutoApproveRule, AutoApproveRuleInput, BotConfig, BotQuota, CanvasDocument, CanvasSummary, Channel, ChannelKind, ChannelMessage, ChannelResponderRules, ComposioPollStatus, ComposioStateView, ComposioToolkitConnection, ComputerBackend, ComputerPlan, ComputerSchedulerState, ComputerStatusView, CreateFleetWorkspaceInput, CreatePluginTemplateInput, CrashReport, CrashReportSummary, DeepLinkRoute, FleetBotOverview, FleetCapacityCheck, FleetConsoleRole, FleetConsoleUser, FleetDecision, FleetRole, FleetStatusView, FleetUsageSummary, FleetWorkspace, GroupBotInterruptedEntry, GroupBotStatusEntry, GroupChat, GroupMessage, GuestAgentHealth, HarnessEvent, HarnessStatusResult, HarnessThreadLogResult, ListBotSkillsResult, ListBotToolsResult, LocalProfile, LongTermMemoryEntry, MachineProfile, MarketplaceV2Entry, McpAppDefinition, MemoryBlock, OnePasswordBrokerStatus, OpenAppInput, PermissionReview, PluginCatalogEntry, PluginTemplate, QuotaAlert, SetBotSkillEnabledResult, SetBotToolEnabledResult, TaskSnapshot, TeamBundle, ThreadItem, ThreadSearchHit, VerbatimRecord, VisionAttachment, RouterConfig, RouterStats, RouterTarget, RoutingDecision, RouterCliStatus, GetRouterConfigResult, GetRouterDecisionsResult, GetRouterStatsResult, GetRouterTargetsResult, RunLogMeta, RunEventQuery, RunLogVerification, AuditIntegrityReport, PauseResumeResult, ForkRunResult, ReplayedRunState, AnyRunEvent, FleetOverview, PlacementPlan, QueuedPlacement, MarketplaceCollection, MarketplaceEntryVersion, MarketplaceInstallRecord, PluginUpdateInfo, PluginDependencyCheck, QueuedPluginInstall, PluginRollbackRecord, EvalSuite, EvalCase, EvalCheck, EvalSuiteReport, EvalCaseResult, EvalComparison, FleetPolicyV4, FleetTaskV4, MemoryEvalReport, RegressionAlert, RunMemoryEvalSuiteResult, EventStreamSummary, EventStreamBucket } from '@open-bot/core';
 // Trace shapes from core (not ../renderer/types: tsconfig.main.json
 // pins rootDir to src/main, so preload cannot import renderer files).
 // The renderer-side mirrors live in ../renderer/types.ts.
@@ -553,6 +553,64 @@ export interface MemoryV3BlockVersionView {
   action: string;
   actor: string;
   at: string;
+}
+
+// v1.04 (Đội T1): memory v5 views — health dashboard + contradiction
+// groups + consolidation runs (mirror of renderer/types.ts).
+export interface MemoryV5HealthView {
+  generatedAt: string;
+  factCount: number;
+  activeFacts: number;
+  supersededFacts: number;
+  deletedFacts: number;
+  quarantinedPending: number;
+  entityCount: number;
+  orphanEntities: number;
+  contradictionGroups: number;
+  totalGroups: number;
+  contradictionRate: number;
+  staleFacts: number;
+  staleRate: number;
+  lowConfidenceFacts: number;
+  lowConfidenceRate: number;
+  avgConfidence: number;
+  avgFactAgeDays: number;
+  topPredicates: Array<{ predicate: string; count: number }>;
+  score: number;
+  grade: 'excellent' | 'good' | 'fair' | 'poor';
+  issues: string[];
+}
+
+export interface MemoryV5ContradictionGroupView {
+  subjectName: string;
+  predicate: string;
+  winnerObject: string;
+  winnerScore: number;
+  losers: Array<{ objectText: string; score: number; factId: string }>;
+}
+
+export interface MemoryV5ConsolidationRunView {
+  at: string;
+  actor: string;
+  duplicatesMerged: number;
+  groupsResolved: number;
+  losersSuperseded: number;
+  losersDeferred: number;
+  expiredSwept: number;
+  dreamPromoted: number;
+  scoreBefore: number;
+  scoreAfter: number;
+}
+
+/** v1.04 (Đội T1): một fact trả về từ truy vấn bi-temporal (đã bỏ embedding). */
+export interface MemoryV5BiTemporalRowView {
+  factId: string;
+  subjectName: string;
+  predicate: string;
+  objectText: string;
+  validFrom: string;
+  validUntil: string | null;
+  currentAtRecordTime: boolean;
 }
 
 // v1.01 (Đội T5): evolving notes như renderer thấy — mirror của core
@@ -1665,6 +1723,21 @@ export interface OpenBotApi {
   'evals:remove-case'(payload: { suiteId: string; caseId: string }): Promise<{ removed: boolean }>;
   'evals:score-case'(payload: { suiteId: string; caseId: string; runId: string }): Promise<EvalCaseResult>;
   'evals:run-suite'(payload: { suiteId: string; runsByCaseId: Record<string, string> }): Promise<EvalSuiteReport>;
+  // v1.05 (Team T6): memory eval v3 + fleet policy v4.
+  'memoryEval:datasets'(): Promise<Array<{ id: string; name: string; version: number; facts: number; questions: number }>>;
+  'memoryEval:history'(): Promise<{ runs: number; latest: MemoryEvalReport | null; history: Array<{ at: number; retrieverVersion: string; f1: number; recall: number; temporalAccuracy: number | null; multiHopScore: number | null; judgeScore: number }>; regressionAlerts: RegressionAlert[] }>;
+  'memoryEval:run'(payload?: { datasetId?: string; retrieverVersion?: string; topK?: number }): Promise<RunMemoryEvalSuiteResult>;
+  'memoryEval:compare'(payload?: { baselineIndex?: number; currentIndex?: number }): Promise<EvalComparison>;
+  'fleetV4:policy-get'(): Promise<FleetPolicyV4>;
+  'fleetV4:policy-set'(payload: Partial<FleetPolicyV4>): Promise<FleetPolicyV4>;
+  'fleetV4:tasks-list'(): Promise<FleetTaskV4[]>;
+  fleetV4TasksList: () => Promise<FleetTaskV4[]>;
+  memoryEvalDatasets: () => Promise<Array<{ id: string; name: string; version: number; facts: number; questions: number }>>;
+  memoryEvalHistory: () => Promise<{ runs: number; latest: MemoryEvalReport | null; history: Array<{ at: number; retrieverVersion: string; f1: number; recall: number; temporalAccuracy: number | null; multiHopScore: number | null; judgeScore: number }>; regressionAlerts: RegressionAlert[] }>;
+  memoryEvalRun: (payload?: { datasetId?: string; retrieverVersion?: string; topK?: number }) => Promise<RunMemoryEvalSuiteResult>;
+  memoryEvalCompare: (payload?: { baselineIndex?: number; currentIndex?: number }) => Promise<EvalComparison>;
+  fleetV4PolicyGet: () => Promise<FleetPolicyV4>;
+  fleetV4PolicySet: (payload: Partial<FleetPolicyV4>) => Promise<FleetPolicyV4>;
   'runlog:event-stream'(payload?: { runIds?: string[]; types?: string[]; fromAt?: string; toAt?: string; text?: string; limit?: number }): Promise<{ events: AnyRunEvent[]; summary: EventStreamSummary; buckets: EventStreamBucket[] }>;
   listEvalSuites: () => Promise<EvalSuite[]>;
   createEvalSuite: (payload: { name: string; description?: string }) => Promise<EvalSuite>;
@@ -1704,6 +1777,31 @@ export interface OpenBotApi {
   setFeatureFlag: (payload: { name: string; enabled: boolean }) => Promise<unknown>;
   listOllamaModels: () => Promise<string[]>;
   pullOllamaModel: (model: string) => Promise<{ ok: boolean; error?: string }>;
+  // v1.05 (Đội T3): model list tự refresh + trạng thái máy-tính-bot + doctor.
+  refreshModels: (payload?: { providerId?: string }) => Promise<{
+    providerId: string;
+    modelCount: number;
+    updatedAt: number | null;
+    stale: boolean;
+    refreshing: boolean;
+    lastError?: string;
+  }>;
+  getModelRefreshStatus: (payload?: { providerIds?: string[] }) => Promise<Array<{
+    providerId: string;
+    modelCount: number;
+    updatedAt: number | null;
+    stale: boolean;
+    refreshing: boolean;
+    lastError?: string;
+  }>>;
+  getComputerStatus: (payload: { botId: string; workspaceDir?: string }) => Promise<unknown>;
+  runDoctor: () => Promise<{
+    ok: boolean;
+    summary: { ok: number; warn: number; fail: number };
+    checks: Array<{ id: string; label: string; status: 'ok' | 'warn' | 'fail'; detail: string; hint?: string }>;
+    checkedAt: string;
+    durationMs: number;
+  }>;
   // M1: detected CLI engines (Settings → Engines). Method names are the
   // IPC channel names; camelCase aliases exist for the renderer's
   // callOpenBot(channel, camel) fallback.
@@ -1885,6 +1983,10 @@ export interface OpenBotApi {
   listMemoryV3Conflicts: (payload: { botId: string; action: string; conflictId?: string; resolution?: string; resolvedText?: string; blockId?: string }) => Promise<MemoryV3ConflictView[] | MemoryV3ConflictView>;
   findMemoryV3Contradictions: (payload: { botId: string; windowAFrom: string; windowATo: string; windowBFrom: string; windowBTo: string }) => Promise<MemoryV3ContradictionView[]>;
   getMemoryV3BlockHistory: (payload: { botId: string; action: string; block?: string; version?: number }) => Promise<MemoryV3BlockVersionView[] | { id: string; label: string; version: number; content: string }>;
+  // v1.04 (Đội T1): memory v5 — health dashboard + consolidation v2.
+  getMemoryV5Health: (payload: { botId: string }) => Promise<{ health: MemoryV5HealthView; contradictionGroups: MemoryV5ContradictionGroupView[]; recentConsolidationRuns: MemoryV5ConsolidationRunView[] }>;
+  runMemoryV5Consolidation: (payload: { botId: string; skipDream?: boolean }) => Promise<{ healthSummary: string; duplicatesMerged: number; losersSuperseded: number; losersDeferred: number; expiredSwept: number; orphanEntitiesPruned: number; dreamPromoted: number; scoreBefore: number; scoreAfter: number }>;
+  queryMemoryV5BiTemporal: (payload: { botId: string; at: string; recordedAt?: string }) => Promise<MemoryV5BiTemporalRowView[]>;
   listProviderIdentities: () => Promise<Array<{ providerId: string; identity: { id: string; displayName?: string; email?: string; updatedAt: number } | null }>>;
   // v1.01 (Đội T5): evolving notes — CRUD + link + revisit + conflict +
   // graph/timeline + benchmark + import, IPC `memory-notes:*` trong main.ts.
@@ -2388,6 +2490,21 @@ const openBot: OpenBotApi = {
   'evals:remove-case': (payload) => ipcRenderer.invoke('evals:remove-case', payload),
   'evals:score-case': (payload) => ipcRenderer.invoke('evals:score-case', payload),
   'evals:run-suite': (payload) => ipcRenderer.invoke('evals:run-suite', payload),
+  // v1.05 (Team T6): memory eval v3 + fleet policy v4.
+  'memoryEval:datasets': () => ipcRenderer.invoke('memoryEval:datasets'),
+  'memoryEval:history': () => ipcRenderer.invoke('memoryEval:history'),
+  'memoryEval:run': (payload) => ipcRenderer.invoke('memoryEval:run', payload),
+  'memoryEval:compare': (payload) => ipcRenderer.invoke('memoryEval:compare', payload),
+  'fleetV4:policy-get': () => ipcRenderer.invoke('fleetV4:policy-get'),
+  'fleetV4:policy-set': (payload) => ipcRenderer.invoke('fleetV4:policy-set', payload),
+  memoryEvalDatasets: () => ipcRenderer.invoke('memoryEval:datasets'),
+  memoryEvalHistory: () => ipcRenderer.invoke('memoryEval:history'),
+  memoryEvalRun: (payload) => ipcRenderer.invoke('memoryEval:run', payload),
+  memoryEvalCompare: (payload) => ipcRenderer.invoke('memoryEval:compare', payload),
+  fleetV4PolicyGet: () => ipcRenderer.invoke('fleetV4:policy-get'),
+  fleetV4PolicySet: (payload) => ipcRenderer.invoke('fleetV4:policy-set', payload),
+  'fleetV4:tasks-list': () => ipcRenderer.invoke('fleetV4:tasks-list'),
+  fleetV4TasksList: () => ipcRenderer.invoke('fleetV4:tasks-list'),
   'runlog:event-stream': (payload) => ipcRenderer.invoke('runlog:event-stream', payload),
   listEvalSuites: () => ipcRenderer.invoke('evals:list'),
   createEvalSuite: (payload) => ipcRenderer.invoke('evals:create-suite', payload),
@@ -2686,6 +2803,11 @@ const openBot: OpenBotApi = {
   setFeatureFlag: (payload) => ipcRenderer.invoke('models:set-flag', payload),
   listOllamaModels: () => ipcRenderer.invoke('models:ollama-list'),
   pullOllamaModel: (model) => ipcRenderer.invoke('models:ollama-pull', model),
+  // v1.05 (Đội T3): model list tự refresh + trạng thái máy-tính-bot + doctor.
+  refreshModels: (payload) => ipcRenderer.invoke('models:refresh', payload),
+  getModelRefreshStatus: (payload) => ipcRenderer.invoke('models:refresh-status', payload),
+  getComputerStatus: (payload) => ipcRenderer.invoke('computers:status', payload),
+  runDoctor: () => ipcRenderer.invoke('doctor:run'),
   // M1: detected CLI engines (Settings → Engines).
   'engines:list': () => ipcRenderer.invoke('engines:list'),
   'engines:redetect': () => ipcRenderer.invoke('engines:redetect'),
@@ -2819,6 +2941,10 @@ const openBot: OpenBotApi = {
   listMemoryV3Conflicts: (payload) => ipcRenderer.invoke('memory-v3:conflicts', payload),
   findMemoryV3Contradictions: (payload) => ipcRenderer.invoke('memory-v3:contradictions', payload),
   getMemoryV3BlockHistory: (payload) => ipcRenderer.invoke('memory-v3:block-history', payload),
+  // v1.04 (Đội T1): memory v5 — health dashboard + consolidation v2.
+  getMemoryV5Health: (payload) => ipcRenderer.invoke('memory-v5:health', payload),
+  runMemoryV5Consolidation: (payload) => ipcRenderer.invoke('memory-v5:consolidate', payload),
+  queryMemoryV5BiTemporal: (payload) => ipcRenderer.invoke('memory-v5:bitemporal', payload),
   // v1.01 (Đội T5): evolving notes.
   listMemoryNotes: (payload) => ipcRenderer.invoke('memory-notes:list', payload),
   searchMemoryNotes: (payload) => ipcRenderer.invoke('memory-notes:search', payload),

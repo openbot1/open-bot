@@ -60,6 +60,36 @@ export default function ModelPicker({ value, onSelect, onOpenEngines, onToggleEn
   const [customFor, setCustomFor] = useState('');
   const [toggling, setToggling] = useState('');
   const [redetecting, setRedetecting] = useState(false);
+  // v1.05 (Team T3): model list self-refresh — status of the most
+  // recent update for the selected provider (cache + TTL, background refresh).
+  const [refreshingModels, setRefreshingModels] = useState(false);
+  const [refreshInfo, setRefreshInfo] = useState<{ updatedAt: number | null; lastError?: string } | null>(null);
+
+  const loadRefreshStatus = async (providerId: string) => {
+    if (typeof window.openBot.getModelRefreshStatus !== 'function') return;
+    try {
+      const statuses = await window.openBot.getModelRefreshStatus({ providerIds: [providerId] });
+      const status = statuses.find((s) => s.providerId === providerId);
+      if (status) setRefreshInfo({ updatedAt: status.updatedAt, lastError: status.lastError });
+    } catch {
+      // Status is display-only — a failure keeps the previous line.
+    }
+  };
+
+  const refreshModels = async () => {
+    if (typeof window.openBot.refreshModels !== 'function') return;
+    setRefreshingModels(true);
+    try {
+      const status = await window.openBot.refreshModels({ providerId: value.providerId });
+      setRefreshInfo({ updatedAt: status.updatedAt, lastError: status.lastError });
+      setError('');
+      await loadRail();
+    } catch {
+      setError(t('modelPicker.refreshError'));
+    } finally {
+      setRefreshingModels(false);
+    }
+  };
   // Serialised per-bot filter: the rail reloads when the bot's disabled
   // sources (or its current provider) change.
   const disabledKey = JSON.stringify(disabledProviders ?? null);
@@ -81,6 +111,7 @@ export default function ModelPicker({ value, onSelect, onOpenEngines, onToggleEn
 
   useEffect(() => {
     void loadRail();
+    void loadRefreshStatus(value.providerId);
     // Live refresh: a Re-detect / toggle / custom CLI change in
     // Settings pushes a new engines snapshot, and the rail follows
     // without reopening the picker.
@@ -332,19 +363,36 @@ export default function ModelPicker({ value, onSelect, onOpenEngines, onToggleEn
         );
       })}
       {error && <p className="error">{error}</p>}
-      <div className="row" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
-        <button
-          type="button"
-          className="btn secondary"
-          data-testid="model-picker-redetect"
-          disabled={redetecting}
-          onClick={() => void redetect()}
-        >
-          {redetecting ? t('modelPicker.redetecting') : t('modelPicker.redetect')}
-        </button>
-        {onOpenEngines && (
-          <button className="btn secondary" onClick={onOpenEngines}>{t('modelPicker.openEngines')}</button>
-        )}
+      <div className="row" style={{ justifyContent: 'space-between', marginTop: 12 }}>
+        <span className="hint" data-testid="model-picker-updated-at">
+          {refreshInfo?.updatedAt
+            ? t('modelPicker.updatedAt', { time: new Date(refreshInfo.updatedAt).toLocaleTimeString() })
+            : t('modelPicker.notRefreshed')}
+          {refreshInfo?.lastError ? ` — ${t('modelPicker.refreshError')}` : ''}
+        </span>
+        <span className="row">
+          <button
+            type="button"
+            className="btn secondary"
+            data-testid="model-picker-refresh"
+            disabled={refreshingModels}
+            onClick={() => void refreshModels()}
+          >
+            {refreshingModels ? t('modelPicker.refreshing') : t('modelPicker.refresh')}
+          </button>
+          <button
+            type="button"
+            className="btn secondary"
+            data-testid="model-picker-redetect"
+            disabled={redetecting}
+            onClick={() => void redetect()}
+          >
+            {redetecting ? t('modelPicker.redetecting') : t('modelPicker.redetect')}
+          </button>
+          {onOpenEngines && (
+            <button className="btn secondary" onClick={onOpenEngines}>{t('modelPicker.openEngines')}</button>
+          )}
+        </span>
       </div>
     </div>
   );

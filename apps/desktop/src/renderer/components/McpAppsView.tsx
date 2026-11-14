@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { McpAppFullViewLike, McpAppViewLike } from '../types';
 import { useT } from '../i18n/useT';
 import { MCP_APP_SANDBOX, SAMPLE_APP_HTML, buildRendererAppSrcdoc, formatAppBytes } from './mcpApps';
+import McpAppSecurityReview, { buildReviewFromApp } from './McpAppSecurityReview';
 
 interface Props {
   onBack: () => void;
@@ -25,6 +26,10 @@ export default function McpAppsView({ onBack }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  // v1.05: the user confirmed running this app after reading the security
+  // review (only meaningful for apps that need confirmation — tool-result has no
+  // review yet). Sample/manual apps run immediately, no confirmation needed.
+  const [approvedId, setApprovedId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (typeof window.openBot.listMcpApps !== 'function') {
@@ -101,6 +106,7 @@ export default function McpAppsView({ onBack }: Props) {
     try {
       await window.openBot.closeMcpApp(id);
       if (selectedId === id) setSelectedId(null);
+      if (approvedId === id) setApprovedId(null);
       await refresh();
     } catch (err) {
       setError(t('mcpApps.closeFailed', { message: (err as Error).message }));
@@ -108,6 +114,14 @@ export default function McpAppsView({ onBack }: Props) {
       setBusy(false);
     }
   };
+
+  // v1.05: security review of the selected app (cautiously inferred from
+  // the app list data — see McpAppSecurityReview.tsx). An app that needs
+  // confirmation only renders its iframe after the user clicks "Run".
+  const selectedReview = selected !== null ? buildReviewFromApp(selected) : null;
+  const needsApproval =
+    selectedReview !== null && selectedReview.runNeedsConfirmation && approvedId !== selected?.id;
+  const showFrame = selected !== null && !needsApproval;
 
   return (
     <div className="panel">
@@ -172,12 +186,29 @@ export default function McpAppsView({ onBack }: Props) {
                   {t('mcpApps.close')}
                 </button>
               </div>
-              <iframe
-                title={selected.title}
-                sandbox={MCP_APP_SANDBOX}
-                srcDoc={buildRendererAppSrcdoc(selected.title, selected.html)}
-                style={{ width: '100%', height: 420, border: '1px solid var(--border)', borderRadius: 8 }}
-              />
+              {selectedReview !== null && (
+                <McpAppSecurityReview
+                  review={selectedReview}
+                  onApprove={
+                    selectedReview.runNeedsConfirmation
+                      ? () => setApprovedId(selected.id)
+                      : undefined
+                  }
+                  onReject={
+                    selectedReview.runNeedsConfirmation
+                      ? () => setSelectedId(null)
+                      : undefined
+                  }
+                />
+              )}
+              {showFrame && (
+                <iframe
+                  title={selected.title}
+                  sandbox={MCP_APP_SANDBOX}
+                  srcDoc={buildRendererAppSrcdoc(selected.title, selected.html)}
+                  style={{ width: '100%', height: 420, border: '1px solid var(--border)', borderRadius: 8 }}
+                />
+              )}
             </>
           )}
         </div>

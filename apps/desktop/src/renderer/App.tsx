@@ -42,6 +42,7 @@ import PluginMarketplaceView from './components/PluginMarketplaceView';
 // v1.03 (Team T6): event-stream viewer + eval harness.
 import EventStreamView from './components/EventStreamView';
 import EvalHarnessView from './components/EvalHarnessView';
+import EvalFleetDashboardView from './components/EvalFleetDashboardView';
 import ToolsView from './components/ToolsView';
 import BotForm from './components/BotForm';
 import BudgetMeter from './components/BudgetMeter';
@@ -116,7 +117,7 @@ export default function App() {
   const [tasks, setTasks] = useState<TaskView[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [showTasks, setShowTasks] = useState(false);
-  const [view, setView] = useState<'chat' | 'dashboard' | 'planner' | 'settings' | 'marketplace' | 'bot-marketplace' | 'plugin-marketplace' | 'mcp' | 'mcp-apps' | 'mcp-tasks' | 'team' | 'computers' | 'fleet' | 'fleet-console' | 'skills' | 'memory' | 'automations' | 'agui' | 'harness2' | 'traces' | 'eventlog' | 'runlog' | 'event-stream' | 'eval-harness' | 'plans' | 'a2a' | 'group' | 'channels' | 'tools' | 'connected-apps' | 'canvas' | 'internet-data'>('chat');
+  const [view, setView] = useState<'chat' | 'dashboard' | 'planner' | 'settings' | 'marketplace' | 'bot-marketplace' | 'plugin-marketplace' | 'mcp' | 'mcp-apps' | 'mcp-tasks' | 'team' | 'computers' | 'fleet' | 'fleet-console' | 'skills' | 'memory' | 'automations' | 'agui' | 'harness2' | 'traces' | 'eventlog' | 'runlog' | 'event-stream' | 'eval-harness' | 'eval-fleet' | 'plans' | 'a2a' | 'group' | 'channels' | 'tools' | 'connected-apps' | 'canvas' | 'internet-data'>('chat');
   // v0.98 (Team T4 — planning v2): run plan attached to the NEXT chat
   // run (one-shot — `send` consumes it). The plan's owner bot must
   // match the bot being sent to, otherwise the run ignores it.
@@ -1329,6 +1330,7 @@ export default function App() {
         onOpenEventLog={() => setView('eventlog')}
         onOpenEventStream={() => setView('event-stream')}
         onOpenEvalHarness={() => setView('eval-harness')}
+        onOpenEvalFleet={() => setView('eval-fleet')}
         onOpenRunLog={() => setView('runlog')}
         onOpenAgUi={() => setView('agui')}
         threads={threads}
@@ -1523,6 +1525,10 @@ export default function App() {
         ) : view === 'eval-harness' ? (
           <div className="main">
             <EvalHarnessView onBack={() => setView('chat')} />
+          </div>
+        ) : view === 'eval-fleet' ? (
+          <div className="main">
+            <EvalFleetDashboardView onBack={() => setView('chat')} />
           </div>
         ) : view === 'agui' ? (
           <div className="main">
