@@ -37,6 +37,16 @@ import {
   parseElicitationCompleteNotification,
 } from './elicitation';
 import type { ElicitationPrompt } from './elicitation';
+import {
+  McpTaskProgressEmitter,
+  ServerDirectedTaskHandler,
+} from './taskProgress';
+import type {
+  ServerDirectedTaskOutcome,
+  ServerDirectedTaskPolicy,
+} from './taskProgress';
+import { isTaskTerminal, parseTaskStatus } from './tasks';
+import type { McpTaskSpecVersion } from './tasks';
 
 /** Handler cho `sampling/createMessage` do server gửi (khi có). */
 export type McpSamplingHandler = (params: unknown) => unknown | Promise<unknown>;
@@ -50,6 +60,24 @@ export interface McpClientHandlerOptions {
   elicitationPrompt?: ElicitationPrompt;
   /** Handler cho `sampling/createMessage`. Không có thì không đăng ký sampling. */
   samplingHandler?: McpSamplingHandler;
+  /**
+   * v1.05 (MCP 2.0 Tasks): cho phép server yêu cầu client tạo task
+   * (`tasks/create`, server-directed). Khi có, client đăng ký handler
+   * `tasks/create` (chỉ tạo task cho method trong allowlist — mặc
+   * định chỉ `tools/call`) và `notifications/tasks/progress` (forward
+   * tiến độ server push vào emitter). Không có thì server gửi
+   * `tasks/create` sẽ nhận `-32601` như trước.
+   */
+  serverDirectedTasks?: {
+    /** Chính sách allowlist + giới hạn concurrent (mặc định xem taskProgress.ts). */
+    policy?: ServerDirectedTaskPolicy;
+    /** Backend tasks đang nói chuyện (mặc định '2026-07-28'). */
+    specVersion?: McpTaskSpecVersion;
+    /** Gọi ngay khi một task server-directed được tạo (để coordinator track vào McpTaskManager). */
+    onTaskCreated?: (outcome: ServerDirectedTaskOutcome) => void;
+    /** Emitter progress dùng chung (mặc định tạo mới trong handler). */
+    progressEmitter?: McpTaskProgressEmitter;
+  };
   /**
    * v0.85 (P2-8): timeout (ms) chờ server báo hoàn tất một URL-mode
    * elicitation (`notifications/elicitation/complete`) sau khi user
@@ -65,12 +93,20 @@ export interface RegisteredMcpClientHandlers {
   urlTracker: ElicitationUrlTracker;
   /** Capability đã quảng cáo (trùng với cái `connectMcp` đưa vào `initialize`). */
   capabilities: Record<string, unknown>;
+  /**
+   * v1.05: handler server-directed task (chỉ khi
+   * `options.serverDirectedTasks` được truyền) — coordinator dùng để
+   * track task vào McpTaskManager / huỷ khi đóng client.
+   */
+  serverDirectedTaskHandler?: ServerDirectedTaskHandler;
 }
 
 /**
  * Capability client quảng cáo trong `initialize`, tính từ handler thật
  * có: elicitation chỉ khi có prompt hỏi user, roots chỉ khi có workspace,
  * sampling chỉ khi có handler. Luôn có `experimental: {}` như trước.
+ * v1.05: `tasks` chỉ khi server-directed tasks được bật (client nhận
+ * `tasks/create` từ server).
  */
 export function buildMcpClientCapabilities(
   options?: McpClientHandlerOptions,
@@ -79,6 +115,7 @@ export function buildMcpClientCapabilities(
   if (options?.elicitationPrompt) caps['elicitation'] = {};
   if (options?.workspaceDir) caps['roots'] = { listChanged: false };
   if (options?.samplingHandler) caps['sampling'] = {};
+  if (options?.serverDirectedTasks) caps['tasks'] = {};
   return caps;
 }
 
@@ -134,7 +171,74 @@ export function registerDefaultMcpClientHandlers(
     dispatcher.register('sampling/createMessage', (params) => samplingHandler(params));
   }
 
-  return { urlTracker, capabilities: buildMcpClientCapabilities(options) };
+  // v1.05 (MCP 2.0 Tasks): server-directed task — server gửi
+  // `tasks/create` yêu cầu client tạo task. Handler tạo task qua
+  // chính client này (requestJsonRpc), kiểm tra allowlist + giới
+  // hạn concurrent, rồi trả handle cho server. Task được tạo chạy
+  // như task client tự tạo; coordinator nhận `onTaskCreated` để
+  // track vào McpTaskManager (origin 'server-directed').
+  let serverDirectedTaskHandler: ServerDirectedTaskHandler | undefined;
+  if (options.serverDirectedTasks) {
+    if (typeof client.requestJsonRpc !== 'function') {
+      throw new Error(
+        'MCP client này không có requestJsonRpc — không đăng ký được server-directed tasks.',
+      );
+    }
+    const taskTransport = {
+      request: (method: string, params?: Record<string, unknown>) =>
+        client.requestJsonRpc!(method, params),
+    };
+    serverDirectedTaskHandler = new ServerDirectedTaskHandler(
+      taskTransport,
+      options.serverDirectedTasks.policy ?? {},
+      options.serverDirectedTasks.progressEmitter ?? new McpTaskProgressEmitter(),
+    );
+    const handler = serverDirectedTaskHandler;
+    const specVersion = options.serverDirectedTasks.specVersion ?? '2026-07-28';
+    dispatcher.register('tasks/create', async (params) => {
+      const outcome = await handler.handle(params, { specVersion });
+      options.serverDirectedTasks?.onTaskCreated?.(outcome);
+      return {
+        taskId: outcome.handle.taskId,
+        status: outcome.handle.status,
+        pollInterval: outcome.handle.pollIntervalMs,
+      };
+    });
+    // Server push tiến độ cho task client đang chạy: forward vào
+    // emitter chung để UI/coordinator nhận ngay, không chờ poll.
+    dispatcher.register('notifications/tasks/progress', (params) => {
+      if (typeof params !== 'object' || params === null || Array.isArray(params)) return;
+      const raw = params as Record<string, unknown>;
+      if (typeof raw['taskId'] !== 'string') return;
+      let status;
+      try {
+        status = parseTaskStatus(raw['status']);
+      } catch {
+        return;
+      }
+      const progress =
+        typeof raw['progress'] === 'number' && Number.isFinite(raw['progress'])
+          ? Math.max(0, Math.min(1, raw['progress']))
+          : undefined;
+      const progressMessage =
+        typeof raw['progressMessage'] === 'string' ? (raw['progressMessage'] as string) : undefined;
+      handler.progressEmitter.emit({
+        taskId: raw['taskId'] as string,
+        status,
+        ...(progress !== undefined ? { progress } : {}),
+        ...(progressMessage !== undefined ? { progressMessage } : {}),
+        atMs: Date.now(),
+        source: 'push',
+        kind: isTaskTerminal(status) ? 'terminal' : 'progress',
+      });
+    });
+  }
+
+  return {
+    urlTracker,
+    capabilities: buildMcpClientCapabilities(options),
+    ...(serverDirectedTaskHandler ? { serverDirectedTaskHandler } : {}),
+  };
 }
 
 // ---------------------------------------------------------------------------

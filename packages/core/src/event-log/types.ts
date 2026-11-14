@@ -34,7 +34,10 @@ export type RunEventType =
   | 'run.aborted'
   | 'approval.request'
   | 'approval.decision'
-  | 'checkpoint.saved';
+  | 'checkpoint.saved'
+  | 'event.redacted'
+  | 'run.compacted'
+  | 'stuck.detected';
 
 /** Trạng thái cuối cùng (hoặc hiện tại) của một run. */
 export type RunStatus =
@@ -197,6 +200,65 @@ export interface CheckpointSavedPayload {
   toolCalls: number;
 }
 
+/**
+ * Payload của `event.redacted` (v1.03, Đội T1 — time-travel/redaction).
+ *
+ * Redaction là append-only: event gốc KHÔNG bị sửa hay xoá (hash chain
+ * giữ nguyên), chỉ thêm một marker nói rằng nội dung của event ở `seq`
+ * phải được coi là đã che khi hiển thị. `foldEvents` áp dụng marker
+ * này ngược lại transcript/tool result đã fold từ event đó. Lý do
+ * thường gặp: secret lọt vào log, dữ liệu cá nhân cần xoá khỏi bản
+ * hiển thị trước khi chia sẻ log.
+ */
+export interface EventRedactedPayload {
+  /** Seq của event bị che (trong cùng run). */
+  seq: number;
+  /** Lý do che (vd `secret-leaked`, `pii`). Không chứa nội dung bị che. */
+  reason: string;
+  /** Ai yêu cầu che (user/bot id) — không bắt buộc. */
+  redactedBy?: string;
+}
+
+/**
+ * Payload của `run.compacted` (v1.03, Đội T1 — condenser).
+ *
+ * Condenser tóm tắt prefix của log thành một bản tóm tắt ngắn rồi ghi
+ * marker này. Event gốc vẫn còn nguyên trên đĩa (compaction không xoá
+ * lịch sử); marker chỉ nói rằng từ `upToSeq` trở về trước đã có bản
+ * tóm tắt dùng được để thay thế khi nạp context — UI/condenser đọc
+ * `summary` thay vì replay toàn bộ prefix.
+ */
+export interface RunCompactedPayload {
+  /** Seq cuối cùng mà bản tóm tắt bao phủ (bao gồm). */
+  upToSeq: number;
+  /** Bản tóm tắt trích xuất (đã sanitize, tối đa ~1500 ký tự). */
+  summary: string;
+  /** Số event mà bản tóm tắt bao phủ. */
+  eventsReplaced: number;
+  /** Ước lượng token của prefix trước khi nén (nếu tính được). */
+  tokensBefore?: number;
+  /** Ước lượng token của bản tóm tắt. */
+  tokensAfter?: number;
+}
+
+/**
+ * Payload của `stuck.detected` (v1.03, Đội T1 — stuck detection).
+ *
+ * Ghi lại một lần phân tích phát hiện agent kẹt/lặp để audit. Event
+ * này không làm dừng run — việc can thiệp (dừng, đổi hướng, gợi ý)
+ * do loop/UI quyết định từ `StuckReport` (xem `stuck.ts`).
+ */
+export interface StuckDetectedPayload {
+  /** Step mà phát hiện xảy ra. */
+  step: number;
+  /** Loại tín hiệu kẹt (xem `StuckSignalKind`). */
+  kind: string;
+  /** Mô tả ngắn bằng tiếng Anh (đã sanitize, không chứa secret). */
+  detail: string;
+  /** Key i18n của gợi ý can thiệp (vd `harness.v103.stuck.repeatTool`). */
+  suggestionKey?: string;
+}
+
 /** Map từ loại event sang payload của nó. */
 export interface RunEventPayloadMap {
   'run.started': RunStartedPayload;
@@ -215,6 +277,9 @@ export interface RunEventPayloadMap {
   'approval.request': ApprovalPayload;
   'approval.decision': ApprovalPayload;
   'checkpoint.saved': CheckpointSavedPayload;
+  'event.redacted': EventRedactedPayload;
+  'run.compacted': RunCompactedPayload;
+  'stuck.detected': StuckDetectedPayload;
 }
 
 /**
@@ -295,6 +360,23 @@ export interface RunLogVerification {
   reason?: string;
 }
 
+/** Một lần compaction đã ghi trong log (đọc từ event `run.compacted`). */
+export interface RunCompactionInfo {
+  upToSeq: number;
+  summary: string;
+  eventsReplaced: number;
+  tokensBefore?: number;
+  tokensAfter?: number;
+}
+
+/** Một lần phát hiện kẹt đã ghi trong log (đọc từ event `stuck.detected`). */
+export interface StuckDetectionInfo {
+  step: number;
+  kind: string;
+  detail: string;
+  suggestionKey?: string;
+}
+
 /** Trạng thái của một run được tái tạo bằng cách fold event (replay). */
 export interface ReplayedRunState {
   runId: string;
@@ -318,6 +400,15 @@ export interface ReplayedRunState {
   endedAt?: string;
   /** Digest SHA-256 của trạng thái này — hai lần replay cùng log phải cho cùng digest. */
   digest: string;
+  /**
+   * v1.03: các seq đã bị che bởi event `event.redacted` (nội dung của
+   * chúng trong `transcript`/`toolCalls` đã được thay bằng `[redacted]`).
+   */
+  redactedSeqs?: number[];
+  /** v1.03: các lần compaction đã ghi (`run.compacted`), theo thứ tự. */
+  compactions?: RunCompactionInfo[];
+  /** v1.03: các lần phát hiện kẹt đã ghi (`stuck.detected`). */
+  stuckDetections?: StuckDetectionInfo[];
 }
 
 /** Một dòng trong transcript tái tạo. */

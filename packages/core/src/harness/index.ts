@@ -38,6 +38,19 @@ export type {
   ThreadLogPage,
 } from './types';
 
+// --- v1.04 (T3e): minimal scaffold harness (~90 lines, runnable reference) ---
+export { runScaffoldHarness } from './scaffold';
+export type {
+  ScaffoldFinishReason,
+  ScaffoldMessage,
+  ScaffoldModel,
+  ScaffoldModelReply,
+  ScaffoldOptions,
+  ScaffoldResult,
+  ScaffoldTool,
+  ScaffoldToolCall,
+} from './scaffold';
+
 // v0.97 (Team T5): harness v2 — signed webhooks, routines v2, headless
 // jobs, versioned NDJSON export, per-bot-computer health probe.
 export * from './v2/index';

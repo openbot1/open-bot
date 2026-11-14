@@ -65,6 +65,8 @@ import { TemporalKnowledgeGraph } from '../memory/graph';
 import { SleepTimeAgent, episodesFromHistory, scheduleSleepAfterTurn } from '../memory/sleepAgent';
 import { noteConsolidationActivity, runIdleConsolidationIfDue } from '../memory/consolidate';
 import { TemporalGraphStore } from '../memory/graph/store';
+import { V6RecordStore } from '../memory/v3/store';
+import { SharedBlockStore } from '../memory/v3/blocks';
 import { EvolvingNoteStore } from '../memory/notes/store';
 import { SleepConsolidationAgent, createGraphSleepAgent } from '../memory/graph/sleepAgent';
 import { buildMemoryTurnContext, isEmbedderAvailableCached } from '../memory/turnContext';
@@ -96,6 +98,7 @@ import { buildRiskReportMarkdown, summarizeRiskReport } from '../risk/report';
 import type { BudgetSnapshot } from '../risk/types';
 import type { RiskRule } from '../risk/types';
 import { validateVisionAttachments } from '../agent/vision';
+import { VoiceSessionManagerV2, FileVoiceSessionLogStore } from '../voice/voiceSessionManagerV2';
 import {
   GROUP_BOT_STATUS_FILE_NAME,
   GROUP_CHATS_FILE_NAME,
@@ -982,6 +985,12 @@ export function defaultToolFactory(
      * Optional until the tools package ships the factory — guarded at
      * the call site, like createMemoryBlockTools. */
     createMcpV097Tools?(): Tool[];
+    /** v1.05 (Đội T2): MCP 2.0 tools (mcp_v2_discover_server,
+     * mcp_v2_stateless_call, mcp_v2_elicitation_respond,
+     * mcp_v2_task_create/get/cancel, mcp_v2_app_prefetch).
+     * Optional until the tools package ships the factory — guarded at
+     * the call site, like createMcpV097Tools. */
+    createMcpV2Tools?(): Tool[];
     createMemoryBlockTools?(opts?: {
       blocksStore?: MemoryBlockStore;
       longTermStore?: LongTermMemory;
@@ -1047,6 +1056,51 @@ export function defaultToolFactory(
       longTerm?: LongTermMemory;
       getUserId?: () => string | undefined;
       appId?: string;
+    }): Tool[];
+    /** v1.04 (Đội T1): memory v5 tools (memory_v5_addonly_append /
+     * addonly_rank / addonly_recall / bitemporal_query / invalidate /
+     * ingest / health / consolidate). Optional until the tools
+     * package ships the factory — guarded at the call site, like
+     * createMemoryV4Tools. */
+    createMemoryV5Tools?(opts?: {
+      graphStore?: TemporalGraphStore;
+      workspaceDir?: string;
+      blocksStore?: MemoryBlockStore;
+      longTerm?: LongTermMemory;
+      getUserId?: () => string | undefined;
+      appId?: string;
+    }): Tool[];
+    /** v1.05 (Đội T1): memory v6 tools (memory_v6_append / recall /
+     * forget / fused_search / share_block / sleep_consolidate /
+     * stats / migrate). Optional until the tools package ships the
+     * factory — guarded at the call site, like createMemoryV5Tools. */
+    createMemoryV6Tools?(opts?: {
+      v6Store?: V6RecordStore;
+      workspaceDir?: string;
+      blocksStore?: SharedBlockStore;
+      longTerm?: LongTermMemory;
+      graphStore?: TemporalGraphStore;
+      getUserId?: () => string | undefined;
+      appId?: string;
+    }): Tool[];
+    /** v1.05 (Đội T5): voice v4 tools (voice_v4_start/stop/pause/
+     * resume_session, latency_report, barge_in_test, eval_run,
+     * session_log) on the voice session manager. Optional until
+     * the tools package ships the factory — guarded at the call
+     * site, like createMemoryV5Tools. */
+    createVoiceV4Tools?(opts?: {
+      getManager?: () => unknown;
+    }): Tool[];
+    /** v1.05 (Đội T4): context v2 tools (context_v2_compact_tiered /
+     * verify_summary / window_stats / set_policy / inspect /
+     * export_snapshot / import_snapshot / assemble_prompt /
+     * schedule_status). Optional until the tools package ships the
+     * factory — guarded at the call site, like createMemoryV5Tools. */
+    createContextV2Tools?(opts?: {
+      workspaceDir?: string;
+      model?: string;
+      limitTokens?: number;
+      ramBudgetBytes?: number;
     }): Tool[];
     /** v0.31 (P1-2): A2A client tools (call trusted external agents).
      * Optional until the tools package ships the factory — guarded at
@@ -1277,6 +1331,13 @@ export function defaultToolFactory(
     if (typeof toolsMod.createMcpV097Tools === 'function') {
       registry.registerMany(toolsMod.createMcpV097Tools());
     }
+    // v1.05 (Đội T2): MCP 2.0 v1.05 tools (mcp_v2_discover_server,
+    // mcp_v2_stateless_call, mcp_v2_elicitation_respond,
+    // mcp_v2_task_create/get/cancel, mcp_v2_app_prefetch).
+    // Guarded — thiếu factory thì bot chỉ không có tool MCP v2, không fail.
+    if (typeof toolsMod.createMcpV2Tools === 'function') {
+      registry.registerMany(toolsMod.createMcpV2Tools());
+    }
     // v0.96 (Đội T1): memory block tools (memory_block_* + memory_
     // consolidate) trên cùng workspace với long-term memory
     // (`.open-bot/memory-blocks.json`). Guarded — thiếu factory thì bot
@@ -1370,6 +1431,63 @@ export function defaultToolFactory(
           blocksStore: new MemoryBlockStore(workspaceDir),
           longTerm: new LongTermMemory(workspaceDir),
           getUserId: () => host?.getLocalUserId?.() ?? undefined,
+        }),
+      );
+    }
+    // v1.04 (Đội T1): memory v5 tools (memory_v5_* — ADD-only
+    // append/rank/recall, bi-temporal query, invalidate, ingestion,
+    // health, consolidation v2) trên cùng store đồ thị / block /
+    // long-term với các factory memory khác. Guarded như factory khác.
+    if (typeof toolsMod.createMemoryV5Tools === 'function') {
+      registry.registerMany(
+        toolsMod.createMemoryV5Tools({
+          graphStore: TemporalGraphStore.fromWorkspace(workspaceDir),
+          workspaceDir,
+          blocksStore: new MemoryBlockStore(workspaceDir),
+          longTerm: new LongTermMemory(workspaceDir),
+          getUserId: () => host?.getLocalUserId?.() ?? undefined,
+        }),
+      );
+    }
+    // v1.05 (Đội T1): memory v6 tools (memory_v6_* — add-only record
+    // store, multi-scope, fused retrieval, shared blocks, sleep-time
+    // compute, migration v5) trên cùng workspace với các factory
+    // memory khác. Guarded như factory khác.
+    if (typeof toolsMod.createMemoryV6Tools === 'function') {
+      registry.registerMany(
+        toolsMod.createMemoryV6Tools({
+          v6Store: V6RecordStore.fromWorkspace(workspaceDir),
+          workspaceDir,
+          blocksStore: SharedBlockStore.fromWorkspace(workspaceDir),
+          longTerm: new LongTermMemory(workspaceDir),
+          graphStore: TemporalGraphStore.fromWorkspace(workspaceDir),
+          getUserId: () => host?.getLocalUserId?.() ?? undefined,
+        }),
+      );
+    }
+    // v1.05 (Đội T5): voice v4 tools (voice_v4_* — multi-session
+    // start/stop/pause/resume, latency report, barge-in test,
+    // internal eval, session log) trên voice session manager v2.
+    // Manager chạy mock transport mặc định (không key, không mạng);
+    // log phiên lưu file dưới workspace. Guarded như factory khác.
+    if (typeof toolsMod.createVoiceV4Tools === 'function') {
+      const voiceV4Manager = new VoiceSessionManagerV2({
+        logStore: new FileVoiceSessionLogStore(path.join(workspaceDir, 'voice-sessions-v4')),
+      });
+      registry.registerMany(
+        toolsMod.createVoiceV4Tools({
+          getManager: () => voiceV4Manager,
+        }),
+      );
+    }
+    // v1.05 (Đội T4): context v2 tools (context_v2_* — tiered
+    // compaction, verified summaries, 1M window, per-bot policy,
+    // inspector, snapshots) — một runtime riêng cho mỗi bot, policy
+    // + spill lưu dưới <workspace>/context-v2. Guarded như factory khác.
+    if (typeof toolsMod.createContextV2Tools === 'function') {
+      registry.registerMany(
+        toolsMod.createContextV2Tools({
+          workspaceDir,
         }),
       );
     }

@@ -28,6 +28,8 @@ import { randomBytes, createHash } from 'node:crypto';
 import * as http from 'node:http';
 import type { AddressInfo } from 'node:net';
 
+import { validateStoredTokenIssuer } from './oauthIssuer';
+
 export const MCP_OAUTH_VAULT_NAMESPACE = 'mcp-oauth';
 /** Default callback wait: 5 minutes. The user must finish in the browser. */
 export const DEFAULT_OAUTH_CALLBACK_TIMEOUT_MS = 5 * 60_000;
@@ -44,6 +46,12 @@ export interface McpOAuthToken {
   expiresAt?: number;
   /** Epoch ms when this token set was obtained. */
   obtainedAt: number;
+  /**
+   * v1.05: OIDC id_token kèm theo (khi provider trả) — dùng để
+   * validate `iss` khi access token là opaque token (không phải
+   * JWT, xem oauthIssuer.ts). Không bao giờ log giá trị này.
+   */
+  idToken?: string;
 }
 
 /**
@@ -404,6 +412,8 @@ function parseTokenResponse(body: unknown, what: string): McpOAuthToken {
   };
   if (typeof obj['refresh_token'] === 'string') token.refreshToken = obj['refresh_token'] as string;
   if (typeof obj['scope'] === 'string') token.scope = obj['scope'] as string;
+  // v1.05: giữ id_token để validate iss (xem oauthIssuer.ts).
+  if (typeof obj['id_token'] === 'string') token.idToken = obj['id_token'] as string;
   if (expiresIn !== undefined) token.expiresAt = obtainedAt + expiresIn * 1000;
   return token;
 }
@@ -545,6 +555,8 @@ export function parseStoredOAuthToken(stored: string): McpOAuthToken | null {
   if (typeof obj['refreshToken'] === 'string') token.refreshToken = obj['refreshToken'] as string;
   if (typeof obj['scope'] === 'string') token.scope = obj['scope'] as string;
   if (typeof obj['expiresAt'] === 'number') token.expiresAt = obj['expiresAt'] as number;
+  // v1.05: khôi phục id_token đã lưu (để validate iss).
+  if (typeof obj['idToken'] === 'string') token.idToken = obj['idToken'] as string;
   return token;
 }
 
@@ -588,6 +600,15 @@ export interface ValidTokenOptions {
   /** Resource indicator(s) (RFC 8707) sent when refreshing. */
   resource?: string | string[];
   fetchFn?: OAuthFetchFn;
+  /**
+   * v1.05 (MCP 2.0): issuer bắt buộc phải khớp — khi truyền vào,
+   * token (access token JWT hoặc id_token) bị từ chối ngay nếu
+   * claim `iss` khác issuer này (xem oauthIssuer.ts). Khuyến nghị
+   * luôn truyền issuer lấy từ authorization server metadata.
+   */
+  expectedIssuer?: string;
+  /** Audience mong đợi (client_id) — kiểm tra claim `aud` khi có. */
+  expectedAudience?: string;
 }
 
 /**
@@ -596,6 +617,11 @@ export interface ValidTokenOptions {
  * saved back through the store. Returns null when the server was never
  * authorized. Throws when a refresh is needed but fails — the caller
  * should then run the full authorization flow again.
+ *
+ * v1.05 (MCP 2.0): khi `options.expectedIssuer` được truyền, token
+ * (cả token cũ lẫn token vừa refresh) phải qua validate `iss`
+ * (xem oauthIssuer.ts) trước khi trả về — token sai issuer bị từ
+ * chối bằng `OAuthIssuerError` thay vì được gửi đi.
  */
 export async function getValidAccessToken(
   store: McpOAuthStore,
@@ -604,7 +630,10 @@ export async function getValidAccessToken(
 ): Promise<McpOAuthToken | null> {
   const token = await loadOAuthToken(store, serverName);
   if (!token) return null;
-  if (!isTokenExpired(token)) return token;
+  if (!isTokenExpired(token)) {
+    assertTokenIssuer(token, options, serverName);
+    return token;
+  }
   if (!token.refreshToken) {
     throw new Error(
       `MCP OAuth token for "${serverName}" is expired and has no refresh token. ` +
@@ -622,8 +651,35 @@ export async function getValidAccessToken(
   });
   // Keep the old refresh token when the provider does not rotate it.
   if (!fresh.refreshToken) fresh.refreshToken = token.refreshToken;
+  // Keep the old id_token when the provider does not return a new one.
+  if (!fresh.idToken && token.idToken) fresh.idToken = token.idToken;
+  assertTokenIssuer(fresh, options, serverName);
   await saveOAuthToken(store, serverName, fresh);
   return fresh;
+}
+
+/**
+ * Validate `iss` của token khi caller yêu cầu (`expectedIssuer`).
+ * Không có expectedIssuer thì không làm gì (tương thích ngược —
+ * caller cũ không truyền issuer vẫn chạy như trước).
+ */
+function assertTokenIssuer(
+  token: McpOAuthToken,
+  options: ValidTokenOptions,
+  serverName: string,
+): void {
+  if (!options.expectedIssuer) return;
+  try {
+    validateStoredTokenIssuer(token, options.expectedIssuer, {
+      ...(options.expectedAudience ? { expectedAudience: options.expectedAudience } : {}),
+    });
+  } catch (err) {
+    throw new Error(
+      `MCP OAuth token cho "${serverName}" bị từ chối: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
 }
 
 // ===========================================================================

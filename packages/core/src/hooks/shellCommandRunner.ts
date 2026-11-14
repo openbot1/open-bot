@@ -315,6 +315,34 @@ export function validateHookCommandEntry(
       ? obj['description'].trim()
       : undefined;
 
+  // v1.04 — optional tool-name matcher (PreToolUse / PostToolUse only).
+  let matcher: string | string[] | undefined;
+  if (obj['matcher'] !== undefined) {
+    const rawMatcher = obj['matcher'];
+    const list = Array.isArray(rawMatcher) ? rawMatcher : [rawMatcher];
+    const bad = list.some((m) => typeof m !== 'string' || m.trim() === '');
+    if (list.length === 0 || bad) {
+      issues.push({
+        field: 'matcher',
+        message: 'matcher phải là một glob tên tool (vd "shell-*") hoặc một mảng glob không rỗng.',
+      });
+    } else {
+      // Validated above: every item is a non-empty string.
+      matcher = (list as string[]).length === 1 ? (list as string[])[0] : [...(list as string[])];
+    }
+  }
+
+  // v1.04 — optional run priority (lower runs first, default 100).
+  let priority: number | undefined;
+  if (obj['priority'] !== undefined) {
+    const p = obj['priority'];
+    if (typeof p !== 'number' || !Number.isInteger(p)) {
+      issues.push({ field: 'priority', message: 'priority phải là một số nguyên.' });
+    } else {
+      priority = p;
+    }
+  }
+
   if (issues.length > 0) return { valid: false, issues };
   return {
     valid: true,
@@ -327,6 +355,8 @@ export function validateHookCommandEntry(
       timeoutMs,
       ...(env !== undefined ? { env } : {}),
       ...(description !== undefined ? { description } : {}),
+      ...(matcher !== undefined ? { matcher } : {}),
+      ...(priority !== undefined ? { priority } : {}),
     },
   };
 }

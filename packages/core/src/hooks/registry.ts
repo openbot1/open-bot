@@ -12,10 +12,12 @@
  *   `<stateDir>/hooks-enabled.json` (a plain JSON map name -> boolean;
  *   missing entry means enabled), mirroring SkillRegistry. A disabled
  *   hook never runs.
- * - `listForEvent(kind)` — enabled hooks for one event, in registration
- *   order. The runner executes them in this order; the first `block`
- *   wins, `modify` decisions chain (each hook sees the previous hook's
- *   rewritten args/output).
+ * - `listForEvent(kind, toolName?)` — enabled hooks for one event, in
+ *   run order (v1.04: priority ascending, ties keep registration
+ *   order; Pre/PostToolUse hooks are filtered by their matcher against
+ *   `toolName` when given). The runner executes them in this order;
+ *   the first `block` wins, `modify` decisions chain (each hook sees
+ *   the previous hook's rewritten args/output).
  * - `applySettings(settings)` — apply the `hooks` section of settings:
  *   enable/disable by name and optionally restrict a hook to a subset of
  *   its events. Unknown names are reported in the return value, never
@@ -43,16 +45,29 @@ import type {
   HookEvent,
   HookEventKind,
   HookFn,
+  HookMatcher,
   HookSettings,
   HookSource,
 } from './types';
-import { ALL_HOOK_EVENTS, DEFAULT_HOOK_COMMAND_TIMEOUT_MS, HOOK_NAME_RE, HookRegistrationError } from './types';
+import {
+  ALL_HOOK_EVENTS,
+  DEFAULT_HOOK_COMMAND_TIMEOUT_MS,
+  DEFAULT_HOOK_PRIORITY,
+  HOOK_NAME_RE,
+  HookRegistrationError,
+} from './types';
 import {
   DEFAULT_HOOK_SCRIPT_TIMEOUT_MS,
   resolveHookScriptPath,
   runHookScript,
   type HookScriptOptions,
 } from './scriptRunner';
+import {
+  matchesHookMatcher,
+  normalizeHookMatcher,
+  validateHookPriority,
+  validateHookTimeoutMs,
+} from './matcher';
 import {
   assertValidHookCommandEntry,
   runHookCommand,
@@ -150,6 +165,14 @@ export class HookRegistry {
    */
   private readonly eventOverrides = new Map<string, Set<HookEventKind>>();
   /**
+   * v1.04 — per-hook matcher / priority / timeout overrides from
+   * settings (`applySettings`). Same pattern as `eventOverrides`:
+   * settings can narrow a hook without touching its code.
+   */
+  private readonly matcherOverrides = new Map<string, string[]>();
+  private readonly priorityOverrides = new Map<string, number>();
+  private readonly timeoutOverrides = new Map<string, number>();
+  /**
    * v1.01: validated config of every shell-command hook, by name. Only
    * command hooks appear here — function/script hooks have no settings
    * config to remember. Used by `listCommandHooks()` (Settings UI) and
@@ -182,7 +205,13 @@ export class HookRegistry {
     name: string,
     events: HookEventKind[],
     handler: HookFn,
-    opts: { description?: string; source?: HookSource } = {},
+    opts: {
+      description?: string;
+      source?: HookSource;
+      matcher?: HookMatcher;
+      priority?: number;
+      timeoutMs?: number;
+    } = {},
   ): HookDefinition {
     return this.register({
       name,
@@ -191,6 +220,9 @@ export class HookRegistry {
       handler,
       source: opts.source ?? 'settings',
       enabled: true,
+      ...(opts.matcher !== undefined ? { matcher: opts.matcher } : {}),
+      ...(opts.priority !== undefined ? { priority: opts.priority } : {}),
+      ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
     });
   }
 
@@ -236,6 +268,9 @@ export class HookRegistry {
       handler,
       source: def.source ?? 'plugin',
       enabled: true,
+      // v1.04: the script's own timeout is also the runner-level
+      // per-hook timeout, so one value bounds the whole invocation.
+      timeoutMs,
     });
   }
 
@@ -245,6 +280,9 @@ export class HookRegistry {
     this.byName.delete(name);
     this.commandDefs.delete(name);
     this.eventOverrides.delete(name);
+    this.matcherOverrides.delete(name);
+    this.priorityOverrides.delete(name);
+    this.timeoutOverrides.delete(name);
     const idx = this.order.indexOf(name);
     if (idx >= 0) this.order.splice(idx, 1);
     return true;
@@ -290,6 +328,10 @@ export class HookRegistry {
       handler,
       source: 'command',
       enabled: true,
+      // v1.04: matcher / priority / timeout from the validated entry.
+      ...(valid.matcher !== undefined ? { matcher: valid.matcher } : {}),
+      ...(valid.priority !== undefined ? { priority: valid.priority } : {}),
+      timeoutMs,
     });
     this.commandDefs.set(valid.name, valid);
     if (valid.enabled === false) this.disable(valid.name);
@@ -390,12 +432,45 @@ export class HookRegistry {
     return hook.events.filter((e) => override.has(e));
   }
 
+  /** v1.04 — tool-name matcher a hook effectively runs with (settings override wins). */
+  effectiveMatcher(name: string): string[] | undefined {
+    const override = this.matcherOverrides.get(name);
+    if (override !== undefined) return [...override];
+    const hook = this.byName.get(name);
+    if (!hook || hook.matcher === undefined) return undefined;
+    return Array.isArray(hook.matcher) ? [...hook.matcher] : [hook.matcher];
+  }
+
+  /** v1.04 — run priority a hook effectively runs with (settings override wins). */
+  effectivePriority(name: string): number {
+    const override = this.priorityOverrides.get(name);
+    if (override !== undefined) return override;
+    const hook = this.byName.get(name);
+    return hook?.priority ?? DEFAULT_HOOK_PRIORITY;
+  }
+
+  /** v1.04 — per-hook timeout a hook effectively runs with (settings override wins). */
+  effectiveTimeoutMs(name: string): number | undefined {
+    const override = this.timeoutOverrides.get(name);
+    if (override !== undefined) return override;
+    return this.byName.get(name)?.timeoutMs;
+  }
+
   /**
-   * Enabled hooks for one event, in registration order. This is the
-   * order the runner executes them in.
+   * Enabled hooks for one event, in run order: priority ascending
+   * (lower first), ties keep registration order (stable sort).
+   * For PreToolUse / PostToolUse, pass `toolName` so hooks whose
+   * matcher does not admit the tool are skipped.
    */
-  listForEvent(kind: HookEventKind): HookDefinition[] {
-    return this.listEnabled().filter((h) => this.effectiveEvents(h.name).includes(kind));
+  listForEvent(kind: HookEventKind, toolName?: string): HookDefinition[] {
+    const hooks = this.listEnabled().filter((h) => this.effectiveEvents(h.name).includes(kind));
+    const admitted =
+      toolName === undefined
+        ? hooks
+        : hooks.filter((h) => matchesHookMatcher(this.effectiveMatcher(h.name), toolName));
+    return admitted.sort(
+      (a, b) => this.effectivePriority(a.name) - this.effectivePriority(b.name),
+    );
   }
 
   enable(name: string): boolean {
@@ -423,9 +498,11 @@ export class HookRegistry {
   /**
    * Apply the `hooks` section of settings. For each entry: if the hook
    * exists, set its enabled state (default true) and, when `events` is
-   * given, restrict it to those events; otherwise record the name as
-   * unknown. Never throws for unknown names or bad entries — a bad
-   * settings line must not break the agent; the caller can log `unknown`.
+   * given, restrict it to those events; `matcher` / `priority` /
+   * `timeoutMs` (v1.04) override the hook's own values the same way.
+   * Otherwise record the name as unknown. Never throws for unknown
+   * names or bad entries — a bad settings line must not break the
+   * agent; the caller can log `unknown`.
    */
   applySettings(settings: HookSettings): ApplyHookSettingsResult {
     const applied: string[] = [];
@@ -450,6 +527,36 @@ export class HookRegistry {
         if (valid.length > 0) this.eventOverrides.set(entry.name, new Set(valid));
       } else {
         this.eventOverrides.delete(entry.name);
+      }
+      // v1.04 — matcher / priority / timeout overrides (bad values are
+      // ignored, never fatal: settings must not break the agent).
+      if (entry.matcher !== undefined) {
+        try {
+          const normalized = normalizeHookMatcher(entry.matcher);
+          if (normalized !== undefined) this.matcherOverrides.set(entry.name, normalized);
+        } catch {
+          // Invalid matcher in settings: keep the hook's own matcher.
+        }
+      } else {
+        this.matcherOverrides.delete(entry.name);
+      }
+      if (entry.priority !== undefined) {
+        try {
+          this.priorityOverrides.set(entry.name, validateHookPriority(entry.priority, entry.name));
+        } catch {
+          // Invalid priority in settings: keep the hook's own priority.
+        }
+      } else {
+        this.priorityOverrides.delete(entry.name);
+      }
+      if (entry.timeoutMs !== undefined) {
+        try {
+          this.timeoutOverrides.set(entry.name, validateHookTimeoutMs(entry.timeoutMs, entry.name));
+        } catch {
+          // Invalid timeout in settings: keep the hook's own timeout.
+        }
+      } else {
+        this.timeoutOverrides.delete(entry.name);
       }
       applied.push(entry.name);
     }
@@ -511,4 +618,8 @@ function validateDefinition(def: HookDefinition): void {
   if (typeof def.handler !== 'function') {
     throw new HookRegistrationError(`Hook "${def.name}" must have a function handler.`);
   }
+  // v1.04 — matcher / priority / per-hook timeout validation.
+  if (def.matcher !== undefined) normalizeHookMatcher(def.matcher);
+  if (def.priority !== undefined) validateHookPriority(def.priority, def.name);
+  if (def.timeoutMs !== undefined) validateHookTimeoutMs(def.timeoutMs, def.name);
 }

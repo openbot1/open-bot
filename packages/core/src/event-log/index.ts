@@ -18,11 +18,7 @@ export {
   resumeRun,
 } from './control';
 export type { ForkRunResult, PauseResumeResult, RunPauseGateLike } from './control';
-export {
-  foldEvents,
-  replayDeterministically,
-  replayMatches,
-} from './replay';
+export { REDACTED_TEXT, foldEvents, replayDeterministically, replayMatches } from './replay';
 export type { ReplayDriverHandlers } from './replay';
 export { RunLogRecorder } from './recorder';
 export type { LoopRunLogWiring, RunLogRecorderOptions, RunLogSink } from './recorder';
@@ -48,18 +44,80 @@ export type {
   AuditQuery,
   AuditSummary,
 } from './audit';
+// v1.03 (Đội T1): time-travel / fork tại seq, redaction, stuck detection, condenser.
+export { compactRun, condenseEvents, estimateEventTokens, shouldCondense } from './condenser';
+export type { CompactRunResult, CondenseCheck, CondenseOptions, Condensation } from './condenser';
+// v1.04 (Đội T4): snapshot trạng thái đã fold + condenser v2 (3 chiến lược).
+export {
+  RUN_SNAPSHOT_SUFFIX,
+  RUN_SNAPSHOT_VERSION,
+  RUN_SNAPSHOTS_DIR,
+  createRunSnapshot,
+  deleteRunSnapshot,
+  listRunSnapshots,
+  loadRunSnapshot,
+  mergeReplayedStates,
+  pruneRunSnapshots,
+  restoreRunState,
+  snapshotFileName,
+  snapshotFilePath,
+  snapshotsDirFor,
+  tailMergeHints,
+  verifyRestoredState,
+  verifySnapshotObject,
+} from './snapshot';
+export type {
+  CreateRunSnapshotResult,
+  RestoreRunStateResult,
+  RunSnapshot,
+  RunSnapshotMeta,
+  RunSnapshotOptions,
+  TailMergeHints,
+} from './snapshot';
+export {
+  EXTRACT_KEEP_TYPES,
+  compactRunV2,
+  condenseEventsV2,
+  condenseRunV2,
+  countErrorEvents,
+  describeEventLine,
+  estimateEventsTokens,
+  recommendStrategy,
+} from './condenser-v2';
+export type {
+  CompactRunV2Result,
+  CondenseStrategyV2,
+  CondenseV2Options,
+  CondenserV2Report,
+  StrategyRecommendation,
+} from './condenser-v2';
+export { findEventsContaining, redactEvent, redactedSeqs } from './redaction';
+export type { RedactResult } from './redaction';
+export { STUCK_SUGGESTION_KEYS, detectStuck, detectStuckForRun, recordStuckDetection } from './stuck';
+export type { StuckOptions, StuckReport, StuckSignal, StuckSignalKind } from './stuck';export {
+  compareRunStates,
+  forkRunAt,
+  listChildRuns,
+  readRunEvents,
+  replayUpTo,
+  timeTravelTo,
+} from './timeTravel';
+export type { RunBranch, RunStateDiff, TimeTravelResult } from './timeTravel';
 export type {
   AnyRunEvent,
   ApprovalPayload,
   CheckpointSavedPayload,
   CompileErrorPayload,
   DeterministicReplayResult,
+  EventRedactedPayload,
   FileChangePayload,
   ModelResponsePayload,
   NewRunEvent,
   ReplayedRunState,
   ReplayedToolCall,
   ReplayedTranscriptEntry,
+  RunCompactedPayload,
+  RunCompactionInfo,
   RunEndPayload,
   RunEvent,
   RunEventPayloadMap,
@@ -72,6 +130,8 @@ export type {
   RunPromptPayload,
   RunStartedPayload,
   RunStatus,
+  StuckDetectedPayload,
+  StuckDetectionInfo,
   ToolCallPayload,
   ToolResultPayload,
 } from './types';

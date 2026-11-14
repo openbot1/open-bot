@@ -21,6 +21,7 @@ export type {
   HookEvent,
   HookEventKind,
   HookFn,
+  HookMatcher,
   HookSettings,
   HookSettingsEntry,
   HookSource,
@@ -41,6 +42,7 @@ export {
   blockDecision,
   blockStopDecision,
   DEFAULT_HOOK_COMMAND_TIMEOUT_MS,
+  DEFAULT_HOOK_PRIORITY,
   HOOK_NAME_RE,
   HookRegistrationError,
   MAX_HOOK_COMMAND_TIMEOUT_MS,
@@ -50,6 +52,16 @@ export {
   modifyContextDecision,
   modifyOutputDecision,
 } from './types';
+
+// --- v1.04: tool-name matcher + run priority + per-hook timeout ---
+export {
+  isToolHookEvent,
+  matchesHookMatcher,
+  matchesToolName,
+  normalizeHookMatcher,
+  validateHookPriority,
+  validateHookTimeoutMs,
+} from './matcher';
 
 export {
   ALL_HOOK_EVENTS,
@@ -136,6 +148,7 @@ export type { CreateTestGateHookOptions, TestGateCommandResult, TestGateConfig, 
 // --- v1.01: whole-settings validation (hooks commands + test gate) ---
 export {
   validateHookCommandsList,
+  validateHookFunctionSettingsList,
   validateHookSettings,
   validateHookSettingsFiles,
   validateTestGateInput,

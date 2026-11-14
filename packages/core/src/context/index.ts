@@ -44,3 +44,106 @@ export { VirtualComputer } from './virtualComputer';
 export type { VirtualComputerOptions, VirtualComputerRunResult } from './virtualComputer';
 export { LongRunCompaction } from './longRunCompaction';
 export type { LongRunCompactionOptions, LongRunCompactionResult } from './longRunCompaction';
+// --- v1.05 (Đội T4): context engineering v2 — tiered compaction,
+// verified summaries, 1M-token window manager, disk spill, per-bot
+// policies, inspector + snapshots, session runtime. ---
+export {
+  DEFAULT_TIER_RETENTION,
+  TieredCompactor,
+  groupSummariesByTopic,
+  topicLabelFor,
+} from './tieredCompaction';
+export type {
+  CompactableTurn,
+  CompactionTier,
+  TieredCompactionResult,
+  TierRetentionPolicy,
+  TierSummary,
+} from './tieredCompaction';
+export {
+  classifyAnchorLine,
+  countAnchorsByKind,
+  extractAnchors,
+  filterAnchors,
+  formatAnchors,
+} from './anchors';
+export type { Anchor, AnchorKind, AnchorSourceMessage } from './anchors';
+export {
+  buildVerifiedSummary,
+  claimsFromText,
+  salientTokensOf,
+  verifyClaim,
+  verifySummary,
+  verifiedSummaryMarkdown,
+  auditVerifiedSummaries,
+} from './verifiedSummary';
+export type {
+  AuditedSummary,
+  ClaimStatus,
+  SummaryClaim,
+  VerifiedClaim,
+  VerifiedSummary,
+  VerificationSource,
+} from './verifiedSummary';
+export {
+  ContextWindowManager,
+  WINDOW_THRESHOLDS,
+} from './windowManager';
+export type {
+  ContextSegment,
+  SegmentKind,
+  ThresholdAlert,
+  ThresholdName,
+  WindowManagerOptions,
+  WindowStats,
+} from './windowManager';
+export { SpillStore } from './spillStore';
+export type { SpilledSegment } from './spillStore';
+export {
+  COMPACTION_POLICY_PRESETS,
+  CompactionPolicyStore,
+  defaultCompactionPolicy,
+  estimateSavings,
+  presetCompactionPolicy,
+  validatePolicy,
+} from './compactionPolicy';
+export type {
+  CompactionFrequency,
+  CompactionPolicy,
+  SavingsEstimate,
+} from './compactionPolicy';
+export {
+  exportSnapshot,
+  importSnapshot,
+  inspectWindow,
+  snapshotToMarkdown,
+  validateSnapshot,
+  exportContextBundle,
+} from './contextInspector';
+export type {
+  AnchorLike,
+  ContextSnapshot,
+  ContextTree,
+  InspectorNode,
+  TierSummaryLike,
+} from './contextInspector';
+export { ContextV2Runtime } from './contextV2Runtime';
+export type { CompactTurnsResult, ContextV2RuntimeOptions } from './contextV2Runtime';
+export {
+  HOURLY_COMPACTION_INTERVAL_MS,
+  CompactionScheduler,
+} from './compactionScheduler';
+export type { BotScheduleStatus, ScheduleDecision } from './compactionScheduler';
+export { TierStore, emptyStoredTiers, searchStoredAnchors } from './tierStore';
+export type { StoredAnchorHit, StoredTiers } from './tierStore';
+export {
+  assemblePrompt,
+  assemblyManifest,
+  estimateAssemblyTokens,
+} from './contextAssembly';
+export type { AssembledMessage, AssembleOptions, AssemblyResult } from './contextAssembly';
+export {
+  buildCompactionReport,
+  compactionReportMarkdown,
+} from './compactionReport';
+export type { CompactionReport } from './compactionReport';

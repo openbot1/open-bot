@@ -49,6 +49,9 @@ import {
   type ServerTaskHandleData,
   type McpTaskRunnerContext,
 } from './taskStore';
+import { checkTasksMethodAllowed, resolveTasksSpecVersion } from './tasksSpec';
+import type { McpTaskSpecVersion } from './tasks';
+import { extractMrtrToolResult } from './mrtrClient';
 import { McpAuditLog, summarizeMcpResult } from './auditLog';
 import {
   McpNotificationHub,
@@ -183,6 +186,18 @@ export interface McpServerOptions {
    * thì không tốn gì, và client cũ không gọi các method này.
    */
   tasksEnabled?: boolean;
+  /**
+   * v1.04 (MCP 2.0, Tasks extension): pin cứng phiên bản tasks
+   * server nói — `'2026-07-28'` (extension chính thức
+   * `io.modelcontextprotocol/tasks`: `tasks/get` trả luôn kết quả
+   * cuối, `tasks/update` gửi input, KHÔNG có `tasks/list` /
+   * `tasks/result`) hoặc `'2025-11-25'` (compat: giữ hai method
+   * cũ). Không đặt thì phiên bản tasks suy ra từ protocol version
+   * đã thương lượng: client 2026 → Tasks 2026, client 2025 trở
+   * xuống → Tasks 2025 (client cũ không vỡ khi server lên 2026).
+   * Xem `tasksSpec.ts`.
+   */
+  tasksSpecVersion?: McpTaskSpecVersion;
   /**
    * v1.02 (protocol stack): audit log every request this server
    * answers (method, tool, redacted args, outcome, duration). Not
@@ -415,6 +430,11 @@ export class McpServer {
   /** v0.97: server-side task store (Tasks extension, spec 2026-07-28). */
   private readonly taskStore: McpTaskStore;
   private readonly tasksEnabled: boolean;
+  /**
+   * v1.04: pin cứng phiên bản tasks (undefined = suy ra từ protocol
+   * version đã thương lượng, xem `effectiveTasksSpecVersion()`).
+   */
+  private readonly tasksSpecVersionOverride: McpTaskSpecVersion | undefined;
   /** v0.97: deprecation shim — sampling/roots/logging vẫn chạy, có cảnh báo. */
   private readonly deprecationShim: DeprecationShim;
   /** v1.02: audit log for answered requests (undefined = no audit). */
@@ -432,6 +452,9 @@ export class McpServer {
     this.workspaceDir = options.workspaceDir;
     this.onLog = options.onLog;
     this.tasksEnabled = options.tasksEnabled ?? true;
+    this.tasksSpecVersionOverride = options.tasksSpecVersion
+      ? resolveTasksSpecVersion(options.tasksSpecVersion)
+      : undefined;
     this.auditLogger = options.auditLogger;
     this.notificationHub = options.notificationHub ?? new McpNotificationHub();
     this.callerLabel = options.caller ?? this.name;
@@ -543,6 +566,25 @@ export class McpServer {
   /** v0.97: deprecation notices recorded so far (sampling/roots/logging use). */
   getDeprecationNotices(): DeprecationNotice[] {
     return this.deprecationShim.getNotices();
+  }
+
+  /**
+   * v1.04: phiên bản tasks đang có hiệu lực. Option
+   * `tasksSpecVersion` (nếu đặt) pin cứng; không thì suy ra từ
+   * protocol version đã thương lượng — client 2026 nói Tasks 2026
+   * (không tasks/list / tasks/result), client 2025 trở xuống nói
+   * Tasks 2025 (compat).
+   */
+  private effectiveTasksSpecVersion(): McpTaskSpecVersion {
+    if (this.tasksSpecVersionOverride) return this.tasksSpecVersionOverride;
+    return this.negotiatedProtocolVersion === MCP_PROTOCOL_VERSION_2026
+      ? '2026-07-28'
+      : '2025-11-25';
+  }
+
+  /** v1.04: phiên bản Tasks extension server đang nói (đang có hiệu lực). */
+  getTasksSpecVersion(): McpTaskSpecVersion {
+    return this.effectiveTasksSpecVersion();
   }
 
   /** Đăng ký thêm tool sau khi tạo server (chỉ trước khi có client). */
@@ -924,6 +966,13 @@ export class McpServer {
         }
       }
       case 'tasks/result': {
+        // v1.04: method này chỉ tồn tại ở shape 2025-11-25. Ở
+        // extension 2026-07-28, client lấy kết quả cuối qua
+        // `tasks/get` — trả -32601 kèm thông điệp migration.
+        const allowedResult = checkTasksMethodAllowed('tasks/result', this.effectiveTasksSpecVersion());
+        if (!allowedResult.allowed) {
+          return this.fail(id, JSON_RPC_METHOD_NOT_FOUND, allowedResult.error.message);
+        }
         // Shape 2025-11-25: client lấy kết quả cuối sau khi completed.
         if (!this.tasksEnabled) {
           return this.fail(id, JSON_RPC_METHOD_NOT_FOUND, 'Tasks extension chưa bật trên server này.');
@@ -951,7 +1000,13 @@ export class McpServer {
         }
       }
       case 'tasks/list': {
-        // Shape 2025-11-25 (bỏ ở extension 2026-07-28): liệt kê task.
+        // v1.04: method này chỉ tồn tại ở shape 2025-11-25 (bỏ ở
+        // extension 2026-07-28) — trả -32601 kèm thông điệp migration.
+        const allowedList = checkTasksMethodAllowed('tasks/list', this.effectiveTasksSpecVersion());
+        if (!allowedList.allowed) {
+          return this.fail(id, JSON_RPC_METHOD_NOT_FOUND, allowedList.error.message);
+        }
+        // Shape 2025-11-25: liệt kê task.
         if (!this.tasksEnabled) {
           return this.fail(id, JSON_RPC_METHOD_NOT_FOUND, 'Tasks extension chưa bật trên server này.');
         }
@@ -991,6 +1046,12 @@ export class McpServer {
         const args = asArgs(params['arguments']);
         try {
           const raw = await tool.handler(args);
+          // v1.04 (MRTR, SEP-2322): handler trả `resultType` thì đó
+          // là kết quả multi-round-trip — trả thẳng, không bọc vào
+          // content block (bọc vào thì client chỉ thấy text và round
+          // trip chết). Xem `mrtrClient.ts: extractMrtrToolResult`.
+          const mrtr = extractMrtrToolResult(raw);
+          if (mrtr) return this.ok(id, mrtr);
           const text = typeof raw === 'string' ? raw : raw.text;
           const structured = typeof raw === 'string' ? undefined : raw.structuredContent;
           const isError = typeof raw === 'string' ? false : raw.isError === true;

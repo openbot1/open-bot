@@ -18,6 +18,8 @@ import * as path from 'node:path';
 import { normalizeTestGateConfig, testGateCommands } from './testGate';
 import type { TestGateConfig } from './testGate';
 import { validateHookCommandEntry } from './shellCommandRunner';
+import { ALL_HOOK_EVENTS, HOOK_NAME_RE } from './types';
+import type { HookEventKind } from './types';
 
 /** One problem found in a hooks settings object. */
 export interface HookSettingsIssue {
@@ -66,6 +68,82 @@ export function validateHookSettings(input: unknown): HookSettingsIssue[] {
   if (obj['testGate'] !== undefined) {
     issues.push(...validateTestGateInput(obj['testGate']));
   }
+  if (obj['hooks'] !== undefined) {
+    if (!Array.isArray(obj['hooks'])) {
+      issues.push({ field: 'hooks', message: 'hooks phải là một mảng.' });
+    } else {
+      issues.push(...validateHookFunctionSettingsList(obj['hooks']));
+    }
+  }
+  return issues;
+}
+
+/**
+ * Validate the `hooks` list (function-hook settings entries, v1.04):
+ * name must look like a hook name, `enabled` a boolean, `events` a
+ * non-empty subset of known events, `matcher` a glob or list of globs,
+ * `priority` an integer, `timeoutMs` an integer in 100…300000ms.
+ * Unknown hook names are NOT flagged here — the hook may be registered
+ * later by a plugin; `applySettings` reports those at apply time.
+ */
+export function validateHookFunctionSettingsList(list: unknown[]): HookSettingsIssue[] {
+  const issues: HookSettingsIssue[] = [];
+  list.forEach((raw, i) => {
+    const base = `hooks[${i}]`;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      issues.push({ field: base, message: 'Mỗi hook phải là một object.' });
+      return;
+    }
+    const obj = raw as Record<string, unknown>;
+    const name = typeof obj['name'] === 'string' ? obj['name'] : '';
+    if (!name || !HOOK_NAME_RE.test(name)) {
+      issues.push({
+        field: `${base}.name`,
+        message: `Tên hook "${String(obj['name'] ?? '')}" không hợp lệ: chỉ dùng chữ thường, số, "-" và "_".`,
+      });
+    }
+    if (obj['enabled'] !== undefined && typeof obj['enabled'] !== 'boolean') {
+      issues.push({ field: `${base}.enabled`, message: 'enabled phải là true/false.' });
+    }
+    if (obj['events'] !== undefined) {
+      if (!Array.isArray(obj['events']) || obj['events'].length === 0) {
+        issues.push({ field: `${base}.events`, message: 'events phải là một mảng không rỗng.' });
+      } else {
+        for (const e of obj['events'] as unknown[]) {
+          if (typeof e !== 'string' || !ALL_HOOK_EVENTS.includes(e as HookEventKind)) {
+            issues.push({
+              field: `${base}.events`,
+              message: `Event không hợp lệ: "${String(e)}". Event hợp lệ: ${ALL_HOOK_EVENTS.join(', ')}.`,
+            });
+          }
+        }
+      }
+    }
+    if (obj['matcher'] !== undefined) {
+      const m = obj['matcher'];
+      const items = Array.isArray(m) ? m : [m];
+      if (items.length === 0 || items.some((x) => typeof x !== 'string' || x.trim() === '')) {
+        issues.push({
+          field: `${base}.matcher`,
+          message: 'matcher phải là một glob tên tool (vd "shell-*") hoặc một mảng glob không rỗng.',
+        });
+      }
+    }
+    if (obj['priority'] !== undefined) {
+      if (typeof obj['priority'] !== 'number' || !Number.isInteger(obj['priority'])) {
+        issues.push({ field: `${base}.priority`, message: 'priority phải là một số nguyên.' });
+      }
+    }
+    if (obj['timeoutMs'] !== undefined) {
+      const t = obj['timeoutMs'];
+      if (typeof t !== 'number' || !Number.isInteger(t) || t < 100 || t > 300_000) {
+        issues.push({
+          field: `${base}.timeoutMs`,
+          message: 'timeoutMs phải là số nguyên từ 100ms đến 300000ms.',
+        });
+      }
+    }
+  });
   return issues;
 }
 

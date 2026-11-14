@@ -57,6 +57,15 @@ import { McpDispatcher } from './dispatcher';
 import { buildMcpClientCapabilities, registerDefaultMcpClientHandlers } from './clientHandlers';
 import { parseStepUpScope } from './oauth';
 import { discoverServer, type ServerDiscoverResult } from './stateless';
+import {
+  attachStatelessMetaToParams,
+  buildRequestStatelessMeta,
+  negotiateStatelessConnection,
+  statelessCapabilitiesFor,
+  type StatelessNegotiation,
+} from './statelessClient';
+import { runToolCallMultiRoundTrip } from './mrtrClient';
+import type { MrtrHandlers, MrtrRoundRecord } from './mrtr';
 import { StreamableHttpTransport } from './transport';
 import { summarizeMcpResult, type McpAuditLog } from './auditLog';
 import { registerMcpListChangedHandlers, type McpListKind } from './notifications';
@@ -1206,6 +1215,10 @@ export class StdioMcpClient implements McpClient {
   private closed = false;
   private spawnError: Error | null = null;
   negotiatedProtocolVersion: string | undefined;
+  /** v1.04: true khi client đang nói stateless MCP 2.0 (mọi request mang _meta riêng). */
+  statelessActive = false;
+  /** v1.04: kết quả thương lượng của `connectMcp` (null trước khi connect xong). */
+  statelessNegotiation: StatelessNegotiation | null = null;
   /**
    * Dispatcher cho mọi message do server khởi xướng (v0.13, W5a).
    * Public để coordinator đăng ký handler elicitation / sampling /
@@ -1424,6 +1437,22 @@ export class StdioMcpClient implements McpClient {
    * probe, is skipped). A synchronous throw (not started / already
    * closed) is audited too, then rethrown unchanged.
    */
+  /**
+   * v1.04 (MCP 2.0): ở mode stateless, mọi request mang `_meta`
+   * riêng (protocol version + capabilities). `initialize` và
+   * `server/discover` không bao giờ được gắn — handshake là
+   * handshake, discovery là cách tìm ra stateless mode.
+   */
+  private statelessParams(method: string, params: unknown): unknown {
+    if (!this.statelessActive) return params;
+    if (method === 'initialize' || method === 'server/discover') return params;
+    if (params !== undefined && !isRecord(params)) return params;
+    return attachStatelessMetaToParams(params as Record<string, unknown> | undefined, buildRequestStatelessMeta({
+      protocolVersion: this.negotiatedProtocolVersion ?? MCP_PROTOCOL_VERSION_2026,
+      capabilities: statelessCapabilitiesFor(this.config.capabilities),
+    }));
+  }
+
   private request(
     method: string,
     params?: unknown,
@@ -1434,14 +1463,15 @@ export class StdioMcpClient implements McpClient {
       onProgress?: McpProgressCallback;
     },
   ): Promise<unknown> {
+    const sendParams = this.statelessParams(method, params);
     if (!this.config.auditLogger || method === 'ping') {
-      return this.requestInner(method, params, options);
+      return this.requestInner(method, sendParams, options);
     }
     const startedAt = Date.now();
     const at = new Date(startedAt).toISOString();
     let inner: Promise<unknown>;
     try {
-      inner = this.requestInner(method, params, options);
+      inner = this.requestInner(method, sendParams, options);
     } catch (err) {
       recordMcpClientAudit(
         this.config,
@@ -1575,6 +1605,10 @@ export class StdioMcpClient implements McpClient {
     this.negotiatedProtocolVersion = negotiateProtocolVersion(
       typeof rec['protocolVersion'] === 'string' ? rec['protocolVersion'] : undefined,
     );
+    // v1.04: handshake xong thì không còn stateless — request sau này
+    // đi theo session, không mang _meta stateless nữa.
+    this.statelessActive = false;
+    this.statelessNegotiation = null;
     return {
       name: typeof serverInfo['name'] === 'string' ? serverInfo['name'] : this.config.name,
       version: typeof serverInfo['version'] === 'string' ? serverInfo['version'] : '',
@@ -1681,6 +1715,54 @@ export class StdioMcpClient implements McpClient {
     }
   }
 
+  /**
+   * v1.04 (MCP 2.0, MRTR — SEP-2322): `tools/call` qua bao nhiêu
+   * round server yêu cầu. Server cũ (không trả `resultType`) xong
+   * trong 1 round. Handlers do coordinator nối (xem
+   * `mrtrClient.ts: buildDefaultMrtrHandlers`); thiếu handler cho
+   * kind server hỏi thì fail bằng `MrtrError`, không bịa đáp án.
+   * Round cuối `complete` được parse y như `callToolStructured`
+   * (cùng xử lý -32602 thành tool error).
+   */
+  async callToolMrtr(
+    name: string,
+    args: Record<string, unknown> = {},
+    handlers: MrtrHandlers = {},
+    options: { maxRounds?: number; outputSchema?: unknown } = {},
+  ): Promise<{
+    result: McpToolCallResult;
+    rounds: number;
+    roundTripId?: string;
+    history: MrtrRoundRecord[];
+  }> {
+    try {
+      const outcome = await runToolCallMultiRoundTrip(
+        { requestJsonRpc: (method, params) => this.request(method, params) },
+        name,
+        args,
+        handlers,
+        {
+          ...(options.maxRounds !== undefined ? { maxRounds: options.maxRounds } : {}),
+          protocolVersion: this.negotiatedProtocolVersion ?? MCP_PROTOCOL_VERSION_2026,
+        },
+      );
+      return {
+        result: parseToolCallResult(outcome.result, options?.outputSchema),
+        rounds: outcome.rounds,
+        ...(outcome.roundTripId ? { roundTripId: outcome.roundTripId } : {}),
+        history: outcome.history,
+      };
+    } catch (err) {
+      // Cùng xử lý -32602 như callToolStructured: invalid params là
+      // tool error, không phải lỗi protocol — trả result isError.
+      const invalidParams = invalidParamsToolCallResult(err, this.config.name, name);
+      if (invalidParams) {
+        return { result: invalidParams, rounds: 1, history: [] };
+      }
+      throw err;
+    }
+  }
+
   async listResources(): Promise<McpResource[]> {
     try {
       return parseResources(await this.request('resources/list'));
@@ -1771,6 +1853,10 @@ export class StreamableHttpMcpClient implements McpClient {
    */
   private transport: StreamableHttpTransport | null = null;
   negotiatedProtocolVersion: string | undefined;
+  /** v1.04: true khi client đang nói stateless MCP 2.0 (mọi request mang _meta riêng). */
+  statelessActive = false;
+  /** v1.04: kết quả thương lượng của `connectMcp` (null trước khi connect xong). */
+  statelessNegotiation: StatelessNegotiation | null = null;
   /**
    * Dispatcher cho mọi message do server khởi xướng (v0.13, W5a) —
    * giống stdio client. Từ v0.13 (integration), response cho
@@ -1919,7 +2005,9 @@ export class StreamableHttpMcpClient implements McpClient {
       reconnectPolicy: this.reconnectPolicy,
       onServerMessage: (msg) => this.dispatchServerMessage(msg),
     });
-    transport.setSessionId(this.sessionId);
+    // v1.05: stateless mode không mở stream SSE và không dùng
+    // session id — không set session vào transport.
+    if (!this.statelessActive) transport.setSessionId(this.sessionId);
     this.transport = transport;
     await transport.openStream();
   }
@@ -2001,7 +2089,11 @@ export class StreamableHttpMcpClient implements McpClient {
       };
       // An OAuth token from the provider wins over a static header.
       if (authValue) headers['Authorization'] = authValue;
-      if (this.sessionId) headers['Mcp-Session-Id'] = this.sessionId;
+      // v1.05 (MCP 2.0 stateless): khi statelessActive thì KHÔNG BAO
+      // GIỜ gửi Mcp-Session-Id — mọi request đã tự mang _meta.
+      // Kể cả khi server trả session id trong response, client
+      // stateless cũng không lưu nó (xem dưới).
+      if (this.sessionId && !this.statelessActive) headers['Mcp-Session-Id'] = this.sessionId;
       const res = await fetch(this.config.url as string, {
         method: 'POST',
         headers,
@@ -2009,7 +2101,9 @@ export class StreamableHttpMcpClient implements McpClient {
         signal: controller.signal,
       });
       const sessionId = res.headers.get('mcp-session-id');
-      if (sessionId) this.sessionId = sessionId;
+      // v1.05: client stateless không lưu session id server trả —
+      // lưu rồi sẽ vô tình gửi lại ở request sau.
+      if (sessionId && !this.statelessActive) this.sessionId = sessionId;
       const text = await this.readRpcBody(res, options?.expectedId);
       return {
         status: res.status,
@@ -2232,6 +2326,22 @@ export class StreamableHttpMcpClient implements McpClient {
    * here, so one wrapper audits all calls (`ping`, the keepalive
    * probe, is skipped). Failures are audited, then rethrown unchanged.
    */
+  /**
+   * v1.04 (MCP 2.0): ở mode stateless, mọi request mang `_meta`
+   * riêng (protocol version + capabilities). `initialize` và
+   * `server/discover` không bao giờ được gắn — handshake là
+   * handshake, discovery là cách tìm ra stateless mode.
+   */
+  private statelessParams(method: string, params: unknown): unknown {
+    if (!this.statelessActive) return params;
+    if (method === 'initialize' || method === 'server/discover') return params;
+    if (params !== undefined && !isRecord(params)) return params;
+    return attachStatelessMetaToParams(params as Record<string, unknown> | undefined, buildRequestStatelessMeta({
+      protocolVersion: this.negotiatedProtocolVersion ?? MCP_PROTOCOL_VERSION_2026,
+      capabilities: statelessCapabilitiesFor(this.config.capabilities),
+    }));
+  }
+
   private async request(
     method: string,
     params?: unknown,
@@ -2242,13 +2352,14 @@ export class StreamableHttpMcpClient implements McpClient {
       onProgress?: McpProgressCallback;
     },
   ): Promise<unknown> {
+    const sendParams = this.statelessParams(method, params);
     if (!this.config.auditLogger || method === 'ping') {
-      return this.requestInner(method, params, options);
+      return this.requestInner(method, sendParams, options);
     }
     const startedAt = Date.now();
     const at = new Date(startedAt).toISOString();
     try {
-      const result = await this.requestInner(method, params, options);
+      const result = await this.requestInner(method, sendParams, options);
       recordMcpClientAudit(
         this.config,
         method,
@@ -2339,6 +2450,10 @@ export class StreamableHttpMcpClient implements McpClient {
     this.negotiatedProtocolVersion = negotiateProtocolVersion(
       typeof rec['protocolVersion'] === 'string' ? rec['protocolVersion'] : undefined,
     );
+    // v1.04: handshake xong thì không còn stateless — request sau này
+    // đi theo session, không mang _meta stateless nữa.
+    this.statelessActive = false;
+    this.statelessNegotiation = null;
     // v0.13: mở GET SSE stream để nhận message do server khởi xướng
     // sau handshake. Best-effort — server không hỗ trợ GET stream
     // (405) thì client vẫn chạy bằng POST như trước.
@@ -2451,6 +2566,54 @@ export class StreamableHttpMcpClient implements McpClient {
     }
   }
 
+  /**
+   * v1.04 (MCP 2.0, MRTR — SEP-2322): `tools/call` qua bao nhiêu
+   * round server yêu cầu. Server cũ (không trả `resultType`) xong
+   * trong 1 round. Handlers do coordinator nối (xem
+   * `mrtrClient.ts: buildDefaultMrtrHandlers`); thiếu handler cho
+   * kind server hỏi thì fail bằng `MrtrError`, không bịa đáp án.
+   * Round cuối `complete` được parse y như `callToolStructured`
+   * (cùng xử lý -32602 thành tool error).
+   */
+  async callToolMrtr(
+    name: string,
+    args: Record<string, unknown> = {},
+    handlers: MrtrHandlers = {},
+    options: { maxRounds?: number; outputSchema?: unknown } = {},
+  ): Promise<{
+    result: McpToolCallResult;
+    rounds: number;
+    roundTripId?: string;
+    history: MrtrRoundRecord[];
+  }> {
+    try {
+      const outcome = await runToolCallMultiRoundTrip(
+        { requestJsonRpc: (method, params) => this.request(method, params) },
+        name,
+        args,
+        handlers,
+        {
+          ...(options.maxRounds !== undefined ? { maxRounds: options.maxRounds } : {}),
+          protocolVersion: this.negotiatedProtocolVersion ?? MCP_PROTOCOL_VERSION_2026,
+        },
+      );
+      return {
+        result: parseToolCallResult(outcome.result, options?.outputSchema),
+        rounds: outcome.rounds,
+        ...(outcome.roundTripId ? { roundTripId: outcome.roundTripId } : {}),
+        history: outcome.history,
+      };
+    } catch (err) {
+      // Cùng xử lý -32602 như callToolStructured: invalid params là
+      // tool error, không phải lỗi protocol — trả result isError.
+      const invalidParams = invalidParamsToolCallResult(err, this.config.name, name);
+      if (invalidParams) {
+        return { result: invalidParams, rounds: 1, history: [] };
+      }
+      throw err;
+    }
+  }
+
   async listResources(): Promise<McpResource[]> {
     try {
       return parseResources(await this.request('resources/list'));
@@ -2520,7 +2683,10 @@ export async function connectMcp(config: McpServerConfig): Promise<McpClient> {
     config.capabilities || !config.clientHandlers
       ? config
       : { ...config, capabilities: buildMcpClientCapabilities(config.clientHandlers) };
-  const client: McpClient = effectiveConfig.command
+  // v1.04: giữ kiểu cụ thể (Stdio | StreamableHttp) thay vì
+  // McpClient — cả hai đều có discover() + negotiatedProtocolVersion
+  // mà negotiateStatelessConnection cần.
+  const client = effectiveConfig.command
     ? new StdioMcpClient(effectiveConfig)
     : effectiveConfig.url
       ? new StreamableHttpMcpClient(effectiveConfig)
@@ -2532,13 +2698,17 @@ export async function connectMcp(config: McpServerConfig): Promise<McpClient> {
   if (config.clientHandlers) {
     registerDefaultMcpClientHandlers(client, config.clientHandlers);
   }
-  // v0.97 (MCP 2.0): stateless mode — no `initialize` handshake, no
-  // session id. Best-effort `server/discover` replaces the handshake;
-  // a pre-2.0 server answers -32601 (discover() returns null) and the
-  // client still works, because every later request carries `_meta`.
+  // v1.04 (MCP 2.0): stateless / 'auto' — thử `server/discover`
+  // trước; server 2026 thì stateless, server pre-2.0 ('auto')
+  // fallback về handshake `initialize` (xem statelessClient.ts).
+  // `stateless: true` giữ hành vi v0.97: stateless-only, không
+  // handshake dù server không biết discover.
   if (effectiveConfig.stateless) {
     try {
-      await client.discover?.();
+      const negotiation = await negotiateStatelessConnection(client, effectiveConfig.stateless);
+      client.statelessActive = negotiation.mode === 'stateless';
+      client.statelessNegotiation = negotiation;
+      client.negotiatedProtocolVersion = negotiation.protocolVersion;
     } catch (err) {
       await client.close().catch(() => undefined);
       throw err;

@@ -22,6 +22,7 @@
  */
 import type { McpClient, McpRequestOptions } from './types';
 import type { McpTaskTransport } from './tasks';
+import { createTask, tasksSpecVersionForProtocol, type CreateTaskOptions, type McpTaskSpecVersion, type TaskHandle } from './tasks';
 import type { McpRpcTransport } from './prompts';
 
 function requireRequestJsonRpc(client: McpClient): NonNullable<McpClient['requestJsonRpc']> {
@@ -41,6 +42,38 @@ export function clientAsTaskTransport(client: McpClient): McpTaskTransport {
     request: (method: string, params?: Record<string, unknown>) =>
       requestJsonRpc(method, params),
   };
+}
+
+/**
+ * v1.04: phiên bản Tasks extension một client đang nói, suy từ
+ * protocol version nó đã thương lượng với server (xem
+ * `tasks.ts: tasksSpecVersionForProtocol`). Client 2026 nói Tasks
+ * 2026 (`tasks/get` trả kết quả, `tasks/update` gửi input);
+ * client cũ hơn — hoặc chưa thương lượng xong — nói Tasks 2025
+ * (`tasks/result` + `tasks/list`). Nhờ vậy `TaskHandle` không bao
+ * giờ gọi method mà server đã bỏ theo spec mới.
+ */
+export function clientTasksSpecVersion(client: McpClient): McpTaskSpecVersion {
+  return tasksSpecVersionForProtocol(client.negotiatedProtocolVersion);
+}
+
+/**
+ * v1.04: tạo task qua một client thật, tự chọn đúng backend tasks
+ * theo protocol version đã thương lượng (xem
+ * `clientTasksSpecVersion`). Cùng API `createTask`, chỉ khác là
+ * `specVersion` không cần truyền tay — caller truyền `specVersion`
+ * riêng thì vẫn tôn trọng số đó (vd test ép backend cũ).
+ */
+export async function createTaskForClient(
+  client: McpClient,
+  method: string,
+  params: Record<string, unknown> = {},
+  options: CreateTaskOptions = {},
+): Promise<TaskHandle> {
+  return createTask(clientAsTaskTransport(client), method, params, {
+    ...options,
+    specVersion: options.specVersion ?? clientTasksSpecVersion(client),
+  });
 }
 
 /** Notification method mà adapter fan-out từ dispatcher tới listener. */

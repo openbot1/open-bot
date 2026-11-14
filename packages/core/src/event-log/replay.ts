@@ -28,8 +28,13 @@ import type {
   ReplayedRunState,
   ReplayedToolCall,
   ReplayedTranscriptEntry,
+  RunCompactionInfo,
   RunStatus,
+  StuckDetectionInfo,
 } from './types';
+
+/** Chuỗi thay thế nội dung đã che (xem `event.redacted` trong types.ts). */
+export const REDACTED_TEXT = '[redacted]';
 
 /**
  * Fold một dãy event (đã theo seq tăng dần) thành trạng thái run.
@@ -50,6 +55,10 @@ export function foldEvents(runId: string, events: readonly AnyRunEvent[]): Repla
   let tokensUsed = 0;
   let startedAt = '';
   let endedAt: string | undefined;
+  // v1.03: marker mới — redaction, compaction, stuck detection.
+  const redactedSeqs: number[] = [];
+  const compactions: RunCompactionInfo[] = [];
+  const stuckDetections: StuckDetectionInfo[] = [];
 
   for (const event of events) {
     switch (event.type) {
@@ -195,10 +204,124 @@ export function foldEvents(runId: string, events: readonly AnyRunEvent[]): Repla
       case 'checkpoint.saved':
         // Không đổi trạng thái fold — UI đọc trực tiếp từ event khi cần.
         break;
+      case 'event.redacted': {
+        // Chỉ ghi nhận seq — nội dung được che ở pass sau vòng lặp
+        // (cần trạng thái đã fold xong mới che ngược được).
+        const p = event.payload as { seq?: number };
+        if (typeof p.seq === 'number') redactedSeqs.push(p.seq);
+        break;
+      }
+      case 'run.compacted': {
+        const p = event.payload as {
+          upToSeq?: number;
+          summary?: string;
+          eventsReplaced?: number;
+          tokensBefore?: number;
+          tokensAfter?: number;
+        };
+        compactions.push({
+          upToSeq: typeof p.upToSeq === 'number' ? p.upToSeq : 0,
+          summary: typeof p.summary === 'string' ? p.summary : '',
+          eventsReplaced: typeof p.eventsReplaced === 'number' ? p.eventsReplaced : 0,
+          ...(typeof p.tokensBefore === 'number' ? { tokensBefore: p.tokensBefore } : {}),
+          ...(typeof p.tokensAfter === 'number' ? { tokensAfter: p.tokensAfter } : {}),
+        });
+        break;
+      }
+      case 'stuck.detected': {
+        const p = event.payload as {
+          step?: number;
+          kind?: string;
+          detail?: string;
+          suggestionKey?: string;
+        };
+        stuckDetections.push({
+          step: typeof p.step === 'number' ? p.step : 0,
+          kind: typeof p.kind === 'string' ? p.kind : '',
+          detail: typeof p.detail === 'string' ? p.detail : '',
+          ...(typeof p.suggestionKey === 'string' ? { suggestionKey: p.suggestionKey } : {}),
+        });
+        break;
+      }
       default:
         // Type lạ (log phiên bản mới hơn) — bỏ qua, fold vẫn chạy.
         break;
     }
+  }
+
+  // v1.03 — pass che ngược: mỗi marker `event.redacted` che nội dung
+  // của đúng event mà nó trỏ tới. Log gốc trên đĩa không đổi (chỉ
+  // trạng thái fold bị che); `file.change` không che path vì path đã
+  // qua sanitize và cần cho audit — chỉ che text/output/error.
+  for (const seq of redactedSeqs) {
+    const target = events.find((e) => e.seq === seq);
+    if (!target) continue;
+    if (target.type === 'run.prompt') {
+      prompt = REDACTED_TEXT;
+      continue;
+    }
+    if (target.type === 'model.response') {
+      const p = target.payload as {
+        step?: number;
+        toolCalls?: Array<{ callId: string; tool: string }>;
+      };
+      const step = typeof p.step === 'number' ? p.step : -1;
+      const callIds = new Set((p.toolCalls ?? []).map((c) => c.callId));
+      for (const entry of transcript) {
+        if (entry.kind === 'text' && entry.step === step) entry.text = REDACTED_TEXT;
+        if (entry.kind === 'tool_result' && callIds.has(entry.callId)) {
+          entry.outputPreview = REDACTED_TEXT;
+        }
+      }
+      for (const call of toolCalls) {
+        if (callIds.has(call.callId) && call.outputPreview !== undefined) {
+          call.outputPreview = REDACTED_TEXT;
+        }
+      }
+      // Gỡ cả chuỗi lỗi suy ra từ tool result của các call này.
+      for (const e of events) {
+        if (e.type !== 'tool.result') continue;
+        const rp = e.payload as { callId?: string; tool?: string; status?: string; outputPreview?: string };
+        if (rp.status === 'error' && typeof rp.callId === 'string' && callIds.has(rp.callId)) {
+          const errStr = `${rp.tool ?? 'tool'}: ${rp.outputPreview ?? ''}`;
+          const idx = errors.indexOf(errStr);
+          if (idx !== -1) errors.splice(idx, 1);
+        }
+      }
+      continue;
+    }
+    if (target.type === 'tool.result') {
+      const p = target.payload as { callId?: string; tool?: string; status?: string; outputPreview?: string };
+      if (typeof p.callId === 'string') {
+        for (const entry of transcript) {
+          if (entry.kind === 'tool_result' && entry.callId === p.callId) {
+            entry.outputPreview = REDACTED_TEXT;
+          }
+        }
+        const call = toolById.get(p.callId);
+        if (call && call.outputPreview !== undefined) call.outputPreview = REDACTED_TEXT;
+        if (p.status === 'error') {
+          const errStr = `${p.tool ?? 'tool'}: ${p.outputPreview ?? ''}`;
+          const idx = errors.indexOf(errStr);
+          if (idx !== -1) errors.splice(idx, 1);
+        }
+      }
+      continue;
+    }
+    if (target.type === 'compile.error') {
+      const p = target.payload as { callId?: string; firstError?: string };
+      for (const ce of compileErrors) {
+        if (typeof p.callId === 'string' && ce.callId === p.callId) ce.firstError = REDACTED_TEXT;
+      }
+      if (typeof p.firstError === 'string') {
+        const errStr = `compile: ${p.firstError}`;
+        const idx = errors.indexOf(errStr);
+        if (idx !== -1) errors.splice(idx, 1);
+      }
+      continue;
+    }
+    // Các loại còn lại (file.change, run.*): không có nội dung text
+    // để che — marker vẫn được ghi nhận trong `redactedSeqs`.
   }
 
   const state: Omit<ReplayedRunState, 'digest'> = {
@@ -215,6 +338,9 @@ export function foldEvents(runId: string, events: readonly AnyRunEvent[]): Repla
     tokensUsed,
     startedAt,
     ...(endedAt !== undefined ? { endedAt } : {}),
+    redactedSeqs,
+    compactions,
+    stuckDetections,
   };
   return { ...state, digest: digestReplayState(state) };
 }

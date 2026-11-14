@@ -55,6 +55,29 @@ export {
   tryPromoteQueue,
 } from './scheduler';
 export { GUEST_AGENT_INSTALL_HINT, GUEST_HEALTH_CHECK_MIN_INTERVAL_MS } from './runtime';
+// v1.05 (Đội T3): quota mềm + trạng thái máy-tính-bot theo bot.
+export {
+  MAX_MEASURED_FILES,
+  QUOTA_WARN_RATIO,
+  TEAM_COMPUTERS_FILE,
+  buildBotComputerStatusView,
+  checkLevelFeasible,
+  emptyBotComputerUsage,
+  evaluateQuota,
+  loadBotComputerQuotas,
+  measureDirSizeMb,
+  parseBotComputerQuotas,
+  saveBotComputerQuotas,
+  upsertBotComputerQuota,
+  validateBotComputerQuota,
+} from './quota';
+export type {
+  BotComputerQuota,
+  BotComputerStatusView,
+  BotComputerUsage,
+  QuotaWarning,
+  QuotaWarningSeverity,
+} from './quota';
 export type {
   BotComputer,
   BotComputerRequest,

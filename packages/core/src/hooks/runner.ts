@@ -2,10 +2,12 @@
  * HookRunner (v0.10, P0-2).
  *
  * Executes the hooks in a `HookRegistry` for one lifecycle event, in
- * registration order. The runner is the safety contract of the hook
+ * run order (v1.04: priority ascending, ties keep registration order;
+ * Pre/PostToolUse hooks are filtered by their matcher against the
+ * tool name). The runner is the safety contract of the hook
  * system:
  *
- * - DETERMINISTIC ORDER: hooks run in registration order; the first
+ * - DETERMINISTIC ORDER: hooks run in priority order; the first
  *   `block` wins and later hooks do not run; `modify` decisions chain
  *   (each hook sees the previous hook's rewritten args/output).
  * - A HOOK NEVER CRASHES THE RUN: a hook that throws, returns an
@@ -18,7 +20,8 @@
  *   Session-boundary events (SessionStart/SessionEnd/Stop) never block
  *   on a hook failure regardless of this option — there is nothing
  *   left to stop there, so failures are only recorded.
- * - PER-HOOK TIMEOUT: each hook gets `timeoutMs` (default 5s). A hook
+ * - PER-HOOK TIMEOUT: each hook gets `timeoutMs` (default 5s, or the
+ *   hook's own `timeoutMs` when it sets one — v1.04). A hook
  *   that times out is treated exactly like a throwing hook. The late
  *   hook's promise is left to settle on its own (its rejection is
  *   swallowed so it can never become an unhandled rejection).
@@ -296,8 +299,10 @@ export class HookRunner {
     handler: (event: HookEvent, ctx: HookContext) => unknown,
     event: HookEvent,
     ctx: HookContext,
+    perHookTimeoutMs?: number,
   ): Promise<InvokeResult> {
-    const timeoutMs = this.timeoutMs();
+    // v1.04 — a hook's own timeoutMs overrides the runner default.
+    const timeoutMs = perHookTimeoutMs ?? this.timeoutMs();
     const startedAt = Date.now();
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
@@ -389,7 +394,7 @@ export class HookRunner {
   async runHooks(event: HookEvent, ctx: HookContext = {}): Promise<HookRunResult[]> {
     const results: HookRunResult[] = [];
     for (const hook of this.registry.listForEvent(event.event)) {
-      const res = await this.invokeOne(hook.name, hook.handler, event, ctx);
+      const res = await this.invokeOne(hook.name, hook.handler, event, ctx, this.registry.effectiveTimeoutMs(hook.name));
       if (res.kind === 'decision') {
         results.push({ hookName: hook.name, decision: res.decision });
       } else {
@@ -428,7 +433,7 @@ export class HookRunner {
     const hookErrors: HookError[] = [];
     const hooksRun: string[] = [];
 
-    for (const hook of this.registry.listForEvent('PreToolUse')) {
+    for (const hook of this.registry.listForEvent('PreToolUse', input.toolName)) {
       hooksRun.push(hook.name);
       const event: PreToolUseEvent = {
         event: 'PreToolUse',
@@ -436,7 +441,7 @@ export class HookRunner {
         toolCallId: input.toolCallId,
         args,
       };
-      const res = await this.invokeOne(hook.name, hook.handler, event, ctx);
+      const res = await this.invokeOne(hook.name, hook.handler, event, ctx, this.registry.effectiveTimeoutMs(hook.name));
       if (res.kind === 'error') {
         this.recordError(hookErrors, hook.name, 'PreToolUse', res.error, res.timedOut);
         if (this.failClosed()) {
@@ -503,7 +508,7 @@ export class HookRunner {
     const hookErrors: HookError[] = [];
     const hooksRun: string[] = [];
 
-    for (const hook of this.registry.listForEvent('PostToolUse')) {
+    for (const hook of this.registry.listForEvent('PostToolUse', input.toolName)) {
       hooksRun.push(hook.name);
       const event: PostToolUseEvent = {
         event: 'PostToolUse',
@@ -512,7 +517,7 @@ export class HookRunner {
         args: input.args,
         result: { ok, output },
       };
-      const res = await this.invokeOne(hook.name, hook.handler, event, ctx);
+      const res = await this.invokeOne(hook.name, hook.handler, event, ctx, this.registry.effectiveTimeoutMs(hook.name));
       if (res.kind === 'error') {
         this.recordError(hookErrors, hook.name, 'PostToolUse', res.error, res.timedOut);
         if (this.failClosed()) {
@@ -600,7 +605,7 @@ export class HookRunner {
     for (const hook of this.registry.listForEvent('SubagentStart')) {
       hooksRun.push(hook.name);
       const event: SubagentStartEvent = { event: 'SubagentStart', ...input };
-      const res = await this.invokeOne(hook.name, hook.handler, event, ctx);
+      const res = await this.invokeOne(hook.name, hook.handler, event, ctx, this.registry.effectiveTimeoutMs(hook.name));
       if (res.kind === 'error') {
         this.recordError(hookErrors, hook.name, 'SubagentStart', res.error, res.timedOut);
         if (this.failClosed()) {
@@ -660,7 +665,7 @@ export class HookRunner {
     for (const hook of this.registry.listForEvent('SubagentStop')) {
       hooksRun.push(hook.name);
       const event: SubagentStopEvent = { event: 'SubagentStop', ...input };
-      const res = await this.invokeOne(hook.name, hook.handler, event, ctx);
+      const res = await this.invokeOne(hook.name, hook.handler, event, ctx, this.registry.effectiveTimeoutMs(hook.name));
       if (res.kind === 'error') {
         this.recordError(hookErrors, hook.name, 'SubagentStop', res.error, res.timedOut);
         if (this.failClosed()) {
@@ -749,7 +754,7 @@ export class HookRunner {
     for (const hook of this.registry.listForEvent(kind)) {
       hooksRun.push(hook.name);
       const event = { event: kind, ...input } as PreCompactEvent | PostCompactEvent;
-      const res = await this.invokeOne(hook.name, hook.handler, event, ctx);
+      const res = await this.invokeOne(hook.name, hook.handler, event, ctx, this.registry.effectiveTimeoutMs(hook.name));
       if (res.kind === 'error') {
         this.recordError(hookErrors, hook.name, kind, res.error, res.timedOut);
         if (this.failClosed()) {
@@ -814,7 +819,7 @@ export class HookRunner {
     for (const hook of this.registry.listForEvent('UserPromptSubmit')) {
       hooksRun.push(hook.name);
       const event: UserPromptSubmitEvent = { event: 'UserPromptSubmit', ...input };
-      const res = await this.invokeOne(hook.name, hook.handler, event, ctx);
+      const res = await this.invokeOne(hook.name, hook.handler, event, ctx, this.registry.effectiveTimeoutMs(hook.name));
       if (res.kind === 'error') {
         this.recordError(hookErrors, hook.name, 'UserPromptSubmit', res.error, res.timedOut);
         if (this.failClosed()) {
@@ -867,7 +872,7 @@ export class HookRunner {
     for (const hook of this.registry.listForEvent(kind)) {
       hooksRun.push(hook.name);
       const event = { event: kind, ...input } as SessionStartEvent | SessionEndEvent | StopEvent;
-      const res = await this.invokeOne(hook.name, hook.handler, event, ctx);
+      const res = await this.invokeOne(hook.name, hook.handler, event, ctx, this.registry.effectiveTimeoutMs(hook.name));
       if (res.kind === 'error') {
         // A failing session hook can never block the session: record + go on.
         this.recordError(hookErrors, hook.name, kind, res.error, res.timedOut);

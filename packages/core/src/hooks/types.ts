@@ -343,6 +343,17 @@ export type HookFn = (
 /** Hook names: lowercase, digits, `-`/`_` (same rule as skill names). */
 export const HOOK_NAME_RE = /^[a-z0-9][a-z0-9_-]*$/;
 
+/** Default hook priority (v1.04): lower numbers run first. */
+export const DEFAULT_HOOK_PRIORITY = 100;
+
+/**
+ * A tool-name glob (v1.04): `*` matches any run of characters, `?`
+ * matches one character, e.g. `shell-*` or `read`. A list means "any
+ * of these". Only applies to PreToolUse / PostToolUse; ignored for
+ * other events.
+ */
+export type HookMatcher = string | string[];
+
 /** One registered hook: identity + which events it handles + handler. */
 export interface HookDefinition {
   /** Unique name (also the key settings/plugin entries refer to). */
@@ -359,6 +370,22 @@ export interface HookDefinition {
    * from persisted state (default true); use `enable()`/`disable()`.
    */
   enabled: boolean;
+  /**
+   * v1.04 — tool-name glob(s) for PreToolUse / PostToolUse. Only hooks
+   * whose matcher admits the tool name run for that call; undefined
+   * means "every tool". Ignored for non-tool events.
+   */
+  matcher?: HookMatcher;
+  /**
+   * v1.04 — run order within one event. Lower runs first; default
+   * `DEFAULT_HOOK_PRIORITY` (100). Ties keep registration order.
+   */
+  priority?: number;
+  /**
+   * v1.04 — per-hook timeout in ms, overriding the runner's default
+   * (5s). Must be an integer between 100 and 300000.
+   */
+  timeoutMs?: number;
 }
 
 /**
@@ -375,6 +402,12 @@ export interface HookSettingsEntry {
    * Omit to keep the hook's registered events.
    */
   events?: HookEventKind[];
+  /** v1.04 — override the hook's tool-name matcher (Pre/PostToolUse). */
+  matcher?: HookMatcher;
+  /** v1.04 — override the hook's run priority (lower runs first). */
+  priority?: number;
+  /** v1.04 — override the hook's per-invocation timeout in ms. */
+  timeoutMs?: number;
 }
 
 /**
@@ -409,6 +442,10 @@ export interface HookCommandSettingsEntry {
   env?: Record<string, string>;
   /** Human-readable description (shown in Settings). */
   description?: string;
+  /** v1.04 — tool-name glob(s) for PreToolUse / PostToolUse entries. */
+  matcher?: HookMatcher;
+  /** v1.04 — run order within one event (lower runs first, default 100). */
+  priority?: number;
 }
 
 /** The `hooks` section of settings. */

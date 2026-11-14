@@ -33,7 +33,17 @@ export const RUN_LOG_DEPTH_LIMIT = 4;
 const SECRET_KEY_RE =
   /token|secret|password|passwd|api[-_]?key|auth|credential|bearer|session|private/i;
 /** Key là bộ đếm token (số), KHÔNG phải secret — giữ nguyên. */
-const TOKEN_COUNT_KEYS = new Set(['inputTokens', 'outputTokens', 'tokensUsed', 'totalTokens']);
+const TOKEN_COUNT_KEYS = new Set([
+  'inputTokens',
+  'outputTokens',
+  'tokensUsed',
+  'totalTokens',
+  // v1.04 (Đội T4): số token trước/sau nén của marker `run.compacted`
+  // — trước đây regex secret (`token`) redact nhầm hai key này thành
+  // '<redacted>', khiến marker nén mất số đo token trên đĩa.
+  'tokensBefore',
+  'tokensAfter',
+]);
 
 /** Dạng key provider đã biết (`sk-…`, `xai-…`, `sk-ant-…`). */
 const KNOWN_KEY_SHAPE_RE = /\b(?:sk-ant|sk|xai)-[A-Za-z0-9_-]{8,}\b/g;
