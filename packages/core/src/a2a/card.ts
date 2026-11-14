@@ -31,6 +31,23 @@ export interface AgentCardInput {
 /** Default protocol version written into a built card. */
 export const A2A_CARD_PROTOCOL_VERSION = '1.0';
 
+/** Well-known Agent Card path (A2A 1.0). */
+export const A2A_WELL_KNOWN_CARD_PATH = '/.well-known/agent-card.json';
+
+/**
+ * v1.07: well-known path alias ngắn `/.well-known/agent.json` — một
+ * số client A2A chỉ thử path này. Server open-bot phục vụ cả hai
+ * path với cùng một card; client thử path chuẩn trước, fallback
+ * sang alias khi server ngoài chỉ phục vụ alias.
+ */
+export const A2A_WELL_KNOWN_CARD_PATH_ALIAS = '/.well-known/agent.json';
+
+/** Mọi well-known path mà server open-bot phục vụ Agent Card. */
+export const A2A_WELL_KNOWN_CARD_PATHS: readonly string[] = [
+  A2A_WELL_KNOWN_CARD_PATH,
+  A2A_WELL_KNOWN_CARD_PATH_ALIAS,
+];
+
 /** Build an Agent Card from its pieces (A2A defaults filled in). */
 export function buildAgentCard(input: AgentCardInput): A2aAgentCard {
   if (!input.name.trim()) throw new Error('Agent Card needs a name.');

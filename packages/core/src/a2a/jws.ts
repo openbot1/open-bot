@@ -12,6 +12,7 @@
  */
 
 import { createPrivateKey, createPublicKey, sign, verify, type KeyObject } from 'node:crypto';
+import { canonicalizeJson } from './canonical';
 
 /** JWS header for Ed25519 (only `EdDSA` is supported here). */
 export interface JwsHeader {
@@ -39,8 +40,10 @@ function base64urlDecode(text: string): Buffer {
 /** Sign a payload into a JWS compact token (Ed25519 private key). */
 export function signJws(payload: Record<string, unknown>, privateKey: KeyObject, header: Partial<JwsHeader> = {}): string {
   const fullHeader: JwsHeader = { alg: 'EdDSA', typ: 'JWT', ...header };
-  const encodedHeader = base64urlEncode(JSON.stringify(fullHeader));
-  const encodedPayload = base64urlEncode(JSON.stringify(payload));
+  // v1.07: header + payload serialize bằng JCS (RFC 8785) để hai phía
+  // tính cùng một chuỗi byte bất kể thứ tự key lúc build object.
+  const encodedHeader = base64urlEncode(canonicalizeJson(fullHeader));
+  const encodedPayload = base64urlEncode(canonicalizeJson(payload));
   const signingInput = `${encodedHeader}.${encodedPayload}`;
   const signature = sign(null, Buffer.from(signingInput, 'utf8'), privateKey);
   return `${signingInput}.${base64urlEncode(signature)}`;

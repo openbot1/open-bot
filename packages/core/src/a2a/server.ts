@@ -95,6 +95,12 @@ import {
   type A2aSigningKeyPair,
 } from './signing';
 import {
+  AGENT_CARD_JWS_MEDIA_TYPE,
+  A2A_WELL_KNOWN_CARD_JWS_PATH,
+  signAgentCardJws,
+} from './cardJws';
+import { A2A_WELL_KNOWN_CARD_PATH_ALIAS } from './card';
+import {
   A2A_TENANT_HEADER,
   DEFAULT_A2A_TENANT,
   normalizeA2aTenantId,
@@ -310,6 +316,12 @@ function agentMessage(text: string): A2aMessage {
 export interface A2aServer {
   /** Agent Card hiện tại (url được điền sau khi start HTTP). */
   getAgentCard(): A2aAgentCard;
+  /**
+   * v1.07: Agent Card ký bằng JWS compact (RFC 7515 + RFC 8785,
+   * xem `cardJws.ts`). Trả null khi server không có signer (card
+   * không ký thì không có JWS để phục vụ).
+   */
+  getAgentCardJws(): string | null;
   /**
    * v0.28: trạng thái lần lưu task gần nhất xuống store — UI dùng để
    * cảnh báo khi lưu thất bại sau hết retry.
@@ -1156,6 +1168,11 @@ export function createA2aServer(options: A2aServerOptions = {}): A2aServer {
 
   const server: A2aServer & { _internals: typeof internals } = {
     getAgentCard,
+    // v1.07: JWS compact của card (null khi không có signer).
+    getAgentCardJws() {
+      if (!signer) return null;
+      return signAgentCardJws(getAgentCard(), signer);
+    },
     getPersistStatus,
     handleJsonRpc,
     getTask,
@@ -1236,6 +1253,12 @@ export interface A2aHttpServer {
   readonly url: string;
   readonly cardUrl: string;
   readonly isRunning: boolean;
+  /**
+   * v1.07: server logic đang phục vụ (cùng store task với HTTP
+   * layer) — test/loopback đọc card/task trực tiếp qua nó mà không
+   * cần gọi HTTP. Không dùng để chạy task ngoài HTTP layer.
+   */
+  readonly server: A2aServer;
   close(): Promise<void>;
 }
 
@@ -1338,12 +1361,35 @@ export function startA2aHttpServer(
         }
 
         // Agent Card — discovery (A2A 1.0, header version đi kèm).
-        if (method === 'GET' && path === '/.well-known/agent-card.json') {
+        // v1.07: phục vụ cả hai path well-known — `agent-card.json`
+        // (chuẩn A2A 1.0) và `agent.json` (alias ngắn; một số client
+        // chỉ thử path này). Cùng một card, cùng chữ ký.
+        if (
+          method === 'GET' &&
+          (path === '/.well-known/agent-card.json' || path === A2A_WELL_KNOWN_CARD_PATH_ALIAS)
+        ) {
           res.writeHead(200, {
             'Content-Type': 'application/json; charset=utf-8',
             'A2A-Version': A2A_PROTOCOL_VERSION,
           });
           res.end(JSON.stringify(server.getAgentCard()));
+          return;
+        }
+
+        // v1.07: GET /.well-known/agent-card.jws — Agent Card ký bằng
+        // JWS compact (RFC 7515 + RFC 8785, `application/jwt`).
+        // Không có signer → 404 (card không ký thì không có JWS).
+        if (method === 'GET' && path === A2A_WELL_KNOWN_CARD_JWS_PATH) {
+          const token = server.getAgentCardJws();
+          if (token === null) {
+            sendJson(res, 404, { error: 'Server này không ký Agent Card (chưa cấu hình signing key).' });
+            return;
+          }
+          res.writeHead(200, {
+            'Content-Type': AGENT_CARD_JWS_MEDIA_TYPE,
+            'A2A-Version': A2A_PROTOCOL_VERSION,
+          });
+          res.end(token);
           return;
         }
 
@@ -1543,6 +1589,8 @@ export function startA2aHttpServer(
         get isRunning() {
           return httpServer !== null && httpServer.listening;
         },
+        // v1.07: expose server logic thật (cùng store với HTTP layer).
+        server,
         close(): Promise<void> {
           if (!httpServer) return Promise.resolve();
           const s = httpServer;
@@ -1556,11 +1604,64 @@ export function startA2aHttpServer(
 }
 
 // --- v1.02 (rescue port of v1.00): Agent Card builder/validator, discovery, JWS, ACP adapter ---
-export { A2A_CARD_PROTOCOL_VERSION, buildAgentCard, isValidAgentCard, validateAgentCard } from './card';
+export {
+  A2A_CARD_PROTOCOL_VERSION,
+  A2A_WELL_KNOWN_CARD_PATH,
+  A2A_WELL_KNOWN_CARD_PATHS,
+  A2A_WELL_KNOWN_CARD_PATH_ALIAS,
+  buildAgentCard,
+  isValidAgentCard,
+  validateAgentCard,
+} from './card';
 export type { AgentCardInput } from './card';
-export { A2A_WELL_KNOWN_CARD_PATH, discoverAgent, discoverAgents, wellKnownCardUrl } from './discovery';
+export { discoverAgent, discoverAgents, wellKnownCardUrl, wellKnownCardUrlAlias } from './discovery';
 export type { DiscoveredAgent } from './discovery';
 export { decodeJwsUnverified, privateKeyFromPem, publicKeyFromPem, signJws, verifyJws } from './jws';
 export type { DecodedJws, JwsHeader } from './jws';
-export { AcpUpdateCollector, acpStopReasonToA2aState, runA2aTaskViaAcp } from './acpAdapter';
+export { ACP_MIGRATION_NOTE, AcpUpdateCollector, acpStopReasonToA2aState, runA2aTaskViaAcp } from './acpAdapter';
 export type { AcpAdapterResult, AcpSessionRunner } from './acpAdapter';
+// --- v1.07 (Đội T3): JCS RFC 8785, JWS Agent Card, Vault signing key, registry, state machine, loopback ---
+export { canonicalizeJson, canonicalJsonEquals, canonicalizeJsonNumber, canonicalizeJsonString, isCanonicalizableJson } from './canonical';
+export {
+  AGENT_CARD_JWS_MEDIA_TYPE,
+  AGENT_CARD_JWS_TTL_SECONDS,
+  A2A_WELL_KNOWN_CARD_JWS_PATH,
+  decodeAgentCardJwsUnverified,
+  signAgentCardJws,
+  verifyAgentCardJws,
+  verifyAgentCardJwsWithCardKey,
+} from './cardJws';
+export type { AgentCardJwsHeader, AgentCardJwsPayload, AgentCardJwsVerification } from './cardJws';
+export {
+  A2A_REGISTRY_FILE_NAME,
+  A2A_REGISTRY_FILE_VERSION,
+  A2aAgentRegistry,
+  createA2aAgentRegistry,
+} from './registry';
+export type {
+  A2aAgentRegistryOptions,
+  A2aRegistryEntry,
+  A2aRegistryHealth,
+  A2aRegistryRegisterInput,
+  A2aRegistrySearchFilters,
+  A2aRegistrySearchResult,
+  A2aRegistrySource,
+} from './registry';
+export {
+  A2aIllegalTransitionError,
+  A2aTaskStateMachine,
+  createA2aTaskWithStateMachine,
+} from './stateMachine';
+export type { A2aStateMachineEvent, A2aStateMachineListener, A2aTaskStateMachineOptions } from './stateMachine';
+export {
+  A2A_VAULT_NAMESPACE,
+  A2A_VAULT_SIGNING_KEY,
+  hasVaultSigningKey,
+  loadOrCreateVaultSigningKey,
+  loadVaultSigningKey,
+  removeVaultSigningKey,
+  rotateVaultSigningKey,
+} from './vaultSigning';
+export type { VaultSigningKeyResult, VaultSigningKeyStore } from './vaultSigning';
+export { createEchoA2aRunner, startLoopbackA2aPair } from './loopback';
+export type { LoopbackA2aPair, LoopbackA2aPairOptions } from './loopback';

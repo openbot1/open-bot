@@ -42,6 +42,31 @@
   --accent: #4f8cff;
   --bubble-bot: #262a30;
 }
+/* v1.07 (Team T5 — Paper theme): warm, airy light theme for long
+ * reading/writing sessions. Paper background, warm ink text, soft
+ * brown accent, slightly larger radius; every variable the app
+ * uses is overridden so no dark/light value leaks through. */
+:root[data-theme="paper"] {
+  --bg: #f7f2e7;
+  --bg-panel: #fffdf6;
+  --bg-chat: #fbf8ef;
+  --text: #2b2620;
+  --text-dim: #7d7261;
+  --border: #e6dcc6;
+  --accent: #96692f;
+  --accent-text: #ffffff;
+  --bubble-user: #96692f;
+  --bubble-user-text: #ffffff;
+  --bubble-bot: #f0e8d5;
+  --danger: #b3261e;
+  --ok: #2e7d32;
+  --warn: #96692f;
+  --radius: 12px;
+}
+:root[data-theme="paper"] .badge.done { background: #e3efd9; color: #2e5b2e; }
+:root[data-theme="paper"] .badge.running { background: #f3e5c3; color: #6b4d1f; }
+:root[data-theme="paper"] .badge.failed { background: #f7d9d4; color: #8c1d18; }
+:root[data-theme="paper"] .badge.approval { background: #f3e5c3; color: #6b4d1f; }
 * { box-sizing: border-box; }
 body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
 button { font: inherit; cursor: pointer; }

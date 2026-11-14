@@ -14,14 +14,27 @@
 import type { A2aAgentCard } from './types';
 import { fetchAgentCard } from './client';
 import { validateAgentCard } from './card';
+import {
+  A2A_WELL_KNOWN_CARD_PATH,
+  A2A_WELL_KNOWN_CARD_PATH_ALIAS,
+} from './card';
 
-/** Well-known Agent Card path (A2A 1.0). */
-export const A2A_WELL_KNOWN_CARD_PATH = '/.well-known/agent-card.json';
+export {
+  A2A_WELL_KNOWN_CARD_PATH,
+  A2A_WELL_KNOWN_CARD_PATH_ALIAS,
+  A2A_WELL_KNOWN_CARD_PATHS,
+} from './card';
 
 /** Build the well-known card URL for a base URL. */
 export function wellKnownCardUrl(baseUrl: string): string {
   const base = baseUrl.replace(/\/+$/, '');
   return `${base}${A2A_WELL_KNOWN_CARD_PATH}`;
+}
+
+/** Build the well-known card URL dùng path alias (v1.07). */
+export function wellKnownCardUrlAlias(baseUrl: string): string {
+  const base = baseUrl.replace(/\/+$/, '');
+  return `${base}${A2A_WELL_KNOWN_CARD_PATH_ALIAS}`;
 }
 
 export interface DiscoveredAgent {

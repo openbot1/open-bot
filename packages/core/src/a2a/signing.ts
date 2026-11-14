@@ -25,6 +25,7 @@
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { canonicalizeJson } from './canonical';
 import type { A2aCardSignature } from './types';
 
 export type { A2aCardSignature };
@@ -52,24 +53,15 @@ export interface A2aSigningKeyPair {
  * `JSON.stringify` không khoảng trắng. Hai object bằng nhau về nội
  * dung thì cho cùng một chuỗi → chữ ký ổn định, không phụ thuộc
  * thứ tự key lúc build card.
+ *
+ * v1.07: cài đặt chuẩn RFC 8785 (JCS) — xem `canonical.ts`.
+ * Khác bản tự viết trước đây: escape lone surrogate + ký tự điều
+ * khiển đúng JCS, `-0` → `"0"`, và THROW với giá trị không phải
+ * JSON (undefined/function/NaN/circular) thay vì lặng lẽ bỏ qua.
+ * Giữ tên hàm + chữ ký cũ để code cũ (sign/verify card) không đổi.
  */
 export function canonicalJson(value: unknown): string {
-  if (value === null || typeof value !== 'object') {
-    const out = JSON.stringify(value);
-    return out === undefined ? 'null' : out;
-  }
-  if (Array.isArray(value)) {
-    return `[${value.map((v) => canonicalJson(v)).join(',')}]`;
-  }
-  const rec = value as Record<string, unknown>;
-  const keys = Object.keys(rec).sort();
-  const parts: string[] = [];
-  for (const key of keys) {
-    const v = rec[key];
-    if (v === undefined) continue;
-    parts.push(`${JSON.stringify(key)}:${canonicalJson(v)}`);
-  }
-  return `{${parts.join(',')}}`;
+  return canonicalizeJson(value);
 }
 
 /** Fingerprint SHA-256 (hex) của một public key DER. */

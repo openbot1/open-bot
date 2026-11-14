@@ -16,10 +16,30 @@
  * - ACP `stopReason` -> A2A task state: `end_turn` -> `completed`,
  *   `cancelled` -> `cancelled`, anything else -> `failed`.
  * - ACP tool-call updates -> a short line in the artifact ("[tool: name]").
+ *
+ * ACP MIGRATION NOTE (v1.07, xem docs/a2a-v107.md §6): ACP (Agent
+ * Client Protocol, IBM BeeAI, 03/2025) đã SÁP NHẬP vào A2A tháng
+ * 08/2025; ACP dừng phát triển độc lập, repo gốc archived, doc IBM
+ * redirect sang A2A. ACP chỉ còn giá trị tham khảo lịch sử + adapter
+ * migration như module này — KHÔNG xây kiến trúc mới quanh ACP.
+ * Mọi tính năng agent↔agent mới viết bằng A2A v1.0 thuần.
+ * Adapter này giữ lại vì còn agent ACP cũ (vd BeeAI) cần nối vào;
+ * khi không còn agent ACP nào thì xoá module này cùng `acp/`.
+ * Xem `ACP_MIGRATION_NOTE` để lấy đúng câu chữ chuẩn cho doc/UI.
  */
 
 import type { A2aTaskState } from './types';
 import type { AcpContentBlock, AcpSessionUpdate, AcpStopReason } from '../acp/types';
+
+/**
+ * Câu chữ chuẩn về ACP cho doc/UI (v1.07): ACP đã sáp nhập vào A2A
+ * 08/2025, repo gốc archived — chỉ còn là migration note, không
+ * phải hướng phát triển mới.
+ */
+export const ACP_MIGRATION_NOTE =
+  'ACP (Agent Client Protocol, IBM BeeAI) merged into A2A in August 2025; ' +
+  'the original ACP repo is archived and IBM docs redirect to A2A. ' +
+  'ACP remains only as a migration note / legacy adapter — do not build new architecture around ACP.';
 
 /** What the host must provide: run one ACP prompt and stream updates back. */
 export interface AcpSessionRunner {

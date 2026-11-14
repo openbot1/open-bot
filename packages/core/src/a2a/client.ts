@@ -31,6 +31,16 @@ import {
   type A2aSignatureVerification,
 } from './signing';
 import {
+  AGENT_CARD_JWS_MEDIA_TYPE,
+  A2A_WELL_KNOWN_CARD_JWS_PATH,
+  verifyAgentCardJws,
+  type AgentCardJwsVerification,
+} from './cardJws';
+import {
+  A2A_WELL_KNOWN_CARD_PATH,
+  A2A_WELL_KNOWN_CARD_PATH_ALIAS,
+} from './card';
+import {
   assertA2aUrlAllowed,
   type A2aNetworkPolicy,
 } from './network';
@@ -144,6 +154,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * HTTP/JSON đều thành `A2aError` rõ ràng — không throw lỗi fetch thô.
  * `options.networkPolicy` (v0.97): khi truyền vào, URL ngoài
  * loopback bị chặn trước khi fetch nếu policy chưa cho phép.
+ * v1.07: thử path chuẩn `/.well-known/agent-card.json` trước, rồi
+ * fallback sang alias `/.well-known/agent.json` khi server ngoài
+ * trả 404 ở path chuẩn (một số server A2A chỉ phục vụ alias).
  */
 export async function fetchAgentCard(
   baseUrl: string,
@@ -153,9 +166,41 @@ export async function fetchAgentCard(
     assertA2aUrlAllowed(baseUrl, options.networkPolicy);
   }
   const timeoutMs = options.timeoutMs ?? A2A_CLIENT_TIMEOUT_MS;
-  const url = joinUrl(baseUrl, '/.well-known/agent-card.json');
+  const tried: string[] = [];
+  let lastNotFound: A2aError | null = null;
+  for (const cardPath of [A2A_WELL_KNOWN_CARD_PATH, A2A_WELL_KNOWN_CARD_PATH_ALIAS]) {
+    const url = joinUrl(baseUrl, cardPath);
+    tried.push(url);
+    const result = await fetchAgentCardAt(url, { timeoutMs, token: options.token });
+    if (result.ok) return result.card;
+    if (result.notFound) {
+      lastNotFound = result.error;
+      continue; // 404 ở path chuẩn → thử alias.
+    }
+    throw result.error; // Lỗi khác (auth, timeout, mạng, JSON hỏng): không fallback.
+  }
+  throw (
+    lastNotFound ??
+    new A2aError(`Không đọc được Agent Card tại ${tried.join(' hoặc ')} — agent này có thể không phải A2A server.`)
+  );
+}
+
+/** Kết quả một lần thử đọc card ở một URL cụ thể. */
+type FetchCardAttempt =
+  | { ok: true; card: A2aAgentCard }
+  | {
+      ok: false;
+      /** true khi server trả 404 (đường dẫn này không có card — thử path khác). */
+      notFound?: boolean;
+      error: A2aError;
+    };
+
+async function fetchAgentCardAt(
+  url: string,
+  options: { timeoutMs: number; token?: string },
+): Promise<FetchCardAttempt> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const timer = setTimeout(() => controller.abort(), options.timeoutMs);
   timer.unref?.();
   let res: Response;
   try {
@@ -170,31 +215,93 @@ export async function fetchAgentCard(
     });
   } catch (err) {
     if ((err as Error).name === 'AbortError') {
-      throw new A2aError(`Đọc Agent Card tại ${url} timed out sau ${timeoutMs}ms — agent có đang chạy không?`);
+      return {
+        ok: false,
+        error: new A2aError(`Đọc Agent Card tại ${url} timed out sau ${options.timeoutMs}ms — agent có đang chạy không?`),
+      };
     }
-    throw new A2aError(
-      `Không đọc được Agent Card tại ${url}: ${(err as Error).message} — kiểm tra URL và mạng.`,
-    );
+    return {
+      ok: false,
+      error: new A2aError(`Không đọc được Agent Card tại ${url}: ${(err as Error).message} — kiểm tra URL và mạng.`),
+    };
   } finally {
     clearTimeout(timer);
   }
   if (!res.ok) {
-    throw new A2aError(
-      `Agent tại ${url} trả HTTP ${res.status} khi đọc Agent Card — agent này có thể không phải A2A server.`,
-      undefined,
-      res.status,
-    );
+    return {
+      ok: false,
+      notFound: res.status === 404,
+      error: new A2aError(
+        `Agent tại ${url} trả HTTP ${res.status} khi đọc Agent Card — agent này có thể không phải A2A server.`,
+        undefined,
+        res.status,
+      ),
+    };
   }
   let card: unknown;
   try {
     card = await res.json();
   } catch {
-    throw new A2aError(`Agent tại ${url} trả Agent Card không phải JSON hợp lệ.`);
+    return { ok: false, error: new A2aError(`Agent tại ${url} trả Agent Card không phải JSON hợp lệ.`) };
   }
   if (!isRecord(card) || typeof card['name'] !== 'string' || typeof card['url'] !== 'string') {
-    throw new A2aError(`Agent Card tại ${url} thiếu field bắt buộc "name" hoặc "url".`);
+    return { ok: false, error: new A2aError(`Agent Card tại ${url} thiếu field bắt buộc "name" hoặc "url".`) };
   }
-  return card as unknown as A2aAgentCard;
+  return { ok: true, card: card as unknown as A2aAgentCard };
+}
+
+/**
+ * v1.07: đọc Agent Card đã ký JWS từ `/.well-known/agent-card.jws`
+ * rồi verify chữ ký bằng public key đưa vào (`publicKeyBase64` —
+ * lấy từ `card.signature.publicKey` của card JSON, hoặc từ key đã
+ * trust trước). Trả card + kết quả verify. Server không có signer
+ * thì endpoint trả 404 → throw A2aError rõ ràng.
+ */
+export async function fetchAgentCardJws(
+  baseUrl: string,
+  publicKeyBase64: string,
+  options: { timeoutMs?: number; token?: string; networkPolicy?: A2aNetworkPolicy } = {},
+): Promise<{ card: A2aAgentCard; verification: AgentCardJwsVerification }> {
+  if (options.networkPolicy !== undefined) {
+    assertA2aUrlAllowed(baseUrl, options.networkPolicy);
+  }
+  const timeoutMs = options.timeoutMs ?? A2A_CLIENT_TIMEOUT_MS;
+  const url = joinUrl(baseUrl, A2A_WELL_KNOWN_CARD_JWS_PATH);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  timer.unref?.();
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Accept: AGENT_CARD_JWS_MEDIA_TYPE,
+        'A2A-Version': A2A_PROTOCOL_VERSION,
+        ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
+      },
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if ((err as Error).name === 'AbortError') {
+      throw new A2aError(`Đọc JWS Agent Card tại ${url} timed out sau ${timeoutMs}ms — agent có đang chạy không?`);
+    }
+    throw new A2aError(`Không đọc được JWS Agent Card tại ${url}: ${(err as Error).message} — kiểm tra URL và mạng.`);
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!res.ok) {
+    throw new A2aError(
+      `Agent tại ${url} trả HTTP ${res.status} khi đọc JWS Agent Card — agent này có thể không ký card (chưa cấu hình signing key).`,
+      undefined,
+      res.status,
+    );
+  }
+  const token = (await res.text()).trim();
+  const verification = verifyAgentCardJws(token, publicKeyBase64);
+  if (!verification.ok || !verification.card) {
+    throw new A2aError(`JWS Agent Card tại ${url} không verify được: ${verification.reason ?? 'lỗi không rõ'}.`);
+  }
+  return { card: verification.card, verification };
 }
 
 /** Kết quả đọc card kèm kiểm tra version + chữ ký (v0.97). */
