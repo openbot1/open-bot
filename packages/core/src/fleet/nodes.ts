@@ -234,7 +234,7 @@ export function getFleetNodesPath(fleetRoot: string): string {
 
 function parseNode(raw: unknown, index: number): FleetNode {
   if (!isRecord(raw)) throw new Error(`fleet node at index ${index} is not an object.`);
-  const { id, hostname, host, port, role, cpuCores, ramBytes, diskBytes, loopback, lastHeartbeatAt, lastLoad, registeredAt, updatedAt } = raw;
+  const { id, hostname, host, port, role, cpuCores, ramBytes, diskBytes, loopback, lastHeartbeatAt, lastLoad, registeredAt, updatedAt, draining, drainReason, drainedAt } = raw;
   if (typeof id !== 'string' || id.trim().length === 0) throw new Error(`fleet node at index ${index} needs a non-empty id.`);
   if (typeof hostname !== 'string' || hostname.trim().length === 0) throw new Error(`fleet node ${id} needs a non-empty hostname.`);
   if (typeof host !== 'string' || host.trim().length === 0) throw new Error(`fleet node ${id} needs a non-empty host.`);
@@ -247,6 +247,11 @@ function parseNode(raw: unknown, index: number): FleetNode {
   if (lastHeartbeatAt !== null && !Number.isInteger(lastHeartbeatAt)) throw new Error(`fleet node ${id} has an invalid lastHeartbeatAt.`);
   if (lastLoad !== null) validateNodeLoad(lastLoad);
   if (!Number.isInteger(registeredAt) || !Number.isInteger(updatedAt)) throw new Error(`fleet node ${id} needs integer registeredAt/updatedAt.`);
+  // v1.06 (Đội T6): cờ drain cho bảo trì (xem fleet/nodeMaintenance.ts) —
+  // field optional, node cũ không có vẫn đọc được; giá trị sai thì bỏ qua (không drain).
+  if (draining !== undefined && typeof draining !== 'boolean') throw new Error(`fleet node ${id} has an invalid draining flag.`);
+  if (drainReason !== undefined && typeof drainReason !== 'string') throw new Error(`fleet node ${id} has an invalid drainReason.`);
+  if (drainedAt !== undefined && drainedAt !== null && !Number.isInteger(drainedAt)) throw new Error(`fleet node ${id} has an invalid drainedAt.`);
   return {
     id: id as string,
     hostname: hostname as string,
@@ -261,6 +266,9 @@ function parseNode(raw: unknown, index: number): FleetNode {
     lastLoad: lastLoad as FleetNodeLoad | null,
     registeredAt: registeredAt as number,
     updatedAt: updatedAt as number,
+    ...(draining !== undefined ? { draining: draining as boolean } : {}),
+    ...(drainReason !== undefined ? { drainReason: drainReason as string } : {}),
+    ...(drainedAt !== undefined && drainedAt !== null ? { drainedAt: drainedAt as number } : {}),
   };
 }
 

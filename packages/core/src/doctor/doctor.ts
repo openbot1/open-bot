@@ -410,3 +410,124 @@ export function renderDoctorReport(report: DoctorReport, useColor = true): strin
   lines.push(verdict);
   return lines.join('\n');
 }
+
+// ---------------------------------------------------------------------------
+// v1.06 (Đội T3): runDoctor 11-check + format text/JSON — gộp từ bản
+// v1.06. Type DoctorCheck/DoctorReport của bản này (có category) khác
+// bản v1.05 nên dùng tên DoctorCheckV106/DoctorReportV106 để không
+// trùng với interface cùng tên của section v1.05 phía trên.
+// ---------------------------------------------------------------------------
+
+import { checkCliEngines, checkCpu, checkDataDir, checkDisk, checkHarnessLoopback, checkHarnessPort, checkMemory, checkNodeVersion, checkNpmVersion, checkOs, checkVault, resolveDoctorEnv, type DoctorEnv } from './checks';
+import type { DoctorCheck as DoctorCheckV106, DoctorCheckId, DoctorReport as DoctorReportV106 } from './types';
+import { DEFAULT_DOCTOR_THRESHOLDS, DOCTOR_CHECK_IDS, type DoctorThresholds } from './types';
+
+export interface RunDoctorOptions {
+  /** Chỉ chạy các check này (mặc định: tất cả). */
+  only?: DoctorCheckId[];
+  /** Ngưỡng cảnh báo/lỗi cho tài nguyên (mặc định: DEFAULT_DOCTOR_THRESHOLDS). */
+  thresholds?: DoctorThresholds;
+}
+
+const CHECK_RUNNERS: Record<DoctorCheckId, (env: ReturnType<typeof resolveDoctorEnv>, thresholds: DoctorThresholds) => DoctorCheckV106 | Promise<DoctorCheckV106>> = {
+  'node-version': (env, thresholds) => checkNodeVersion(env, thresholds),
+  'npm-version': (env) => checkNpmVersion(env),
+  os: (env) => checkOs(env),
+  cpu: (env, thresholds) => checkCpu(env, thresholds),
+  memory: (env, thresholds) => checkMemory(env, thresholds),
+  disk: (env, thresholds) => checkDisk(env, thresholds),
+  'cli-engines': (env) => checkCliEngines(env),
+  'harness-loopback': (env) => checkHarnessLoopback(env),
+  'harness-port': (env) => checkHarnessPort(env),
+  vault: (env) => checkVault(env),
+  'data-dir': (env) => checkDataDir(env),
+};
+
+export async function runDoctor(envInput: DoctorEnv = {}, opts: RunDoctorOptions = {}): Promise<DoctorReportV106> {
+  const env = resolveDoctorEnv(envInput);
+  const thresholds = opts.thresholds ?? DEFAULT_DOCTOR_THRESHOLDS;
+  const wanted = new Set(opts.only ?? DOCTOR_CHECK_IDS);
+  const checks: DoctorCheckV106[] = [];
+  for (const id of DOCTOR_CHECK_IDS) {
+    if (!wanted.has(id)) continue;
+    try {
+      checks.push(await CHECK_RUNNERS[id](env, thresholds));
+    } catch (err) {
+      checks.push({
+        id,
+        category: 'runtime',
+        label: id,
+        status: 'fail',
+        detail: `check lỗi nội bộ: ${err instanceof Error ? err.message : String(err)}`,
+        fix: 'Chạy lại `open-bot doctor`; nếu vẫn lỗi, báo lỗi kèm dòng này cho nhà phát triển.',
+        durationMs: 0,
+      });
+    }
+  }
+  const summary = {
+    pass: checks.filter((c) => c.status === 'pass').length,
+    warn: checks.filter((c) => c.status === 'warn').length,
+    fail: checks.filter((c) => c.status === 'fail').length,
+    total: checks.length,
+  };
+  return {
+    version: 1,
+    ranAt: new Date(env.now()).toISOString(),
+    summary,
+    ok: summary.fail === 0,
+    checks,
+  };
+}
+
+/** Tóm tắt một dòng cho báo cáo text (vd "✓ Node.js — Node v24.3.0"). */
+export function formatDoctorCheckLine(check: DoctorCheckV106): string {
+  const mark = check.status === 'pass' ? '✓' : check.status === 'warn' ? '!' : '✗';
+  const line = `${mark} ${check.label} — ${check.detail}`;
+  if (!check.fix) return line;
+  return `${line}\n  → Sửa: ${check.fix}`;
+}
+
+const CATEGORY_TITLES: Record<DoctorCheckV106['category'], string> = {
+  runtime: 'Môi trường chạy',
+  resources: 'Tài nguyên máy',
+  cli: 'CLI agent',
+  harness: 'Harness server',
+  vault: 'Vault / khoá API',
+  data: 'Dữ liệu',
+};
+
+const CATEGORY_ORDER: DoctorCheckV106['category'][] = ['runtime', 'resources', 'cli', 'harness', 'vault', 'data'];
+
+/**
+ * Báo cáo dạng text cho CLI. Gom check theo nhóm, mỗi nhóm một tiêu
+ * đề; cuối cùng là dòng tổng kết. Text này an toàn để in ra stdout
+ * (không chứa secret — detail của doctor vốn không chứa secret).
+ */
+export function formatDoctorReport(report: DoctorReportV106): string {
+  const lines: string[] = [];
+  lines.push('open-bot doctor — kiểm tra môi trường');
+  lines.push(`Chạy lúc ${report.ranAt}`);
+  lines.push('');
+  for (const category of CATEGORY_ORDER) {
+    const group = report.checks.filter((c) => c.category === category);
+    if (group.length === 0) continue;
+    lines.push(`[${CATEGORY_TITLES[category]}]`);
+    for (const check of group) lines.push(formatDoctorCheckLine(check));
+    lines.push('');
+  }
+  const { pass, warn, fail, total } = report.summary;
+  lines.push(`Kết quả: ${pass}/${total} pass, ${warn} cảnh báo, ${fail} lỗi.`);
+  if (fail > 0) {
+    lines.push('Có lỗi cần sửa trước khi chạy bot ổn định — xem gợi ý "→ Sửa" ở từng mục.');
+  } else if (warn > 0) {
+    lines.push('Môi trường chạy được, nhưng nên xử lý các cảnh báo trên để bot chạy tốt hơn.');
+  } else {
+    lines.push('Môi trường tốt — sẵn sàng chạy bot.');
+  }
+  return lines.join('\n');
+}
+
+/** Báo cáo dạng JSON (chuỗi) cho UI/CLI `--json`. */
+export function formatDoctorReportJson(report: DoctorReportV106): string {
+  return JSON.stringify(report, null, 2);
+}

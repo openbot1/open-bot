@@ -32,6 +32,25 @@ export { buildExtractiveSummary, pruneLowRelevanceTurns, relevanceScore } from '
 export type { PrunableMessage, PruneResult } from './pruning';
 export { PROMPT_CACHE_PROVIDERS, PromptCacheTracker, cacheSupportForProvider } from './cacheHints';
 export type { CacheObservation } from './cacheHints';
+// v1.07 (Đội T6): prompt-cache theo hash cho memory blocks đã biên dịch.
+export {
+  CompiledPromptCache,
+  DEFAULT_PROMPT_CACHE_MAX_ENTRIES,
+  DEFAULT_PROMPT_CACHE_MAX_SECTIONS,
+  PROMPT_CACHE_FILE,
+  cacheHintForProvider,
+  diffCompiledPrompts,
+  estimateTokensForChars,
+  getPromptCachePath,
+  hashPromptContent,
+  loadPromptCache,
+  savePromptCache,
+} from './promptCache';
+export type {
+  CachedCompiledPrompt,
+  PromptCacheStats,
+  PromptSendPlan,
+} from './promptCache';
 export { CompactionHistory } from './compactionStore';
 export type { CompactionRecord } from './compactionStore';
 export { LeadAgent } from './leadAgent';

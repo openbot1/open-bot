@@ -67,6 +67,7 @@ import { noteConsolidationActivity, runIdleConsolidationIfDue } from '../memory/
 import { TemporalGraphStore } from '../memory/graph/store';
 import { V6RecordStore } from '../memory/v3/store';
 import { SharedBlockStore } from '../memory/v3/blocks';
+import type { GitMemoryProjection } from '../memory/gitProjection';
 import { EvolvingNoteStore } from '../memory/notes/store';
 import { SleepConsolidationAgent, createGraphSleepAgent } from '../memory/graph/sleepAgent';
 import { buildMemoryTurnContext, isEmbedderAvailableCached } from '../memory/turnContext';
@@ -99,6 +100,9 @@ import type { BudgetSnapshot } from '../risk/types';
 import type { RiskRule } from '../risk/types';
 import { validateVisionAttachments } from '../agent/vision';
 import { VoiceSessionManagerV2, FileVoiceSessionLogStore } from '../voice/voiceSessionManagerV2';
+import { VoiceV5Manager } from '../voice/voiceSessionV5';
+import { VoiceV6Manager } from '../voice/voiceSessionV6';
+import { VoiceV7Manager } from '../voice/voiceSessionV7';
 import {
   GROUP_BOT_STATUS_FILE_NAME,
   GROUP_CHATS_FILE_NAME,
@@ -882,6 +886,16 @@ export function defaultToolFactory(
       getInternetDataFile?: () => string | null | undefined;
       /** v1.03 (Team T6): userData dir resolver for fleet v3 tools. */
       getFleetV103BaseDir?: () => string | null | undefined;
+      /** v1.07 (Đội T1): workspace dir resolver for memory v8 tools
+       * (binds the 12 placeholders in ALL_TOOLS). */
+      getMemoryV8WorkspaceDir?: () => string | null | undefined;
+      /** v1.08 (Đội T1): workspace dir resolver for memory v9 tools
+       * (binds the 14 placeholders in ALL_TOOLS; starts the sleep
+       * daemon when the stored v9 policy is enabled). */
+      getMemoryV9WorkspaceDir?: () => string | null | undefined;
+      /** v1.08 (Đội T2): workspace dir resolver for coding v2 tools
+       * (binds the 10 placeholders in ALL_TOOLS). */
+      getCodingV2WorkspaceDir?: () => string | null | undefined;
       /** v0.95 (Team D1): opt-in Brave Search API key resolver. */
       getBraveSearchApiKey?: () => string | null;
       /** v0.95 (Team D1): called once per watch that changed. */
@@ -991,6 +1005,11 @@ export function defaultToolFactory(
      * Optional until the tools package ships the factory — guarded at
      * the call site, like createMcpV097Tools. */
     createMcpV2Tools?(): Tool[];
+    /** v1.06 (Đội T2): MCP 2.0 stateless wave 2 (mcp2_version_features,
+     * mcp2_server_age, mcp2_check_elicitation_schema, mcp2_task_update,
+     * mcp2_list_deprecated). Optional + guarded tại call site, giống
+     * createMcpV097Tools. */
+    createMcpV106Tools?(): Tool[];
     createMemoryBlockTools?(opts?: {
       blocksStore?: MemoryBlockStore;
       longTermStore?: LongTermMemory;
@@ -1102,6 +1121,57 @@ export function defaultToolFactory(
       limitTokens?: number;
       ramBudgetBytes?: number;
     }): Tool[];
+    /** v1.06 (Đội T1): memory v7 tools (memory_v7_block_create /
+     * block_update / block_list / block_promote / block_demote /
+     * prompt_recompile / block_history / episodic_search /
+     * tiers_status). Optional until the tools package ships the
+     * factory — guarded at the call site, like createMemoryV5Tools. */
+    createMemoryV7Tools?(opts?: {
+      workspaceDir?: string;
+      blocksStore?: MemoryBlockStore;
+      getUserId?: () => string | undefined;    }): Tool[];
+    /** v1.07 (Đội T1): memory v8 tools (memory_v8_sleep_status /
+     * sleep_config / sleep_run / local_search / provenance /
+     * review_list / review_decide / poisoning_scan / fleet_export /
+     * fleet_import / fleet_status / erase_user). Bound through
+     * createDefaultTools (getMemoryV8WorkspaceDir) — this factory
+     * interface is for hosts that build the tools directly. */
+    createMemoryV8Tools?(opts?: {
+      workspaceDir?: string;
+      v6Store?: V6RecordStore;
+      projection?: GitMemoryProjection;
+      blocksStore?: SharedBlockStore;
+      getUserId?: () => string | undefined;    }): Tool[];
+    /** v1.08 (Đội T2): coding agent v2 tools (coding_v2_repo_map_
+     * build/query/symbol, coding_v2_architect_plan/execute/status,
+     * coding_v2_git_commit/diff/revert/squash). Bound through
+     * createDefaultTools (getCodingV2WorkspaceDir) — this factory
+     * interface is for hosts that build the tools directly. */
+    createCodingV2Tools?(opts?: {
+      workspaceDir?: string;
+      getWorkspaceDir?: () => string | undefined;    }): Tool[];
+    /** v1.06 (Đội T4): voice v5 tools (voice_v5_route /
+     * router_config / start/stop_session / vad_config /
+     * list_speakers / name_speaker / note_turn / transcript) on
+     * the v5 session manager. Optional until the tools package
+     * ships the factory — guarded at the call site, like
+     * createMemoryV5Tools. */
+    createVoiceV5Tools?(opts?: {
+      getManager?: () => unknown;    }): Tool[];
+    /** v1.07 (Đội T5): voice v6 tools (voice_v6_state /
+     * list_voices / switch_voice / revert_voice / network_status /
+     * reconnect / session_stats) on the v6 session manager.
+     * Optional until the tools package ships the factory — guarded
+     * at the call site, like createVoiceV5Tools. */
+    createVoiceV6Tools?(opts?: {
+      getManager?: () => unknown;    }): Tool[];
+    /** v1.08 (Đội T5): voice v7 tools (voice_v7_session_create /
+     * list / stats / stop / delete / transcript / vad / barge_in /
+     * simulate_turn) on the v7 session manager. Optional until the
+     * tools package ships the factory — guarded at the call site,
+     * like createVoiceV6Tools. */
+    createVoiceV7Tools?(opts?: {
+      getManager?: () => unknown;    }): Tool[];
     /** v0.31 (P1-2): A2A client tools (call trusted external agents).
      * Optional until the tools package ships the factory — guarded at
      * the call site, like createSkillMarketplaceTools. */
@@ -1233,6 +1303,19 @@ export function defaultToolFactory(
         // ALL_TOOLS; this opt only BINDS the placeholders (userData
         // dir) — never a second registration.
         getFleetV103BaseDir: host?.getFleetV103BaseDir,
+        // v1.07 (Đội T1): memory v8 tools are already in ALL_TOOLS;
+        // this opt only BINDS the placeholders (workspace dir) —
+        // never a second registration (duplicate names throw).
+        getMemoryV8WorkspaceDir: () => workspaceDir,
+        // v1.08 (Đội T1): memory v9 tools are already in ALL_TOOLS;
+        // this opt only BINDS the placeholders (workspace dir) —
+        // never a second registration. When the stored v9 policy is
+        // enabled, createDefaultTools also starts the sleep daemon.
+        getMemoryV9WorkspaceDir: () => workspaceDir,
+        // v1.08 (Đội T2): coding v2 tools are already in ALL_TOOLS;
+        // this opt only BINDS the placeholders (workspace dir) —
+        // never a second registration (duplicate names throw).
+        getCodingV2WorkspaceDir: () => workspaceDir,
       }),
     );
     registry.registerMany(toolsMod.CODE_TOOLS);
@@ -1337,6 +1420,12 @@ export function defaultToolFactory(
     // Guarded — thiếu factory thì bot chỉ không có tool MCP v2, không fail.
     if (typeof toolsMod.createMcpV2Tools === 'function') {
       registry.registerMany(toolsMod.createMcpV2Tools());
+    }
+    // v1.06 (Đội T2): MCP 2.0 stateless wave 2 (mcp2_version_features,
+    // mcp2_server_age, mcp2_check_elicitation_schema, mcp2_task_update,
+    // mcp2_list_deprecated). Guarded — giống khối v0.97 phía trên.
+    if (typeof toolsMod.createMcpV106Tools === 'function') {
+      registry.registerMany(toolsMod.createMcpV106Tools());
     }
     // v0.96 (Đội T1): memory block tools (memory_block_* + memory_
     // consolidate) trên cùng workspace với long-term memory
@@ -1465,6 +1554,19 @@ export function defaultToolFactory(
         }),
       );
     }
+    // v1.06 (Đội T1): memory v7 tools (memory_v7_* — git-backed
+    // blocks, 4-tier promote/demote, prompt recompile, history,
+    // episodic search, tiers status) trên cùng workspaceDir với các
+    // factory memory khác. Guarded như factory khác.
+    if (typeof toolsMod.createMemoryV7Tools === 'function') {
+      registry.registerMany(
+        toolsMod.createMemoryV7Tools({
+          workspaceDir,
+          blocksStore: new MemoryBlockStore(workspaceDir),
+          getUserId: () => host?.getLocalUserId?.() ?? undefined,
+        }),
+      );
+    }
     // v1.05 (Đội T5): voice v4 tools (voice_v4_* — multi-session
     // start/stop/pause/resume, latency report, barge-in test,
     // internal eval, session log) trên voice session manager v2.
@@ -1488,6 +1590,45 @@ export function defaultToolFactory(
       registry.registerMany(
         toolsMod.createContextV2Tools({
           workspaceDir,
+        }),
+      );
+    }
+    // v1.06 (Đội T4): voice v5 tools (voice_v5_* — multi-model
+    // router, per-bot router config, session start/stop, adaptive
+    // VAD config, speakers, diarized transcript) trên
+    // VoiceV5Manager (in-memory; mock transport mặc định, không
+    // key, không mạng). Guarded như factory khác.
+    if (typeof toolsMod.createVoiceV5Tools === 'function') {
+      const voiceV5Manager = new VoiceV5Manager();
+      registry.registerMany(
+        toolsMod.createVoiceV5Tools({
+          getManager: () => voiceV5Manager,
+        }),
+      );
+    }
+    // v1.07 (Đội T5): voice v6 tools (voice_v6_* — explicit call
+    // state, mid-call voice switching, network guard, reconnect,
+    // session stats) trên VoiceV6Manager (in-memory; mock
+    // transport mặc định, không key, không mạng). Guarded như
+    // factory khác.
+    if (typeof toolsMod.createVoiceV6Tools === 'function') {
+      const voiceV6Manager = new VoiceV6Manager();
+      registry.registerMany(
+        toolsMod.createVoiceV6Tools({
+          getManager: () => voiceV6Manager,
+        }),
+      );
+    }
+    // v1.08 (Đội T5): voice v7 tools (voice_v7_* — session
+    // create/list/stats/stop/delete, streaming transcript, VAD
+    // config/status, barge-in, scripted mock turns) trên
+    // VoiceV7Manager (in-memory; mock transport mặc định, không
+    // key, không mạng). Guarded như factory khác.
+    if (typeof toolsMod.createVoiceV7Tools === 'function') {
+      const voiceV7Manager = new VoiceV7Manager();
+      registry.registerMany(
+        toolsMod.createVoiceV7Tools({
+          getManager: () => voiceV7Manager,
         }),
       );
     }

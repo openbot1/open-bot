@@ -184,6 +184,59 @@ export type {
   ComposioPollToQueueBridge,
   ComposioPollToQueueBridgeOptions,
 } from './pollBridge';
+// --- v1.08 (Đội T4): toolkit-status polling — poll connection status
+// per toolkit on a schedule, report changes (not app-event polling,
+// which lives in polling.ts / pollScheduler.ts). ---
+export {
+  COMPOSIO_TOOLKIT_STATUS_POLL_DEFAULT_INTERVAL_MS,
+  COMPOSIO_TOOLKIT_STATUS_POLL_MAX_CHANGES,
+  COMPOSIO_TOOLKIT_STATUS_POLL_MAX_INTERVAL_MS,
+  COMPOSIO_TOOLKIT_STATUS_POLL_MIN_INTERVAL_MS,
+  ComposioToolkitStatusPoller,
+} from './toolkitStatusPolling';
+export type {
+  ComposioToolkitStatusChange,
+  ComposioToolkitStatusEntry,
+  ComposioToolkitStatusFetchFn,
+  ComposioToolkitStatusPollResult,
+  ComposioToolkitStatusPollerOptions,
+  ComposioToolkitStatusPollerStatus,
+} from './toolkitStatusPolling';
+// --- v1.08 (Đội T4): trigger → internal-action mapping (user-editable
+// table: Composio trigger slug → automation / internal tool / notify). ---
+export {
+  COMPOSIO_TRIGGER_MAPPINGS_FILE,
+  COMPOSIO_TRIGGER_MAPPINGS_VERSION,
+  COMPOSIO_TRIGGER_MAPPING_MAX_DESCRIPTION_CHARS,
+  COMPOSIO_TRIGGER_MAPPING_MAX_TARGET_CHARS,
+  ComposioTriggerMappingStore,
+  renderComposioTriggerTemplate,
+  resolveComposioTriggerMapping,
+  validateComposioTriggerMapping,
+} from './triggerMapping';
+export type {
+  ComposioResolvedTriggerAction,
+  ComposioTriggerActionKind,
+  ComposioTriggerMapping,
+  ComposioTriggerMappingEvent,
+  ComposioTriggerMappingInput,
+  ComposioTriggerMappingPatch,
+  ComposioTriggerMappingStoreOptions,
+  ComposioTriggerResolveResult,
+} from './triggerMapping';
+// --- v1.08 (Đội T4): per-toolkit connection management — enable/disable
+// per toolkit + health check per toolkit + summary for the UI. ---
+export {
+  COMPOSIO_TOOLKIT_CONNECTIONS_FILE,
+  COMPOSIO_TOOLKIT_CONNECTIONS_VERSION,
+  ComposioToolkitConnectionManager,
+} from './toolkitConnections';
+export type {
+  ComposioSingleToolkitStatusFetchFn,
+  ComposioToolkitConnectionManagerOptions,
+  ComposioToolkitConnectionState,
+  ComposioToolkitConnectionSummary,
+} from './toolkitConnections';
 export type {
   ComposioPollFetchFn,
   ComposioPollItem,
