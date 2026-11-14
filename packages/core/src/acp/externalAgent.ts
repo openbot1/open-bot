@@ -47,7 +47,24 @@ export class ExternalAgentManager {
   /** Spawn an agent and register it. Returns the managed agent id. */
   async spawn(name: string, command: string, args: string[] = []): Promise<ManagedAcpAgent> {
     const { process, client } = spawnAcpAgent(command, args, this.clientOptions);
-    await client.initialize();
+    try {
+      await client.initialize();
+    } catch (error) {
+      // v1.03 (Team T3): a failed handshake used to leak the child
+      // process (nobody owned it yet). Kill it before surfacing the
+      // error so variant-retry callers (AcpHost) can try the next argv.
+      try {
+        client.close();
+      } catch {
+        // Ignore close errors; the process is being killed anyway.
+      }
+      try {
+        process.kill('SIGKILL');
+      } catch {
+        // Already gone.
+      }
+      throw error;
+    }
     const agent: ManagedAcpAgent = {
       id: randomUUID(),
       name,

@@ -243,6 +243,19 @@ export class AcpClient {
     return result?.configOptions;
   }
 
+  /**
+   * Switch the agent's mode (v1.03, Team T3). Returns the mode the
+   * agent reports as current (`currentModeId`), or undefined when
+   * the agent does not report one.
+   */
+  async setMode(sessionId: string, modeId: string): Promise<string | undefined> {
+    this.requireInitialized();
+    const result = (await this.peer.request('session/set_mode', { sessionId, modeId })) as
+      | { currentModeId?: string }
+      | undefined;
+    return typeof result?.currentModeId === 'string' ? result.currentModeId : undefined;
+  }
+
   /** Transport counters (useful for diagnostics). */
   getStats() {
     return this.peer.getStats();

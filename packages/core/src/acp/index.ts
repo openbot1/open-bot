@@ -71,3 +71,111 @@ export type { AcpAgentProbe, KnownAcpAgent } from './detect';
 
 export { ExternalAgentManager } from './externalAgent';
 export type { ExternalAgentManagerOptions, ManagedAcpAgent } from './externalAgent';
+
+// v1.03 (Team T3): ACP hosting — run an external harness as a
+// replaceable backend (backends, host), Claude Code plugin-format
+// compat, the four supplemented harness patterns, and the 29-pattern
+// audit of open-bot against the Harness Engineering survey.
+export {
+  ACP_HOST_BACKENDS,
+  acpBackendArgVariants,
+  getAcpBackend,
+  listAcpBackends,
+  registerAcpBackend,
+} from './backends';
+export type { AcpBackendDefinition } from './backends';
+
+export { AcpHost } from './hosting';
+export type {
+  AcpBackendProbe,
+  AcpFallbackAttempt,
+  AcpHostedBackend,
+  AcpHostOptions,
+  AcpHostPromptResult,
+  AcpHostStatus,
+} from './hosting';
+
+export {
+  claudePluginToOpenBot,
+  parseClaudeMarketplaceManifest,
+  parseClaudePluginManifest,
+  parseMarkdownFrontmatter,
+  scanClaudePluginDir,
+} from './pluginFormat';
+export type {
+  ClaudeMarketplaceManifest,
+  ClaudeMarketplacePluginEntry,
+  ClaudePluginAuthor,
+  ClaudePluginManifest,
+  OpenBotPluginRecord,
+  PluginFormatResult,
+  ScannedPlugin,
+  ScannedPluginCommand,
+  ScannedPluginSkill,
+} from './pluginFormat';
+
+// v1.04 (Team T3): Claude Code plugin RUNTIME — activate a plugin's
+// hooks as shell-command hooks, render its commands/agents as prompt
+// templates. Explicit opt-in activation only; see pluginRuntime.ts.
+export {
+  activateClaudePlugin,
+  deactivateClaudePlugin,
+  extractPluginMcpServers,
+  MAX_PLUGIN_HOOK_COMMAND_CHARS,
+  MAX_PLUGIN_PROMPT_CHARS,
+  parsePluginHooks,
+  parsePromptTemplateFrontmatter,
+  pluginHookBaseName,
+  readPluginHooksFile,
+  readPluginSkill,
+  readPromptTemplates,
+  renderPluginCommand,
+  splitPluginMatcher,
+  stripPromptTemplateFrontmatter,
+} from './pluginRuntime';
+export type {
+  ActivatePluginOptions,
+  ActivatePluginResult,
+  ActivatedPlugin,
+  PluginHookEntry,
+  PluginMcpServer,
+  PluginPromptTemplate,
+} from './pluginRuntime';
+
+export {
+  DEFAULT_DENY_PATTERNS,
+  AcpSubAgentDelegator,
+  DenyListSecurityReviewer,
+  SignatureStuckDetector,
+  ThresholdCompactionAdvisor,
+} from './patterns';
+export type {
+  CompactionAdvice,
+  CompactionAdvisor,
+  ContextState,
+  DelegationRequest,
+  DelegationResult,
+  SecurityReviewer,
+  SecurityVerdict,
+  StuckDetector,
+  StuckVerdict,
+  SubAgentDelegator,
+  ThresholdCompactionAdvisorOptions,
+  ToolCallToReview,
+  TurnRecord,
+} from './patterns';
+
+export {
+  HARNESS_PATTERN_CATALOG,
+  HARNESS_SUBSYSTEMS,
+  V103_IMPROVED_PATTERNS,
+  auditHarnessPatterns,
+  auditSummaryLine,
+} from './harnessAudit';
+export type {
+  HarnessAuditReport,
+  HarnessAuditSummary,
+  HarnessPattern,
+  HarnessSubsystem,
+  PatternStatus,
+} from './harnessAudit';

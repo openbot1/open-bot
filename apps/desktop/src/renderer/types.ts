@@ -1015,6 +1015,12 @@ export interface McpTaskViewLike {
   error?: string;
   /** Workspace the task belongs to (needed to cancel it). */
   workspaceDir: string;
+  /** v1.05: tiến độ 0..1 (khi server báo qua tasks/get hoặc push). */
+  progress?: number;
+  /** v1.05: ghi chú tiến độ của server. */
+  progressMessage?: string;
+  /** v1.05: task do client tạo hay do server yêu cầu (server-directed). */
+  origin?: 'client' | 'server-directed';
 }
 
 /** v0.89a (Marketplace v2): one row of `mcp-marketplace:check-updates`. */
@@ -2654,6 +2660,63 @@ export interface MemoryV3BlockVersionView {
   action: string;
   actor: string;
   at: string;
+}
+
+/** v1.04 (Đội T1): memory v5 views — health dashboard + contradiction groups + consolidation runs. */
+export interface MemoryV5HealthView {
+  generatedAt: string;
+  factCount: number;
+  activeFacts: number;
+  supersededFacts: number;
+  deletedFacts: number;
+  quarantinedPending: number;
+  entityCount: number;
+  orphanEntities: number;
+  contradictionGroups: number;
+  totalGroups: number;
+  contradictionRate: number;
+  staleFacts: number;
+  staleRate: number;
+  lowConfidenceFacts: number;
+  lowConfidenceRate: number;
+  avgConfidence: number;
+  avgFactAgeDays: number;
+  topPredicates: Array<{ predicate: string; count: number }>;
+  score: number;
+  grade: 'excellent' | 'good' | 'fair' | 'poor';
+  issues: string[];
+}
+
+export interface MemoryV5ContradictionGroupView {
+  subjectName: string;
+  predicate: string;
+  winnerObject: string;
+  winnerScore: number;
+  losers: Array<{ objectText: string; score: number; factId: string }>;
+}
+
+export interface MemoryV5ConsolidationRunView {
+  at: string;
+  actor: string;
+  duplicatesMerged: number;
+  groupsResolved: number;
+  losersSuperseded: number;
+  losersDeferred: number;
+  expiredSwept: number;
+  dreamPromoted: number;
+  scoreBefore: number;
+  scoreAfter: number;
+}
+
+/** Một fact trả về từ truy vấn bi-temporal (đã bỏ embedding). */
+export interface MemoryV5BiTemporalRowView {
+  factId: string;
+  subjectName: string;
+  predicate: string;
+  objectText: string;
+  validFrom: string;
+  validUntil: string | null;
+  currentAtRecordTime: boolean;
 }
 
 /** v1.01 (Đội T5): evolving notes như renderer thấy — mirror của preload NoteView. */
