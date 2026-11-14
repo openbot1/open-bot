@@ -33,6 +33,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { BotConfigLike, HarnessEventKindView, HarnessEventView, HarnessStatusView, HarnessThreadLogEntryView, HarnessThreadLogView } from '../types';
 import { useT } from '../i18n/useT';
 import { appendLiveEventLogEntries, eventLogEntryKey, mergeEventLogEntries } from './eventLogMerge';
+import EventLogViewer from './EventLogViewer';
 
 async function callOpenBot<T>(channel: string, camel: string, ...args: unknown[]): Promise<T | null> {
   const api = window.openBot as unknown as Record<string, unknown>;
@@ -202,6 +203,10 @@ export default function EventLogView({ bots, botId, onBack, onSelectBot }: Props
   const [liveTail, setLiveTail] = useState(true);
   const [liveConnected, setLiveConnected] = useState(false);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
+  // v1.08 (Team T5): time-travel viewer — jump to step N, replay,
+  // state at step. The list view stays the default; this is the
+  // advanced mode behind the toggle.
+  const [timeTravel, setTimeTravel] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
   // Live events append while the user pages through history — the
   // IPC offset must only count rows loaded from the log, never live
@@ -567,8 +572,23 @@ export default function EventLogView({ bots, botId, onBack, onSelectBot }: Props
         >
           {t('eventlog.refresh')}
         </button>
+        <button
+          type="button"
+          className="btn secondary"
+          data-testid="eventlog-time-travel"
+          onClick={() => setTimeTravel((v) => !v)}
+          aria-pressed={timeTravel}
+          disabled={entries.length === 0}
+        >
+          {t('eventlog.timeTravel')}
+        </button>
       </div>
 
+      {timeTravel && entries.length > 0 && (
+        <EventLogViewer entries={entries} total={total} onBack={() => setTimeTravel(false)} />
+      )}
+      {!timeTravel && (
+      <>
       <p style={{ margin: '0 0 8px', color: 'var(--text-dim)', fontSize: 13 }}>
         {t('eventlog.filterKinds')}
       </p>
@@ -680,6 +700,8 @@ export default function EventLogView({ bots, botId, onBack, onSelectBot }: Props
             </div>
           )}
         </>
+      )}
+      </>
       )}
     </div>
   );

@@ -60,6 +60,8 @@ interface Props {
   onOpenInternetData: () => void;
   // v0.90a (Team G): harness event log.
   onOpenEventLog: () => void;
+  // v1.08 (Team T5): voice v7 sessions panel.
+  onOpenVoiceSessions: () => void;
   // v1.03 (Team T6): cross-run event stream + eval harness.
   onOpenEventStream: () => void;
   onOpenEvalHarness: () => void;
@@ -95,7 +97,7 @@ interface Props {
   onToggleCollapse: () => void;
 }
 
-export default function Sidebar({ bots, selectedBotId, onSelect, onCreate, onEdit, onDelete, onClone, botMeta = {}, onTogglePin, onToggleHide, onCopyConversationId, onOpenDashboard, onOpenPlanner, onOpenSettings, onOpenMarketplace, onOpenMcpMarketplace, onOpenMcpApps, onOpenMcpTasks, onOpenMcpTasksMonitor, onOpenDoctorTeam, onOpenA2a, onOpenTeam, onOpenComputers, onOpenFleet, onOpenFleetConsole, onOpenBotMarketplace, onOpenPluginMarketplace, onOpenGroupChat, onOpenChannels, onOpenSkills, onOpenMemory, onOpenCanvas, onOpenAutomations, onOpenTools, onOpenInternetData, onOpenEventLog, onOpenEventStream, onOpenEvalHarness, onOpenEvalFleet, onOpenRunLog, onOpenAgUi, onOpenHarness2, onOpenConnectedApps, threads, selectedThreadId, threadSearchResults, onSelectThread, onCreateThread, onRenameThread, onDeleteThread, onSearchThreads, runningBotIds, pendingCounts, collapsed, onToggleCollapse }: Props) {
+export default function Sidebar({ bots, selectedBotId, onSelect, onCreate, onEdit, onDelete, onClone, botMeta = {}, onTogglePin, onToggleHide, onCopyConversationId, onOpenDashboard, onOpenPlanner, onOpenSettings, onOpenMarketplace, onOpenMcpMarketplace, onOpenMcpApps, onOpenMcpTasks, onOpenMcpTasksMonitor, onOpenDoctorTeam, onOpenA2a, onOpenTeam, onOpenComputers, onOpenFleet, onOpenFleetConsole, onOpenBotMarketplace, onOpenPluginMarketplace, onOpenGroupChat, onOpenChannels, onOpenSkills, onOpenMemory, onOpenCanvas, onOpenAutomations, onOpenTools, onOpenInternetData, onOpenEventLog, onOpenVoiceSessions, onOpenEventStream, onOpenEvalHarness, onOpenEvalFleet, onOpenRunLog, onOpenAgUi, onOpenHarness2, onOpenConnectedApps, threads, selectedThreadId, threadSearchResults, onSelectThread, onCreateThread, onRenameThread, onDeleteThread, onSearchThreads, runningBotIds, pendingCounts, collapsed, onToggleCollapse }: Props) {
   const t = useT();
   // v0.59 (UI-5): thread search box + inline rename + delete confirm
   // (in-app modal, never window.confirm).
@@ -149,6 +151,8 @@ export default function Sidebar({ bots, selectedBotId, onSelect, onCreate, onEdi
     { key: 'tools', label: t('sidebar.tools'), onOpen: onOpenTools },
     { key: 'internet-data', label: `🌐 ${t('sidebar.internetData')}`, onOpen: onOpenInternetData },
     { key: 'eventlog', label: `📜 ${t('sidebar.eventLog')}`, onOpen: onOpenEventLog },
+    // v1.08 (Team T5): voice v7 sessions panel.
+    { key: 'voice-sessions', label: `🎙️ ${t('sidebar.voiceSessions')}`, onOpen: onOpenVoiceSessions },
     { key: 'runlog', label: `🎞️ ${t('sidebar.runLog')}`, onOpen: onOpenRunLog },
     { key: 'event-stream', label: `📡 ${t('sidebar.eventStream')}`, onOpen: onOpenEventStream },
     { key: 'eval-harness', label: `🧪 ${t('sidebar.evalHarness')}`, onOpen: onOpenEvalHarness },

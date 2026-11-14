@@ -23,6 +23,7 @@ import AutomationsView from './components/AutomationsView';
 import HarnessV2View from './components/HarnessV2View';
 import TraceView from './components/TraceView';
 import EventLogView from './components/EventLogView';
+import VoiceSessionPanel from './components/VoiceSessionPanel';
 import RunReplayView from './components/RunReplayView';
 import AgUiPanel from './components/agui/AgUiPanel';
 import InternetDataView from './components/InternetDataView';
@@ -120,7 +121,7 @@ export default function App() {
   const [tasks, setTasks] = useState<TaskView[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [showTasks, setShowTasks] = useState(false);
-  const [view, setView] = useState<'chat' | 'dashboard' | 'planner' | 'settings' | 'marketplace' | 'bot-marketplace' | 'plugin-marketplace' | 'mcp' | 'mcp-apps' | 'mcp-tasks' | 'team' | 'computers' | 'fleet' | 'fleet-console' | 'skills' | 'memory' | 'automations' | 'agui' | 'harness2' | 'traces' | 'eventlog' | 'runlog' | 'event-stream' | 'eval-harness' | 'eval-fleet' | 'plans' | 'a2a' | 'group' | 'channels' | 'tools' | 'connected-apps' | 'canvas' | 'internet-data' | 'mcp-tasks-monitor' | 'doctor-team'>('chat');
+  const [view, setView] = useState<'chat' | 'dashboard' | 'planner' | 'settings' | 'marketplace' | 'bot-marketplace' | 'plugin-marketplace' | 'mcp' | 'mcp-apps' | 'mcp-tasks' | 'team' | 'computers' | 'fleet' | 'fleet-console' | 'skills' | 'memory' | 'automations' | 'agui' | 'harness2' | 'traces' | 'eventlog' | 'voice-sessions' | 'runlog' | 'event-stream' | 'eval-harness' | 'eval-fleet' | 'plans' | 'a2a' | 'group' | 'channels' | 'tools' | 'connected-apps' | 'canvas' | 'internet-data' | 'mcp-tasks-monitor' | 'doctor-team'>('chat');
   // v0.98 (Team T4 — planning v2): run plan attached to the NEXT chat
   // run (one-shot — `send` consumes it). The plan's owner bot must
   // match the bot being sent to, otherwise the run ignores it.
@@ -1333,6 +1334,7 @@ export default function App() {
         onOpenTools={() => setView('tools')}
         onOpenInternetData={() => setView('internet-data')}
         onOpenEventLog={() => setView('eventlog')}
+        onOpenVoiceSessions={() => setView('voice-sessions')}
         onOpenEventStream={() => setView('event-stream')}
         onOpenEvalHarness={() => setView('eval-harness')}
         onOpenEvalFleet={() => setView('eval-fleet')}
@@ -1518,6 +1520,10 @@ export default function App() {
               onBack={() => setView('chat')}
               onSelectBot={(id) => setSelectedBotId(id)}
             />
+          </div>
+        ) : view === 'voice-sessions' ? (
+          <div className="main">
+            <VoiceSessionPanel onBack={() => setView('chat')} />
           </div>
         ) : view === 'runlog' ? (
           <div className="main">

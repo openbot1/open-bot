@@ -14,6 +14,7 @@ import { useEffect, useState } from 'react';
 import { useT } from '../i18n/useT';
 import type { BotConfigLike, MemoryEntryView } from '../types';
 import MemoryBlocksView from './MemoryBlocksView';
+import MemoryBlocksEditor from './MemoryBlocksEditor';
 import MemoryV2View from './MemoryV2View';
 import GraphView from './GraphView';
 import MemoryNotesView from './MemoryNotesView';
@@ -62,7 +63,8 @@ export default function MemoryView({ bots, botId, onBack, onSelectBot }: Props) 
   // v1.02 (Team T2): memory v3 tab (block conflicts, temporal contradictions, block history).
   // v1.04 (Team T1): memory v5 tab (health dashboard + consolidation v2).
   // v1.06 (Team T5): timeline tab — chronological memory events.
-  const [tab, setTab] = useState<'memories' | 'blocks' | 'v2' | 'graph' | 'verbatim' | 'notes' | 'v3' | 'v5' | 'timeline'>('memories');
+  // v1.08 (Team T5): blocks editor tab — versions + diff + restore.
+  const [tab, setTab] = useState<'memories' | 'blocks' | 'blocks-editor' | 'v2' | 'graph' | 'verbatim' | 'notes' | 'v3' | 'v5' | 'timeline'>('memories');
 
   const activeBot = bots.find((b) => b.id === botId) ?? bots[0] ?? null;
 
@@ -193,6 +195,14 @@ export default function MemoryView({ bots, botId, onBack, onSelectBot }: Props) 
         </button>
         <button
           className="btn secondary"
+          data-testid="memory-tab-blocks-editor"
+          onClick={() => setTab('blocks-editor')}
+          disabled={tab === 'blocks-editor'}
+        >
+          {t('memory.tabBlocksEditor')}
+        </button>
+        <button
+          className="btn secondary"
           data-testid="memory-tab-v2"
           onClick={() => setTab('v2')}
           disabled={tab === 'v2'}
@@ -260,6 +270,8 @@ export default function MemoryView({ bots, botId, onBack, onSelectBot }: Props) 
         <MemoryV2View bots={bots} botId={botId} onSelectBot={onSelectBot} />
       ) : tab === 'blocks' ? (
         <MemoryBlocksView bots={bots} botId={botId} onSelectBot={onSelectBot} />
+      ) : tab === 'blocks-editor' ? (
+        <MemoryBlocksEditor bots={bots} botId={botId} onSelectBot={onSelectBot} />
       ) : tab === 'graph' ? (
         <GraphView bots={bots} botId={botId} onSelectBot={onSelectBot} />
       ) : tab === 'notes' ? (

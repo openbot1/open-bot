@@ -384,7 +384,11 @@ import {
   importBlocksFromMemFs,
   importFactsFromMemFs,
   MEMFS_BLOCKS_DIR_NAME,
+  readBlockHistory,
 } from '@open-bot/core';
+// v1.08 (Đội T5): voice v7 sessions cho IPC `voice-v7:*` (mock,
+// local-first — panel quản lý session + transcript streaming).
+import { VoiceV7Manager, isVadV7PresetName } from '@open-bot/core';
 // v0.97 (Team T4): memory v2 — temporal graph + sleep agent + hybrid
 // search + provenance/quota cho IPC `memory-v2:*`.
 import {
@@ -2605,6 +2609,15 @@ const workerPool = new WorkerPool({ size: 4, maxConcurrentToolExecs: 4 });
  * (có test với mock client, không cần kết nối live).
  */
 const voiceSessions = new Map<string, VoiceCallSession>();
+
+/**
+ * v1.08 (Đội T5): voice v7 sessions cho panel quản lý session
+ * (IPC `voice-v7:*`). Một manager cho cả app (in-memory, mock
+ * transport mặc định — không key, không mạng). Panel tạo / nối /
+ * dừng / xóa session ở đây; transcript + VAD + barge-in đọc từ
+ * chính các session này.
+ */
+const voiceV7Manager = new VoiceV7Manager();
 
 /**
  * v0.59: đọc lịch sử tool-call của một bot để `peek_changes` dùng.
@@ -5674,6 +5687,23 @@ function registerIpc(): void {
         ? store.list({ ...(userId !== undefined ? { userId } : {}) })
         : store.list({ botId: payload?.botId, ...(userId !== undefined ? { userId } : {}) });
       return blocks.map((b) => publicBlockView(store, b));
+    },
+  );
+  // v1.08 (Đội T5): lịch sử phiên bản của một block — editor đọc
+  // qua đây để vẽ version + diff (đọc từ
+  // `.open-bot/memory-blocks-history.jsonl`, không secret).
+  ipcMain.handle(
+    'memory-blocks:history',
+    (_event: unknown, payload: { botId: string; blockId: string; limit?: number }) => {
+      const id = requireId(payload?.botId, 'botId');
+      const bot = settings.bots.find((b) => b.id === id);
+      if (!bot) throw new Error('Không tìm thấy bot.');
+      const blockId = requireId(payload?.blockId, 'blockId');
+      const limit =
+        typeof payload?.limit === 'number' && Number.isFinite(payload.limit)
+          ? Math.max(1, Math.min(200, Math.floor(payload.limit)))
+          : 50;
+      return readBlockHistory(workspaceDirFor(bot), blockId, limit);
     },
   );
   ipcMain.handle(
@@ -9049,6 +9079,165 @@ function registerIpc(): void {
     if (!bot) return { available: false };
     return { available: realtimeConfigFor(bot) !== null };
   });
+
+  // v1.08 (Đội T5): voice v7 sessions — panel quản lý session
+  // (VoiceSessionPanel) + transcript streaming + VAD + barge-in.
+  // Mọi session đều mock (transport mặc định của VoiceV7Manager)
+  // trừ khi host nối live transport — không key, không mạng.
+  const voiceV7SessionOrError = (id: unknown): { session: ReturnType<VoiceV7Manager['getSession']>; error?: string } => {
+    const sessionId = typeof id === 'string' ? id.trim() : '';
+    const session = sessionId === '' ? undefined : voiceV7Manager.getSession(sessionId);
+    if (!session) return { session: undefined, error: `Không tìm thấy voice v7 session "${String(id ?? '')}".` };
+    return { session };
+  };
+  ipcMain.handle('voice-v7:list', () => {
+    return { sessions: voiceV7Manager.listSessions(), manager: voiceV7Manager.getStats() };
+  });
+  ipcMain.handle(
+    'voice-v7:create',
+    async (
+      _event: unknown,
+      payload: { id?: string; provider?: string; voiceId?: string; vadPreset?: string; connect?: boolean },
+    ) => {
+      try {
+        const id =
+          typeof payload?.id === 'string' && payload.id.trim() !== ''
+            ? payload.id.trim()
+            : `call-${Date.now().toString(36)}`;
+        const provider = payload?.provider;
+        if (provider !== undefined && provider !== 'openai' && provider !== 'gemini' && provider !== 'openai-compatible') {
+          return { ok: false, error: `Provider voice v7 không hợp lệ: "${provider}".` };
+        }
+        const vadPreset = payload?.vadPreset;
+        if (vadPreset !== undefined && !isVadV7PresetName(vadPreset)) {
+          return { ok: false, error: `VAD preset không hợp lệ: "${vadPreset}".` };
+        }
+        const session = voiceV7Manager.createSession(id, {
+          ...(provider !== undefined ? { provider } : {}),
+          ...(typeof payload?.voiceId === 'string' && payload.voiceId !== ''
+            ? { initialVoiceId: payload.voiceId }
+            : {}),
+          ...(vadPreset !== undefined ? { vadPreset } : {}),
+        });
+        if (payload?.connect === true) await session.connect({});
+        return { ok: true, sessionId: id, summary: session.getSummary() };
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : String(e) };
+      }
+    },
+  );
+  ipcMain.handle('voice-v7:connect', async (_event: unknown, payload: { id: string }) => {
+    const { session, error } = voiceV7SessionOrError(payload?.id);
+    if (!session) return { ok: false, error };
+    try {
+      await session.connect({});
+      return { ok: true, summary: session.getSummary() };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  });
+  ipcMain.handle('voice-v7:stop', (_event: unknown, payload: { id: string }) => {
+    const { session, error } = voiceV7SessionOrError(payload?.id);
+    if (!session) return { ok: false, error };
+    session.disconnect();
+    return { ok: true, summary: session.getSummary() };
+  });
+  ipcMain.handle('voice-v7:delete', (_event: unknown, payload: { id: string }) => {
+    const id = typeof payload?.id === 'string' ? payload.id.trim() : '';
+    return { ok: true, deleted: voiceV7Manager.removeSession(id) };
+  });
+  ipcMain.handle('voice-v7:transcript', (_event: unknown, payload: { id: string; limit?: number }) => {
+    const { session, error } = voiceV7SessionOrError(payload?.id);
+    if (!session) return { ok: false, error };
+    const limit =
+      typeof payload?.limit === 'number' && Number.isFinite(payload.limit)
+        ? Math.max(1, Math.min(500, Math.floor(payload.limit)))
+        : 100;
+    const lines = session.getTranscriptStream().getLines().slice(-limit);
+    return { ok: true, phase: session.getPhase(), lines, stats: session.getTranscriptStream().getStats() };
+  });
+  ipcMain.handle(
+    'voice-v7:simulate',
+    async (_event: unknown, payload: { id: string; userText: string; modelReply?: string }) => {
+      const { session, error } = voiceV7SessionOrError(payload?.id);
+      if (!session) return { ok: false, error };
+      const userText = typeof payload?.userText === 'string' ? payload.userText.trim() : '';
+      if (userText === '') return { ok: false, error: 'userText không được trống.' };
+      const modelReply =
+        typeof payload?.modelReply === 'string' && payload.modelReply.trim() !== ''
+          ? payload.modelReply
+          : undefined;
+      const simulated = await session.simulateTurn(userText, modelReply);
+      return { ok: true, simulated, phase: session.getPhase() };
+    },
+  );
+  ipcMain.handle(
+    'voice-v7:vad',
+    (_event: unknown, payload: { id: string; action?: string; preset?: string; [key: string]: unknown }) => {
+      const { session, error } = voiceV7SessionOrError(payload?.id);
+      if (!session) return { ok: false, error };
+      const action = payload?.action ?? 'status';
+      try {
+        if (action === 'config') {
+          const patch: Record<string, unknown> = {};
+          if (typeof payload?.preset === 'string') {
+            if (!isVadV7PresetName(payload.preset)) {
+              return { ok: false, error: `VAD preset không hợp lệ: "${payload.preset}".` };
+            }
+            patch.preset = payload.preset;
+          }
+          for (const name of [
+            'baseThreshold',
+            'thresholdMultiplier',
+            'hangoverMs',
+            'maxGapMs',
+            'minTurnMs',
+            'backchannelMaxMs',
+            'debounceFrames',
+            'minConfidence',
+            'minZcr',
+            'maxZcr',
+          ]) {
+            if (typeof payload?.[name] === 'number') patch[name] = payload[name];
+          }
+          if (Object.keys(patch).length === 0) {
+            return { ok: false, error: 'Cần preset hoặc ít nhất một ngưỡng để cấu hình VAD.' };
+          }
+          const config = session.updateVadOptions(patch as never);
+          return { ok: true, config, stats: session.getVad().getStats() };
+        }
+        return { ok: true, stats: session.getVad().getStats(), config: session.getVad().getOptions() };
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : String(e) };
+      }
+    },
+  );
+  ipcMain.handle(
+    'voice-v7:barge-in',
+    async (_event: unknown, payload: { id: string; action?: string; rms?: number }) => {
+      const { session, error } = voiceV7SessionOrError(payload?.id);
+      if (!session) return { ok: false, error };
+      const action = payload?.action ?? 'status';
+      try {
+        if (action === 'interrupt') {
+          const result = await session.interrupt();
+          return { ok: true, result };
+        }
+        if (action === 'duck') {
+          const rms = typeof payload?.rms === 'number' ? payload.rms : 0.02;
+          return { ok: true, result: session.getBargeIn().duck(rms) };
+        }
+        if (action === 'resume') {
+          const resumed = session.resumePartial();
+          if (!resumed) return { ok: true, resumed: false };
+          return { ok: true, resumed: true, partial: resumed.partial, resumePrompt: resumed.resumePrompt };
+        }
+        return { ok: true, stats: session.getBargeIn().getStats(), partials: session.getBargeIn().getPartials() };
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : String(e) };
+      }
+    },
+  );
 
   ipcMain.handle('voice:connect', async (_event: unknown, payload: { botId: string }) => {
     const botId = requireId(payload?.botId, 'botId');

@@ -733,6 +733,49 @@ export interface OpenBotApi {
     readiness?: unknown;
     error?: string;
   }>;
+  // v1.08 (Đội T5): voice v7 sessions — panel quản lý session
+  // (VoiceSessionPanel): list/create/connect/stop/delete,
+  // transcript streaming, scripted mock turn, VAD, barge-in.
+  voiceV7List(): Promise<{ sessions?: unknown; manager?: unknown }>;
+  voiceV7Create(payload: {
+    id?: string;
+    provider?: string;
+    voiceId?: string;
+    vadPreset?: string;
+    connect?: boolean;
+  }): Promise<{ ok: boolean; sessionId?: string; summary?: unknown; error?: string }>;
+  voiceV7Connect(payload: { id: string }): Promise<{ ok: boolean; summary?: unknown; error?: string }>;
+  voiceV7Stop(payload: { id: string }): Promise<{ ok: boolean; summary?: unknown; error?: string }>;
+  voiceV7Delete(payload: { id: string }): Promise<{ ok: boolean; deleted?: boolean; error?: string }>;
+  voiceV7Transcript(payload: {
+    id: string;
+    limit?: number;
+  }): Promise<{ ok: boolean; phase?: string; lines?: unknown; stats?: unknown; error?: string }>;
+  voiceV7Simulate(payload: {
+    id: string;
+    userText: string;
+    modelReply?: string;
+  }): Promise<{ ok: boolean; simulated?: boolean; phase?: string; error?: string }>;
+  voiceV7Vad(payload: {
+    id: string;
+    action: 'status' | 'config';
+    preset?: string;
+    [key: string]: unknown;
+  }): Promise<{ ok: boolean; stats?: unknown; config?: unknown; error?: string }>;
+  voiceV7BargeIn(payload: {
+    id: string;
+    action: 'status' | 'interrupt' | 'duck' | 'resume';
+    rms?: number;
+  }): Promise<{
+    ok: boolean;
+    result?: unknown;
+    partial?: unknown;
+    resumePrompt?: string;
+    resumed?: boolean;
+    stats?: unknown;
+    partials?: unknown;
+    error?: string;
+  }>;
   onVoiceRealtimeState(
     cb: (payload: { botId: string; kind: string; state?: string; source?: string; speaker?: string; at?: number }) => void,
   ): () => void;
@@ -1006,6 +1049,26 @@ export interface OpenBotApi {
   // v0.96 (Đội T1): memory blocks — CRUD + attach/detach/share +
   // read-only + MemFS export/import + consolidate.
   listMemoryBlocks(payload: { botId: string; includeDetached?: boolean }): Promise<MemoryBlockView[]>;
+  // v1.08 (Đội T5): lịch sử phiên bản của một block — editor đọc
+  // qua đây để vẽ version + diff.
+  getMemoryBlockHistory(payload: {
+    botId: string;
+    blockId: string;
+    limit?: number;
+  }): Promise<
+    Array<{
+      blockId: string;
+      label: string;
+      version: number;
+      content: string;
+      description: string;
+      charLimit: number;
+      readOnly: boolean;
+      action: string;
+      actor: string;
+      at: string;
+    }>
+  >;
   createMemoryBlock(payload: { botId: string; label: string; description?: string; content?: string; charLimit?: number; readOnly?: boolean }): Promise<MemoryBlockView>;
   updateMemoryBlock(payload: { botId: string; id: string; description?: string; content?: string; charLimit?: number }): Promise<MemoryBlockView>;
   appendMemoryBlock(payload: { botId: string; id: string; text: string }): Promise<MemoryBlockView>;
