@@ -189,11 +189,11 @@ test('surface: register/unregister emit a surface event with the list', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Connect: instructions carry surface guidance, tools are the ten
+// Connect: instructions carry surface guidance, tools are the twelve
 // voice-call tools only
 // ---------------------------------------------------------------------------
 
-test('connect: session instructions carry surface guidance + 10 voice tools', async () => {
+test('connect: session instructions carry surface guidance + 12 voice tools', async () => {
   const { session, clients } = makeSession();
   session.registerSurface('carplay');
   await session.connect({ url: 'wss://example.invalid/v1/realtime', instructions: 'You are helpful.' });
@@ -202,10 +202,10 @@ test('connect: session instructions carry surface guidance + 10 voice tools', as
   assert.match(config.instructions, /You are helpful\./);
   assert.match(config.instructions, /CarPlay/);
   assert.match(config.instructions, /driving/);
-  assert.equal(config.tools.length, 10);
+  assert.equal(config.tools.length, 12);
   assert.deepEqual(
     config.tools.map((t) => t.name),
-    ['nudge', 'peek_agents', 'peek_runs', 'peek_changes', 'recall_texts', 'search_conversations', 'stay_silent', 'switch_agent', 'transfer', 'end_call'],
+    ['nudge', 'peek_agents', 'peek_runs', 'peek_changes', 'recall_texts', 'search_conversations', 'stay_silent', 'switch_agent', 'transfer', 'end_call', 'save_checkpoint', 'recall_media'],
   );
   for (const tool of config.tools) assert.equal(tool.type, 'function');
   assert.equal(session.isConnected(), true);
@@ -216,7 +216,7 @@ test('connect: default surface is desk when nothing registered', async () => {
   const { session, clients } = makeSession();
   await session.connect({ url: 'wss://example.invalid/v1/realtime', instructions: '' });
   assert.match(clients[0].config.instructions, /transcript/);
-  assert.equal(clients[0].config.tools.length, 10);
+  assert.equal(clients[0].config.tools.length, 12);
   session.disconnect();
 });
 

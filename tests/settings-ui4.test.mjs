@@ -87,8 +87,9 @@ test('tabs: 5 tabs, every section in exactly one tab, no tab empty', () => {
   // appearance (manual theme) section + the v0.86 crashReports section
   // + the v0.87c notifications section + the v0.95 mediaKeys section
   // + the v0.95d4 profile section + the v0.96 repoMap section
-  // + the v0.96 router section + the v1.01 risk section.
-  assert.equal(SETTINGS_SECTIONS.length, 28);
+  // + the v0.96 router section + the v1.01 risk section
+  // + the v1.05 doctor section.
+  assert.equal(SETTINGS_SECTIONS.length, 29);
 });
 
 test('no section lost: all pre-UI-4 section titles still render somewhere', () => {
@@ -126,15 +127,17 @@ test('no section lost: all pre-UI-4 section titles still render somewhere', () =
     'profile.title',
     // v0.96 repoMap section, in Bot & Model.
     'settings.repoMapTitle',
+    // v1.05 doctor section, in Advanced.
+    'settings.doctorTitle',
   ];
   for (const key of titleKeys) {
     assert.ok(joined.includes(key), `section title key ${key} is gone from Settings/Connected apps`);
   }
 });
 
-test('no section lost: data-section markers — 40 sections, none duplicated', () => {
+test('no section lost: data-section markers — 41 sections, none duplicated', () => {
   const found = dataSections();
-  // Literal markers (27). The 13 provider cards share one template
+  // Literal markers (28). The 13 provider cards share one template
   // marker, `data-section={`provider-${meta.id}`}`, checked below.
   const expectedLiteral = [
     // General tab (8)
@@ -145,8 +148,8 @@ test('no section lost: data-section markers — 40 sections, none duplicated', (
     'connectors',
     // Security tab (5)
     'auth', 'vault', 'onePassword', 'crashReports', 'risk',
-    // Advanced tab (5)
-    'dream', 'perf', 'plugins', 'hooks', 'api',
+    // Advanced tab (6)
+    'dream', 'perf', 'plugins', 'hooks', 'api', 'doctor',
     // Connected apps view (2)
     'apps', 'composio',
   ];
@@ -165,7 +168,7 @@ test('no section lost: data-section markers — 40 sections, none duplicated', (
     const line = SETTINGS_VIEW.split('\n').find((l) => l.includes(`id: '${id}'`) && l.includes('PROVIDER_META') === false && l.includes('labelKey'));
     assert.ok(line && !line.includes('cliKind'), `PROVIDER_META must list non-CLI provider ${id}`);
   }
-  assert.equal(found.length + nonCliProviders.length, 40, 'total sections must be 40 (27 literal + 13 provider cards)');
+  assert.equal(found.length + nonCliProviders.length, 41, 'total sections must be 41 (28 literal + 13 provider cards)');
 });
 
 test('search: filterSections finds the right section', () => {

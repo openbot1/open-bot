@@ -375,7 +375,7 @@ test('redial: server close 4001 (superseded) and 1008 (policy) never redial', as
 // Voice-call toolset
 // ---------------------------------------------------------------------------
 
-test('voice toolset: exactly the ten call tools, nothing else', () => {
+test('voice toolset: exactly the twelve call tools, nothing else', () => {
   assert.deepEqual([...VOICE_CALL_TOOL_NAMES], [
     'nudge',
     'peek_agents',
@@ -387,6 +387,8 @@ test('voice toolset: exactly the ten call tools, nothing else', () => {
     'switch_agent',
     'transfer',
     'end_call',
+    'save_checkpoint',
+    'recall_media',
   ]);
   assert.equal(VOICE_CALL_REQUEST_CHAR_LIMIT, 4000);
   assert.equal(VOICE_CALL_SEARCH_HIT_LIMIT, 10);
@@ -443,7 +445,7 @@ test('voice toolset: execute serves, and classifies unknown/invalid without thro
   });
   assert.equal(toolset.has('nudge'), true);
   assert.equal(toolset.has('read_file'), false);
-  assert.equal(toolset.definitions.length, 10);
+  assert.equal(toolset.definitions.length, 12);
 
   const served = await toolset.execute('nudge', { task: 'check the build' });
   assert.deepEqual(served, { kind: 'served', tool: 'nudge', output: 'nudged: check the build' });
@@ -578,9 +580,9 @@ test('harness: executeTool outcomes served / unknown_tool / invalid_input', asyn
   assert.equal(invalid.kind, 'invalid_input');
   assert.match(invalid.error, /500-char limit/);
 
-  // Realtime function definitions expose only the ten voice tools.
+  // Realtime function definitions expose only the twelve voice tools.
   const defs = harness.toRealtimeFunctionDefinitions();
-  assert.equal(defs.length, 10);
+  assert.equal(defs.length, 12);
   assert.deepEqual(
     defs.map((d) => d.name),
     [...VOICE_CALL_TOOL_NAMES],

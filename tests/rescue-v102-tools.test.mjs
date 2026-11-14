@@ -34,7 +34,7 @@ function tool(name) {
   return found;
 }
 
-test('registry: all 12 rescue tools are in ALL_TOOLS exactly once; the full registry counts 259', () => {
+test('registry: all 12 rescue tools are in ALL_TOOLS exactly once; the full registry counts 345', () => {
   const expected = [
     'context_measure_budget',
     'context_prune_history',
@@ -53,13 +53,13 @@ test('registry: all 12 rescue tools are in ALL_TOOLS exactly once; the full regi
     assert.equal(ALL_TOOLS.filter((t) => t.definition.name === name).length, 1, name);
   }
   // The full agent registry (defaultToolFactory) counts every tool
-  // the agent can call: 238 in v1.01 + 9 memory v3 (Đội T2) + these 12 = 259.
+  // the agent can call: 238 in v1.01 + 9 memory v3 (Đội T2) + these 12 = 259; v1.03 (Đội T1): + 5 CodeAct/harness; v1.03 (Team T3): + 4 acp_host_*; v1.03 (Đội T4): + 7 workspace_*; v1.03 (Team T6): + 4 fleet/marketplace v3; v1.03 (Đội T2): + 6 memory_v4_* = 285; v1.04 (Đội T1): + 8 memory_v5_* = 293; v1.05 (Đội T1): + 8 memory_v6_* = 301; v1.05 (Đội T5): + 9 voice_v4_* = 310; v1.05 (Đội T4): + 9 context_v2_* = 319; v1.05 (Đội T3): + 8 openmausbot_v105_* = 327; v1.05 (Team T6): + 11 eval/fleet v105_* = 338; v1.05 (Đội T2): + 7 mcp_v2_* = 345.
   const ws = tmpDir();
   const mem = new BotMemory(ws);
   try {
     const tools = defaultToolFactory(mem, ws, 'bot-1');
     const names = tools.map((t) => t.definition.name);
-    assert.equal(names.length, 259, `expected 259 tools, got ${names.length}`);
+    assert.equal(names.length, 345, `expected 345 tools, got ${names.length}`);
     assert.equal(new Set(names).size, names.length, 'duplicate tool names');
     for (const name of expected) assert.ok(names.includes(name), name);
   } finally {
