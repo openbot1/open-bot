@@ -38,13 +38,23 @@ import {
   BotComputerHealthProber,
   buildVerbatimWakeUp,
   ConversationBudgetHistory,
+  DetectedEngineRegistry,
+  DriverRegistry,
+  EnginePicker,
   FleetManager,
+  formatDoctorReport,
+  buildEvalTrends,
+  formatEvalReportText,
+  formatEvalTrendsText,
   HeadlessJobRunner,
   HOOK_COMMANDS_FILE,
   JsonFileRoutineStore,
+  listEngines,
   LocalHarness,
+  loadEvalReportHistory,
   OllamaEmbeddings,
   openVerbatimStoreForWorkspace,
+  probeDriver,
   RiskAnalyzer,
   RiskRuleStore,
   V6RecordStore,
@@ -58,6 +68,11 @@ import {
   retireRecord,
   runConsolidationV6,
   statsMarkdown,
+  runDoctor,
+  applyTeamYamlV106,
+  exportTeamYamlV106,
+  TeamYamlError,
+  runEval,
   decideConfirmation,
   getTeamConfigPath,
   loadHeadlessJobFile,
@@ -106,6 +121,7 @@ import type {
   BotConfig,
   CoordinatorNotification,
   CreateBotProviderConfig,
+  DoctorCheckId,
   RiskRule,
   HookCommandSettingsEntry,
   HookEventKind,
@@ -128,7 +144,15 @@ DÙNG:
   open-bot team apply <file.yaml> [--dry-run] [--json]
   open-bot team export [--out file.yaml] [--json]
   open-bot team diff <file.yaml|json> [--json]
-  open-bot doctor [--json]
+  open-bot doctor [--json] [--port N] [--only a,b]
+  open-bot driver list [--json]
+  open-bot driver register --id <id> --name <name> --provider <id> --binary <path> --format <json|json-rpc|acp|ndjson> [--argv A ...] [--version-args A ...] [--probe-args A ...] [--json]
+  open-bot driver test <id> [--json]
+  open-bot driver enable|disable|remove <id> [--json]
+  open-bot engine list [--json]
+  open-bot engine pick --bot <id> --engine <cli:..|api:..|driver:..> --model <model> [--json]
+  open-bot engine current --bot <id> [--json]
+  open-bot engine unpick --bot <id> [--json]
   open-bot headless start|stop|status|logs [--port N] [--tail N] [--json]
   open-bot models refresh [--provider <id>|--all] [--json]
   open-bot harness routines list [--json]
@@ -178,6 +202,16 @@ DÙNG:
   open-bot context status [--bot <id>] [--workspace DIR] [--json]
   open-bot context policy [--bot <id>] [--workspace DIR] [--preset NAME] [--set key=value ...] [--json]
   open-bot context inspect|export|assemble|schedule|restore [--bot <id>] [--workspace DIR] [--json]
+  open-bot eval memory|mcp|all [--json] [--out FILE]
+                (v1.06) Chạy eval benchmark: memory (recall sau N lượt,
+                tier promotion, block edit) và/hoặc mcp (stateless format,
+                discover, elicitation, Tasks, fallback server cũ). Báo cáo
+                lưu vào <dataDir>/eval-reports/<id>.json. Exit 1 khi có
+                case fail.
+  open-bot eval trends [--json]
+                (v1.06) Xu hướng eval từ các báo cáo đã lưu: pass rate
+                từng suite, case flaky (lúc pass lúc fail), case fail
+                liên tục. Chỉ đọc, không chạy lại eval.
 
 LỆNH:
   run           Chạy 1 prompt qua 1 bot, in kết quả ra stdout.
@@ -204,14 +238,28 @@ LỆNH:
                 validate rồi ghi <dataDir>/team.json (ghi đè file cũ).
                 YAML version 1 còn ghi quota máy-tính-bot vào
                 team-computers.json; --dry-run chỉ validate, không ghi.
+                File YAML dạng team-bots (dòng đầu team:) thì áp dụng
+                Team YAML v1.06: tạo/cập nhật bots trong bots.json.
   team export   Xuất team hiện có ra YAML (kèm quota computer nếu có),
-                in ra stdout hoặc ghi file với --out.
+                in ra stdout hoặc ghi file với --out. Nếu đã áp dụng
+                Team YAML v1.06 (có bots.json) thì xuất dạng team-bots.
   team diff     So sánh file team (YAML/JSON) với team hiện có: liệt kê
                 thành viên/bot/quota thêm, bớt, đổi (chỉ đọc, không ghi).
-  doctor        (v1.05) Kiểm tra sức khoẻ hệ thống: Node, provider đã
-                cấu hình, Ollama local, MCP servers, RAM, ổ đĩa, port
-                headless. Exit 0 khi không có lỗi (cảnh báo vẫn 0),
-                1 khi có check lỗi. --json xuất JSON máy đọc được.
+  doctor        Kiểm tra sức khoẻ môi trường — gộp hai bộ check (v1.05:
+                Node, provider đã cấu hình, Ollama local, MCP servers,
+                RAM, ổ đĩa, port headless; v1.06: Node/npm, OS, CPU,
+                CLI agent đã đăng nhập, harness, vault, thư mục dữ
+                liệu). Exit 0 khi không có lỗi (cảnh báo vẫn 0), 2 khi
+                có check lỗi. --json xuất JSON; --only a,b lọc check;
+                --port N đổi cổng harness cần kiểm tra.
+  driver        (v1.06) Quản lý driver CLI tuỳ chỉnh: đăng ký binary
+                CLI riêng (kèm định dạng stream json/json-rpc/acp/
+                ndjson), test kết nối, bật/tắt/xoá. Lưu ở
+                <dataDir>/cli-drivers.json.
+  engine        (v1.06) Chọn engine cho bot: list (CLI đã detect +
+                driver + provider API), pick (lưu lựa chọn), current
+                (engine bot đang dùng), unpick (về mặc định của bot).
+                Lưu ở <dataDir>/engine-picks.json.
   headless      (v1.05) Chạy core không cần UI desktop: start (spawn
                 daemon loopback 127.0.0.1:8799, log ra
                 <dataDir>/headless.log), stop, status, logs (in N dòng
@@ -827,9 +875,304 @@ async function cmdHarness(sub: string | undefined, positional: string[], flags: 
 }
 
 /**
+/**
+ * `open-bot doctor` — gộp hai bộ kiểm tra (v1.05 + v1.06 Đội T3).
+ *
+ * Bộ v1.05: Node, provider đã cấu hình, Ollama local, MCP servers,
+ * RAM, ổ đĩa, port headless. Bộ v1.06 (T3): 11 check Node/npm, OS,
+ * CPU/RAM/đĩa, CLI agent đã đăng nhập, harness loopback/cổng, vault,
+ * thư mục dữ liệu. Hai bộ có thể trùng id (memory/disk/vault) nhưng
+ * là hai cách đo khác nhau nên giữ cả hai trong báo cáo gộp.
+ *
+ * Exit 0 khi không có check fail (warn vẫn 0), 2 khi có check fail.
+ * `--only a,b` lọc check ở cả hai bộ; `--port N` đổi cổng harness
+ * cần kiểm tra (sai cổng → exit 1).
+ */
+async function cmdDoctor(flags: CliFlags): Promise<number> {
+  const dataDir = resolveDataDir(flags);
+  const asJson = flags['json'] === true;
+  const portRaw = flags['port'];
+  let harnessPort: number | undefined;
+  if (typeof portRaw === 'string' && portRaw.trim() !== '') {
+    const n = Number.parseInt(portRaw, 10);
+    if (!Number.isInteger(n) || n <= 0 || n > 65535) fail('--port phải là số cổng 1–65535.');
+    harnessPort = n;
+  }
+  let only: string[] | undefined;
+  const onlyRaw = flags['only'];
+  if (typeof onlyRaw === 'string' && onlyRaw.trim() !== '') {
+    only = onlyRaw.split(',').map((s) => s.trim()).filter((s) => s !== '');
+    const valid = [
+      'node-version', 'npm-version', 'os', 'cpu', 'memory', 'disk', 'cli-engines',
+      'harness-loopback', 'harness-port', 'vault', 'data-dir',
+      'node', 'datadir', 'providers', 'ollama', 'mcp', 'headless-port',
+    ];
+    for (const id of only) {
+      if (!valid.includes(id)) fail(`--only có check không rõ "${id}" — hợp lệ: ${valid.join(', ')}.`);
+    }
+  }
+  // Bộ v1.06 (T3): 11 check môi trường/CLI/harness/vault.
+  const t3Ids = [
+    'node-version', 'npm-version', 'os', 'cpu', 'memory', 'disk', 'cli-engines',
+    'harness-loopback', 'harness-port', 'vault', 'data-dir',
+  ];
+  const t3Only = only === undefined ? undefined : only.filter((id) => t3Ids.includes(id));
+  const t3Report = await runDoctor(
+    { dataDir, ...(harnessPort ? { harnessPort } : {}) },
+    { ...(t3Only === undefined ? {} : { only: t3Only as DoctorCheckId[] }) },
+  );
+  // Bộ v1.05: Node/provider/Ollama/MCP/RAM/đĩa/port headless.
+  const v105Report = await runDoctorChecks({ dataDir });
+  const v105Checks = only === undefined ? v105Report.checks : v105Report.checks.filter((c) => only.includes(c.id));
+  const checks = [...t3Report.checks, ...v105Checks];
+  const pass = checks.filter((c) => c.status === 'pass' || c.status === 'ok').length;
+  const warn = checks.filter((c) => c.status === 'warn').length;
+  const failCount = checks.filter((c) => c.status === 'fail').length;
+  const v105Pass = v105Checks.filter((c) => c.status === 'ok').length;
+  const v105Warn = v105Checks.filter((c) => c.status === 'warn').length;
+  const v105Fail = v105Checks.filter((c) => c.status === 'fail').length;
+  if (asJson) {
+    const report = {
+      ok: failCount === 0,
+      summary: { ok: pass, warn, fail: failCount, total: checks.length, pass },
+      checks,
+      checkedAt: v105Report.checkedAt,
+      durationMs: v105Report.durationMs,
+      ranAt: t3Report.ranAt,
+    };
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  } else {
+    const useColor = process.stdout.isTTY === true;
+    process.stdout.write(`${formatDoctorReport(t3Report)}\n`);
+    const v105Filtered = {
+      ...v105Report,
+      ok: v105Fail === 0,
+      summary: { ok: v105Pass, warn: v105Warn, fail: v105Fail },
+      checks: v105Checks,
+    };
+    process.stdout.write(`${renderDoctorReport(v105Filtered, useColor)}\n`);
+  }
+  return failCount > 0 ? 2 : 0;
+}
+
+async function cmdDriver(
+  sub: string | undefined,
+  positional: string[],
+  flags: CliFlags,
+): Promise<number> {
+  const dataDir = resolveDataDir(flags);
+  const asJson = flags['json'] === true;
+  const registry = new DriverRegistry({ dataDir });
+  const out = (obj: unknown, text: string): void => {
+    process.stdout.write(asJson ? `${JSON.stringify(obj)}\n` : text);
+  };
+  const needId = (): string => {
+    const id = positional[0];
+    if (!id) fail(`driver ${sub ?? ''} cần id: open-bot driver ${sub ?? '<lệnh>'} <id>.`);
+    return id;
+  };
+  const strFlag = (key: string): string | undefined => {
+    const raw = flags[key];
+    return typeof raw === 'string' && raw.trim() !== '' ? raw.trim() : undefined;
+  };
+  const arrFlag = (key: string): string[] | undefined => {
+    const raw = flags[key];
+    if (typeof raw === 'string') return [raw];
+    if (Array.isArray(raw)) return raw.filter((v): v is string => typeof v === 'string');
+    return undefined;
+  };
+  switch (sub) {
+    case 'list': {
+      const drivers = registry.list();
+      out(
+        { drivers },
+        drivers.length === 0
+          ? 'Chưa có driver nào — đăng ký bằng `open-bot driver register …`.\n'
+          : `${drivers.map((d) => `${d.id}  ${d.name}  provider=${d.providerId}  binary=${d.binaryPath}  format=${d.streamFormat}  ${d.enabled ? 'enabled' : 'disabled'}`).join('\n')}\n`,
+      );
+      return 0;
+    }
+    case 'register': {
+      const id = strFlag('id');
+      const name = strFlag('name');
+      const provider = strFlag('provider');
+      const binary = strFlag('binary');
+      const format = strFlag('format');
+      if (!id || !name || !provider || !binary || !format) {
+        fail('driver register cần: --id <id> --name <name> --provider <id> --binary <path> --format <json|json-rpc|acp|ndjson>.');
+      }
+      try {
+        const cfg = registry.register({
+          id,
+          name,
+          providerId: provider,
+          binaryPath: binary,
+          streamFormat: format as 'json' | 'json-rpc' | 'acp' | 'ndjson',
+          ...(arrFlag('argv') ? { argv: arrFlag('argv') as string[] } : {}),
+          ...(arrFlag('version-args') ? { versionArgs: arrFlag('version-args') as string[] } : {}),
+          ...(arrFlag('probe-args') ? { probeArgs: arrFlag('probe-args') as string[] } : {}),
+        });
+        out({ ok: true, driver: cfg }, `Đã đăng ký driver "${cfg.id}" (${cfg.name}, ${cfg.streamFormat}) → ${registry.filePath}\n`);
+        return 0;
+      } catch (err) {
+        fail(`Không đăng ký được driver: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      return 0;
+    }
+    case 'test': {
+      const id = needId();
+      const driver = registry.get(id);
+      if (!driver) fail(`Driver "${id}" không tồn tại.`);
+      const result = await probeDriver(driver);
+      out(
+        result,
+        result.ok
+          ? `Driver "${id}": OK — version ${result.version ?? '(không rõ)'}${result.signedIn === true ? ', đã đăng nhập' : result.signedIn === false ? ', chưa đăng nhập' : ''} (${result.latencyMs}ms)\n`
+          : `Driver "${id}": LỖI — ${result.error ?? 'không rõ nguyên nhân'}\n`,
+      );
+      return result.ok ? 0 : 2;
+    }
+    case 'enable':
+    case 'disable': {
+      const id = needId();
+      try {
+        const cfg = sub === 'enable' ? registry.enable(id) : registry.disable(id);
+        out({ ok: true, driver: cfg }, `Driver "${id}" đã ${sub === 'enable' ? 'bật' : 'tắt'}.\n`);
+        return 0;
+      } catch (err) {
+        fail(err instanceof Error ? err.message : String(err));
+      }
+      return 0;
+    }
+    case 'remove': {
+      const id = needId();
+      try {
+        const removed = registry.remove(id);
+        out({ ok: true, removed }, `Đã xoá driver "${id}".\n`);
+        return 0;
+      } catch (err) {
+        fail(err instanceof Error ? err.message : String(err));
+      }
+      return 0;
+    }
+    case undefined:
+      fail('driver cần subcommand: list | register | test <id> | enable <id> | disable <id> | remove <id>.');
+      break;
+    default:
+      fail(`Không rõ lệnh driver "${sub}".`);
+      break;
+  }
+  return 0;
+}
+
+/**
+ * v1.06 (Đội T3): `open-bot engine ...` — chọn engine cho bot.
+ */
+async function cmdEngine(
+  sub: string | undefined,
+  positional: string[],
+  flags: CliFlags,
+): Promise<number> {
+  const dataDir = resolveDataDir(flags);
+  const asJson = flags['json'] === true;
+  const out = (obj: unknown, text: string): void => {
+    process.stdout.write(asJson ? `${JSON.stringify(obj)}\n` : text);
+  };
+  const strFlag = (key: string): string | undefined => {
+    const raw = flags[key];
+    return typeof raw === 'string' && raw.trim() !== '' ? raw.trim() : undefined;
+  };
+  const picker = new EnginePicker({ dataDir });
+
+  /** Catalog engine hiện tại (CLI detect + driver + API). */
+  const buildCatalog = async (): Promise<ReturnType<typeof listEngines>> => {
+    let detected = null;
+    try {
+      const registry = new DetectedEngineRegistry({ stateFilePath: path.join(dataDir, 'detected-engines.json') });
+      detected = await registry.detect();
+    } catch {
+      detected = null;
+    }
+    const drivers = new DriverRegistry({ dataDir }).list();
+    return listEngines({ detected, drivers });
+  };
+  const botDefault = (botId: string): { botId: string; providerId: string; model: string } | null => {
+    const entries = loadBotsFile(dataDir);
+    const entry = entries.find((e) => e.bot.id === botId || e.bot.name === botId);
+    if (!entry) return null;
+    return { botId: entry.bot.id, providerId: entry.bot.providerId, model: entry.bot.model };
+  };
+
+  switch (sub) {
+    case 'list': {
+      const engines = await buildCatalog();
+      out(
+        { engines },
+        engines.length === 0
+          ? 'Không có engine nào.\n'
+          : `${engines
+              .map(
+                (e) =>
+                  `${e.id}  ${e.label}  provider=${e.providerId}${e.models.length > 0 ? `  models=${e.models.join(',')}` : ''}${e.accountLabel ? `  (${e.accountLabel})` : ''}  ${e.installed && e.enabled && e.signedIn !== false ? 'chọn được' : `không chọn được (${e.unavailableReason ?? 'chưa rõ'})`}`,
+              )
+              .join('\n')}\n`,
+      );
+      return 0;
+    }
+    case 'pick': {
+      const botId = strFlag('bot');
+      const engineId = strFlag('engine');
+      const model = strFlag('model');
+      if (!botId || !engineId || !model) fail('engine pick cần: --bot <id> --engine <cli:..|api:..|driver:..> --model <model>.');
+      const def = botDefault(botId);
+      if (!def) fail(`Không thấy bot "${botId}" trong bots.json.`);
+      try {
+        const engines = await buildCatalog();
+        const pick = picker.pick(def.botId, engineId, model, engines);
+        out({ ok: true, pick }, `Bot "${def.botId}" sẽ chạy bằng engine ${pick.engineId} (model ${pick.model}).\n`);
+        return 0;
+      } catch (err) {
+        fail(err instanceof Error ? err.message : String(err));
+      }
+      return 0;
+    }
+    case 'current': {
+      const botId = strFlag('bot');
+      if (!botId) fail('engine current cần --bot <id>.');
+      const def = botDefault(botId);
+      if (!def) fail(`Không thấy bot "${botId}" trong bots.json.`);
+      const engines = await buildCatalog();
+      const current = picker.currentEngine(def, engines);
+      out(
+        current,
+        `Bot "${current.botId}": engine ${current.engineId} (${current.label ?? current.providerId}), model ${current.model}${current.fromPick ? ' [đã chọn]' : ' [mặc định của bot]'}\n`,
+      );
+      return 0;
+    }
+    case 'unpick': {
+      const botId = strFlag('bot');
+      if (!botId) fail('engine unpick cần --bot <id>.');
+      const removed = picker.unpick(botId);
+      if (!removed) fail(`Bot "${botId}" chưa có lựa chọn engine nào để xoá.`);
+      out({ ok: true, removed }, `Đã xoá lựa chọn engine của bot "${botId}" (bot về mặc định của nó).\n`);
+      return 0;
+    }
+    case undefined:
+      fail('engine cần subcommand: list | pick --bot <id> --engine <id> --model <model> | current --bot <id> | unpick --bot <id>.');
+      break;
+    default:
+      fail(`Không rõ lệnh engine "${sub}".`);
+      break;
+  }
+  return 0;
+}
+
+/**
  * v1.05 (Đội T3): `open-bot team apply <file.json|yaml> [--dry-run]`.
  * JSON giữ hành vi cũ; YAML (version 1) apply qua applyTeamFile —
- * ghi team.json + quota máy-tính-bot (team-computers.json).
+ * ghi team.json + quota máy-tính-bot (team-computers.json). File YAML
+ * dạng team-bots (dòng đầu `team:`) thì áp dụng Team YAML v1.06
+ * (tạo/cập nhật bots.json) — nhánh đó nằm trong thân hàm phía dưới.
  */
 function cmdTeamApply(positional: string[], flags: CliFlags): number {
   const file = positional[0];
@@ -837,6 +1180,37 @@ function cmdTeamApply(positional: string[], flags: CliFlags): number {
   const dataDir = resolveDataDir(flags);
   const asJson = flags['json'] === true;
   const dryRun = flags['dry-run'] === true;
+  // v1.06 (Đội T3): file YAML dạng team-bots (dòng đầu `team:`) thì áp
+  // dụng Team YAML v1.06 (tạo/cập nhật bots.json) rồi return sớm; các
+  // dạng khác (YAML version 1 / JSON) đi đường applyTeamFile phía dưới.
+  // (Nhánh này PHẢI chạy trước applyTeamFile: file team-bots không có
+  // `version: 1` nên applyTeamFile sẽ throw trước khi tới đây.)
+  if (/\.ya?ml$/i.test(file)) {
+    let text: string;
+    try {
+      text = fs.readFileSync(path.resolve(file), 'utf8');
+    } catch (err) {
+      fail(`Không đọc được file team "${file}": ${err instanceof Error ? err.message : String(err)}`);
+    }
+    const firstLine = text.split('\n').map((s) => s.trim()).find((s) => s !== '') ?? '';
+    if (firstLine.startsWith('team:')) {
+      let teamResult;
+      try {
+        teamResult = applyTeamYamlV106(dataDir, text);
+      } catch (err) {
+        if (err instanceof TeamYamlError) fail(`Team YAML không hợp lệ: ${err.message}`);
+        fail(`Không áp dụng được team YAML: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      if (asJson) {
+        process.stdout.write(`${JSON.stringify({ ok: true, ...teamResult })}\n`);
+      } else {
+        process.stdout.write(
+          `Đã áp dụng team "${teamResult.teamName}": ${teamResult.created} bot mới, ${teamResult.updated} bot cập nhật (${teamResult.botIds.join(', ') || 'không có bot nào'}) → ${teamResult.botsPath}\n`,
+        );
+      }
+      return 0;
+    }
+  }
   let result;
   try {
     result = applyTeamFile(path.resolve(file), dataDir, { dryRun });
@@ -925,8 +1299,20 @@ function cmdTeamExport(positional: string[], flags: CliFlags): number {
   const dataDir = resolveDataDir(flags);
   const asJson = flags['json'] === true;
   let yaml: string;
+  // v1.06 (Đội T3): nếu có bots.json với >= 1 bot (đã áp Team YAML
+  // v1.06) thì xuất dạng team-bots; ngược lại xuất dạng v1.05.
+  let botsYaml: string | null = null;
   try {
-    yaml = exportTeamYaml(dataDir);
+    const botsRaw = fs.readFileSync(path.join(dataDir, 'bots.json'), 'utf8');
+    const bots = JSON.parse(botsRaw) as unknown;
+    if (Array.isArray(bots) && bots.length > 0) {
+      botsYaml = exportTeamYamlV106(dataDir);
+    }
+  } catch {
+    botsYaml = null;
+  }
+  try {
+    yaml = botsYaml ?? exportTeamYaml(dataDir);
   } catch (err) {
     fail(`Không xuất được team: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -951,24 +1337,6 @@ function cmdTeamExport(positional: string[], flags: CliFlags): number {
     process.stdout.write(yaml);
   }
   return 0;
-}
-
-/**
- * v1.05 (Đội T3): `open-bot doctor [--json]`.
- * Chạy kiểm tra sức khoẻ, in báo cáo có màu, exit 0 khi không có
- * check nào fail, 1 khi có fail (warn vẫn exit 0).
- */
-async function cmdDoctor(flags: CliFlags): Promise<number> {
-  const asJson = flags['json'] === true;
-  const dataDir = resolveDataDir(flags);
-  const report = await runDoctorChecks({ dataDir });
-  if (asJson) {
-    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-  } else {
-    const useColor = process.stdout.isTTY === true;
-    process.stdout.write(`${renderDoctorReport(report, useColor)}\n`);
-  }
-  return doctorExitCode(report);
 }
 
 /**
@@ -1795,6 +2163,54 @@ async function cmdMemoryV6(sub: string | undefined, positional: string[], flags:
 }
 
 /**
+ * Lệnh `eval` (v1.06, Đội T6) — chạy eval benchmark từ terminal:
+ *
+ *   open-bot eval memory|mcp|all [--json] [--out FILE]
+ *
+ * `memory` chạy suite memory eval (recall sau N lượt, tier promotion,
+ * block edit) trong workspace tạm; `mcp` chạy suite MCP conformance
+ * eval (không cần server thật); `all` chạy cả hai. Báo cáo lưu vào
+ * `<dataDir>/eval-reports/<id>.json`. Exit 0 khi mọi case pass,
+ * exit 1 khi có case fail (để CI/script dùng được).
+ */
+async function cmdEval(
+  sub: string | undefined,
+  _positional: string[],
+  flags: CliFlags,
+): Promise<number> {
+  const suite = sub ?? 'all';
+  if (suite === 'trends') {
+    const dataDir = resolveDataDir(flags);
+    const trends = buildEvalTrends(loadEvalReportHistory(dataDir));
+    if (flags['json'] === true) {
+      process.stdout.write(`${JSON.stringify(trends)}\n`);
+    } else {
+      process.stdout.write(formatEvalTrendsText(trends));
+    }
+    return 0;
+  }
+  if (suite !== 'memory' && suite !== 'mcp' && suite !== 'all') {
+    fail('eval cần suite: memory | mcp | all | trends (vd: open-bot eval all).');
+  }
+  const dataDir = resolveDataDir(flags);
+  const asJson = flags['json'] === true;
+  const outFile = typeof flags['out'] === 'string' ? flags['out'] : undefined;
+  const suites = suite === 'all' ? (['memory', 'mcp-conformance'] as const) : suite === 'memory' ? (['memory'] as const) : (['mcp-conformance'] as const);
+  const { report, reportPath } = await runEval(suites, { saveDir: dataDir });
+  if (outFile !== undefined) {
+    fs.writeFileSync(outFile, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
+  }
+  if (asJson) {
+    process.stdout.write(`${JSON.stringify({ ...report, reportPath })}\n`);
+  } else {
+    process.stdout.write(formatEvalReportText(report));
+    process.stdout.write(`Report saved to: ${reportPath ?? '(not saved)'}\n`);
+    if (outFile !== undefined) process.stdout.write(`Report also written to: ${outFile}\n`);
+  }
+  return report.failed === 0 ? 0 : 1;
+}
+
+/**
  * v1.01 (Team T6): `open-bot query --prompt "..." [...]` — chạy 1 prompt
  * qua Agent SDK `query()` (agent loop trong process, không cần bot lưu
  * trong bots.json, không cần mở desktop). Text stream ra stdout khi
@@ -2107,6 +2523,15 @@ async function main(argv: string[]): Promise<number> {
   if (cmd === 'hooks') {
     return cmdHooks(sub, positional.slice(2), flags);
   }
+  if (cmd === 'doctor') {
+    return cmdDoctor(flags);
+  }
+  if (cmd === 'driver') {
+    return cmdDriver(sub, positional.slice(2), flags);
+  }
+  if (cmd === 'engine') {
+    return cmdEngine(sub, positional.slice(2), flags);
+  }
   if (cmd === 'team' && sub === 'apply') {
     return cmdTeamApply(positional.slice(2), flags);
   }
@@ -2142,6 +2567,9 @@ async function main(argv: string[]): Promise<number> {
   }
   if (cmd === 'context') {
     return cmdContext(sub, flags);
+  }
+  if (cmd === 'eval') {
+    return cmdEval(sub, positional.slice(2), flags);
   }
   process.stdout.write(HELP);
   return fail(`Không rõ lệnh "${cmd}".`, 1);

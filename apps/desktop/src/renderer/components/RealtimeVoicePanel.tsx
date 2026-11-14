@@ -1,4 +1,5 @@
 import { useT } from '../i18n/useT';
+import VoiceStateBadge, { type VoiceStateBadgeVoice } from './VoiceStateBadge';
 
 /**
  * Realtime voice panel (v0.95, Team D3) — the live 2-way voice
@@ -204,6 +205,22 @@ export interface RealtimeV4Status {
   turnHistory: RealtimeV4TurnHistoryEntry[];
 }
 
+/** Voice realtime v6 status, as VoiceSessionV6 reports it (v1.07). */
+export interface RealtimeV6Status {
+  /** Explicit v6 call state (state machine, never guessed). */
+  callState: 'idle' | 'connecting' | 'listening' | 'speaking' | 'interrupted' | 'reconnecting' | 'degraded' | 'ended';
+  /** Id of the current voice profile. */
+  voiceId: string | null;
+  /** Display name of the current voice profile. */
+  voiceName: string | null;
+  /** True when the network guard degraded the call to local-only. */
+  networkDegraded: boolean;
+  /** Network failures in a row (0 when healthy). */
+  networkFailures: number;
+  /** Voices the user can switch to (null until loaded). */
+  voices?: VoiceStateBadgeVoice[] | null;
+}
+
 interface Props {
   available: boolean;
   provider: RealtimeProviderOption;
@@ -235,6 +252,8 @@ interface Props {
   v4Status?: RealtimeV4Status | null;
   /** Per-stage latency (v1.05 — null until measured). */
   v4Stages?: RealtimeV4LatencyStage[] | null;
+  /** Voice realtime v6 status (v1.07 — null until the v6 session starts). */
+  v6Status?: RealtimeV6Status | null;
   onProviderChange: (provider: RealtimeProviderOption) => void;
   onTurnModeChange: (mode: RealtimeTurnModeOption) => void;
   onStart: () => void;
@@ -251,6 +270,8 @@ interface Props {
   onBargeInTest?: () => void;
   /** Resume the cut reply (v1.05 — optional; no button without it). */
   onResumePartial?: () => void;
+  /** Voice switched mid-call (v1.07 — optional; no switcher without it). */
+  onVoiceSwitch?: (id: string) => void;
 }
 
 export default function RealtimeVoicePanel({
@@ -272,6 +293,7 @@ export default function RealtimeVoicePanel({
   v104Status,
   v4Status,
   v4Stages,
+  v6Status,
   onProviderChange,
   onTurnModeChange,
   onStart,
@@ -283,6 +305,7 @@ export default function RealtimeVoicePanel({
   onLatencyModeChange,
   onBargeInTest,
   onResumePartial,
+  onVoiceSwitch,
 }: Props) {
   const t = useT();
   const active = state === 'listening' || state === 'speaking' || state === 'interrupted';
@@ -350,6 +373,16 @@ export default function RealtimeVoicePanel({
           {stateText}
         </span>
       </div>
+      {v6Status && (
+        <VoiceStateBadge
+          callState={v6Status.callState}
+          voiceName={v6Status.voiceName}
+          networkDegraded={v6Status.networkDegraded}
+          voices={v6Status.voices}
+          voiceId={v6Status.voiceId}
+          onVoiceChange={onVoiceSwitch}
+        />
+      )}
       <div className="row">
         <label>
           {t('voice.realtime.provider')}{' '}

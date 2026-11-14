@@ -31,6 +31,9 @@ import AgentMarketplaceView from './components/AgentMarketplaceView';
 import McpMarketplaceView from './components/McpMarketplaceView';
 import McpAppsView from './components/McpAppsView';
 import McpTasksView from './components/McpTasksView';
+// v1.06 (Team T5): MCP Tasks monitor panel + Doctor/Team/Engine panel.
+import McpTasksMonitorPanel from './components/McpTasksMonitorPanel';
+import DoctorTeamPanel from './components/DoctorTeamPanel';
 import A2aClientView from './components/A2aClientView';
 import TeamView from './components/TeamView';
 import ComputersView from './components/ComputersView';
@@ -117,7 +120,7 @@ export default function App() {
   const [tasks, setTasks] = useState<TaskView[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [showTasks, setShowTasks] = useState(false);
-  const [view, setView] = useState<'chat' | 'dashboard' | 'planner' | 'settings' | 'marketplace' | 'bot-marketplace' | 'plugin-marketplace' | 'mcp' | 'mcp-apps' | 'mcp-tasks' | 'team' | 'computers' | 'fleet' | 'fleet-console' | 'skills' | 'memory' | 'automations' | 'agui' | 'harness2' | 'traces' | 'eventlog' | 'runlog' | 'event-stream' | 'eval-harness' | 'eval-fleet' | 'plans' | 'a2a' | 'group' | 'channels' | 'tools' | 'connected-apps' | 'canvas' | 'internet-data'>('chat');
+  const [view, setView] = useState<'chat' | 'dashboard' | 'planner' | 'settings' | 'marketplace' | 'bot-marketplace' | 'plugin-marketplace' | 'mcp' | 'mcp-apps' | 'mcp-tasks' | 'team' | 'computers' | 'fleet' | 'fleet-console' | 'skills' | 'memory' | 'automations' | 'agui' | 'harness2' | 'traces' | 'eventlog' | 'runlog' | 'event-stream' | 'eval-harness' | 'eval-fleet' | 'plans' | 'a2a' | 'group' | 'channels' | 'tools' | 'connected-apps' | 'canvas' | 'internet-data' | 'mcp-tasks-monitor' | 'doctor-team'>('chat');
   // v0.98 (Team T4 — planning v2): run plan attached to the NEXT chat
   // run (one-shot — `send` consumes it). The plan's owner bot must
   // match the bot being sent to, otherwise the run ignores it.
@@ -1311,6 +1314,8 @@ export default function App() {
         onOpenMcpMarketplace={() => setView('mcp')}
         onOpenMcpApps={() => setView('mcp-apps')}
         onOpenMcpTasks={() => setView('mcp-tasks')}
+        onOpenMcpTasksMonitor={() => setView('mcp-tasks-monitor')}
+        onOpenDoctorTeam={() => setView('doctor-team')}
         onOpenA2a={() => setView('a2a')}
         onOpenTeam={() => setView('team')}
         onOpenComputers={() => setView('computers')}
@@ -1561,6 +1566,22 @@ export default function App() {
               onApprove={(plan) => approvePlan(plan)}
               onReject={(plan) => rejectPlan(plan)}
               onRequestChanges={(plan, note) => requestPlanChanges(plan, note)}
+            />
+          </div>
+        ) : view === 'mcp-tasks-monitor' ? (
+          <div className="main">
+            <McpTasksMonitorPanel onBack={() => setView('chat')} />
+          </div>
+        ) : view === 'doctor-team' ? (
+          <div className="main">
+            <DoctorTeamPanel
+              bots={bots}
+              botId={selectedBotId}
+              onSelectBot={(id) => setSelectedBotId(id)}
+              onBotUpdated={(saved) =>
+                setBots((prev) => prev.map((b) => (b.id === saved.id ? saved : b)))
+              }
+              onBack={() => setView('chat')}
             />
           </div>
         ) : showOnboarding ? (

@@ -20,6 +20,7 @@ import MemoryNotesView from './MemoryNotesView';
 import VerbatimMemoryView from './VerbatimMemoryView';
 import MemoryV3View from './MemoryV3View';
 import MemoryV5View from './MemoryV5View';
+import MemoryTimelineView from './MemoryTimelineView';
 
 interface Props {
   bots: BotConfigLike[];
@@ -60,7 +61,8 @@ export default function MemoryView({ bots, botId, onBack, onSelectBot }: Props) 
   // v1.01 (Team T5): evolving notes tab.
   // v1.02 (Team T2): memory v3 tab (block conflicts, temporal contradictions, block history).
   // v1.04 (Team T1): memory v5 tab (health dashboard + consolidation v2).
-  const [tab, setTab] = useState<'memories' | 'blocks' | 'v2' | 'graph' | 'verbatim' | 'notes' | 'v3' | 'v5'>('memories');
+  // v1.06 (Team T5): timeline tab — chronological memory events.
+  const [tab, setTab] = useState<'memories' | 'blocks' | 'v2' | 'graph' | 'verbatim' | 'notes' | 'v3' | 'v5' | 'timeline'>('memories');
 
   const activeBot = bots.find((b) => b.id === botId) ?? bots[0] ?? null;
 
@@ -237,8 +239,18 @@ export default function MemoryView({ bots, botId, onBack, onSelectBot }: Props) 
         >
           {t('memory.tabV5')}
         </button>
+        <button
+          className="btn secondary"
+          data-testid="memory-tab-timeline"
+          onClick={() => setTab('timeline')}
+          disabled={tab === 'timeline'}
+        >
+          {t('memory.tabTimeline')}
+        </button>
       </div>
-      {tab === 'verbatim' ? (
+      {tab === 'timeline' ? (
+        <MemoryTimelineView bots={bots} botId={botId} onSelectBot={onSelectBot} />
+      ) : tab === 'verbatim' ? (
         <VerbatimMemoryView bots={bots} botId={botId} onSelectBot={onSelectBot} />
       ) : tab === 'v5' ? (
         <MemoryV5View bots={bots} botId={botId} onSelectBot={onSelectBot} />

@@ -145,6 +145,7 @@ export default function SettingsGeneralTab({ s, onlySections }: Props) {
               <option value="system">{t('settings.themeSystem')}</option>
               <option value="light">{t('settings.themeLight')}</option>
               <option value="dark">{t('settings.themeDark')}</option>
+              <option value="paper">{t('settings.themePaper')}</option>
             </select>
             <p className="hint">{t('settings.themeHint')}</p>
           </div>

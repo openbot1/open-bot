@@ -23,6 +23,9 @@ interface Props {
   // v0.98 (T6): MCP Apps (sandboxed iframe) + MCP Tasks (long-running).
   onOpenMcpApps: () => void;
   onOpenMcpTasks: () => void;
+  // v1.06 (Team T5): MCP Tasks monitor panel + Doctor/Team/Engine panel.
+  onOpenMcpTasksMonitor: () => void;
+  onOpenDoctorTeam: () => void;
   onOpenA2a: () => void;
   onOpenTeam: () => void;
   // v0.96 (T6): dashboard + planner (plan flow) destinations.
@@ -92,7 +95,7 @@ interface Props {
   onToggleCollapse: () => void;
 }
 
-export default function Sidebar({ bots, selectedBotId, onSelect, onCreate, onEdit, onDelete, onClone, botMeta = {}, onTogglePin, onToggleHide, onCopyConversationId, onOpenDashboard, onOpenPlanner, onOpenSettings, onOpenMarketplace, onOpenMcpMarketplace, onOpenMcpApps, onOpenMcpTasks, onOpenA2a, onOpenTeam, onOpenComputers, onOpenFleet, onOpenFleetConsole, onOpenBotMarketplace, onOpenPluginMarketplace, onOpenGroupChat, onOpenChannels, onOpenSkills, onOpenMemory, onOpenCanvas, onOpenAutomations, onOpenTools, onOpenInternetData, onOpenEventLog, onOpenEventStream, onOpenEvalHarness, onOpenEvalFleet, onOpenRunLog, onOpenAgUi, onOpenHarness2, onOpenConnectedApps, threads, selectedThreadId, threadSearchResults, onSelectThread, onCreateThread, onRenameThread, onDeleteThread, onSearchThreads, runningBotIds, pendingCounts, collapsed, onToggleCollapse }: Props) {
+export default function Sidebar({ bots, selectedBotId, onSelect, onCreate, onEdit, onDelete, onClone, botMeta = {}, onTogglePin, onToggleHide, onCopyConversationId, onOpenDashboard, onOpenPlanner, onOpenSettings, onOpenMarketplace, onOpenMcpMarketplace, onOpenMcpApps, onOpenMcpTasks, onOpenMcpTasksMonitor, onOpenDoctorTeam, onOpenA2a, onOpenTeam, onOpenComputers, onOpenFleet, onOpenFleetConsole, onOpenBotMarketplace, onOpenPluginMarketplace, onOpenGroupChat, onOpenChannels, onOpenSkills, onOpenMemory, onOpenCanvas, onOpenAutomations, onOpenTools, onOpenInternetData, onOpenEventLog, onOpenEventStream, onOpenEvalHarness, onOpenEvalFleet, onOpenRunLog, onOpenAgUi, onOpenHarness2, onOpenConnectedApps, threads, selectedThreadId, threadSearchResults, onSelectThread, onCreateThread, onRenameThread, onDeleteThread, onSearchThreads, runningBotIds, pendingCounts, collapsed, onToggleCollapse }: Props) {
   const t = useT();
   // v0.59 (UI-5): thread search box + inline rename + delete confirm
   // (in-app modal, never window.confirm).
@@ -155,6 +158,9 @@ export default function Sidebar({ bots, selectedBotId, onSelect, onCreate, onEdi
     { key: 'automations', label: `⏰ ${t('sidebar.automations')}`, onOpen: onOpenAutomations },
     { key: 'harness2', label: `🔌 ${t('sidebar.harness2')}`, onOpen: onOpenHarness2 },
     { key: 'settings', label: `⚙️ ${t('sidebar.settings')}`, onOpen: onOpenSettings },
+    // v1.06 (Team T5): appended at the end of the nav list.
+    { key: 'mcp-tasks-monitor', label: `📈 ${t('sidebar.mcpTasksMonitor')}`, onOpen: onOpenMcpTasksMonitor },
+    { key: 'doctor-team', label: `🩺 ${t('sidebar.doctorTeam')}`, onOpen: onOpenDoctorTeam },
   ];
   const searching = query.trim() !== '';
   const selectedBot = bots.find((b) => b.id === selectedBotId) ?? null;
