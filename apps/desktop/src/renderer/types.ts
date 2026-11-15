@@ -2026,6 +2026,72 @@ export interface FleetV6OverviewView {
   }>;
 }
 
+// v1.11 (Đội T6): fleet v8 dashboard — mirror of core
+// FleetV8DashboardSnapshot (see packages/core/src/fleet/fleetV8Dashboard.ts).
+export interface FleetV8DashboardView {
+  builtAtMs: number;
+  fleetRoot: string;
+  nodes: {
+    totalNodes: number;
+    healthy: number;
+    degraded: number;
+    unhealthy: number;
+    down: number;
+    needsAttention: boolean;
+    worstStatus: string;
+  };
+  nodeRows: Array<{
+    nodeId: string;
+    status: string;
+    lastCheckedAtMs: number | null;
+    consecutiveDowns: number;
+    restartAttempts: number;
+    totalDowns: number;
+    totalEvacuations: number;
+    isLocal: boolean;
+  }>;
+  localProbe: {
+    cpuCores: number;
+    cpuLoad1m: number | null;
+    ramTotalBytes: number;
+    ramFreeBytes: number;
+    diskTotalBytes: number | null;
+    diskFreeBytes: number | null;
+    diskPath: string;
+    probedAtMs: number;
+  } | null;
+  problemBots: Array<{
+    botId: string;
+    status: string;
+    consecutiveFailures: number;
+    recentCrashes: number;
+    unhealthy: boolean;
+    lastError: string | null;
+  }>;
+  totalTrackedBots: number;
+  activeCampaigns: Array<{
+    id: string;
+    goal: string;
+    status: string;
+    totalBots: number;
+    done: number;
+    failed: number;
+    running: number;
+    progressPercent: number;
+    successRate: number | null;
+  }>;
+  totalCampaigns: number;
+  recentIncidents: Array<{
+    id: string;
+    kind: string;
+    nodeId: string;
+    botId?: string;
+    message: string;
+    atMs: number;
+  }>;
+  alerts: string[];
+}
+
 // v1.03 (Team T6): fleet overview + scheduling v3 — mirror of core
 // FleetOverview / PlacementPlan / QueuedPlacement (see
 // packages/core/src/fleet/overview.ts and scheduling.ts).
@@ -2498,6 +2564,120 @@ export interface LettaBlockAppendView {
   condensed: boolean;
   condense: { text: string; originalChars: number; condensedChars: number; originalSentences: number; keptSentences: number; duplicatesRemoved: number; condensed: boolean } | null;
   appendedChars: number;
+}
+
+/** v1.10 (Đội T1): memory v10 — views cho IPC `memory-v10:*`. */
+export interface V10ScoreBreakdownView {
+  vector: number;
+  bm25: number;
+  entity: number;
+  weights: { vector: number; bm25: number; entity: number };
+  total: number;
+}
+export interface V10RetrievalHitView {
+  id: string;
+  kind: 'working' | 'episodic' | 'semantic' | 'procedural';
+  text: string;
+  scores: V10ScoreBreakdownView;
+  reasons: string[];
+}
+export interface V10TimelineEntryView {
+  fact: string;
+  status: string;
+  startsAt: string;
+  endsAt: string | null;
+  learnedAt: string;
+  replacedBy: string | null;
+}
+export interface V10BlockView {
+  id: string;
+  label: string;
+  kind: string;
+  currentBranch: string;
+  currentVersion: number;
+  currentContent: string;
+  versions: Array<{ version: number; branch: string; message: string; author: string; createdAt: string }>;
+}
+export interface V10StatsView {
+  workingItems: number;
+  episodes: number;
+  factsActive: number;
+  factsSuperseded: number;
+  factsDeleted: number;
+  procedures: number;
+  blocks: number;
+  blockVersions: number;
+  quarantinePending: number;
+}
+export interface V10QuarantineView {
+  id: string;
+  candidate: string;
+  detail: string;
+  conflictingFactId: string | null;
+  createdAt: string;
+}
+
+/** v1.11 (Doi T1): memory v11 — views cho IPC `memory-v11:*`. */
+export interface V11SharedBlockView {
+  label: string;
+  blockId: string;
+  group: string;
+  groupId: string;
+  supervisorBotId: string | null;
+  memberBotIds: string[];
+  version: number;
+  usage: { chars: number; limit: number; fillRatio: number; state: 'ok' | 'warm' | 'over'; warning: string };
+}
+export interface V11HistoryEntryView {
+  version: number;
+  backend: string;
+  action: string;
+  actor: string;
+  at: string;
+  chars: number;
+  note: string | null;
+}
+export interface V11HistoryDiffView {
+  label: string;
+  fromVersion: number;
+  toVersion: number;
+  added: number;
+  removed: number;
+  unified: string;
+}
+export interface V11RenderedBlockView {
+  label: string;
+  kind: string;
+  version: number;
+  chars: number;
+  limit: number;
+}
+export interface V11SleepStatusView {
+  unprocessedRawFacts: number;
+  lastRun: {
+    at: string;
+    dryRun: boolean;
+    rawFactsRead: number;
+    factsExtracted: number;
+    learnedContextLinesAdded: number;
+    archivalConsolidated: number;
+    archivalInvalidated: Array<{ id: string; reason: string }>;
+    errors: string[];
+  } | null;
+}
+export interface V11SleepRunView {
+  id: string;
+  at: string;
+  dryRun: boolean;
+  durationMs: number;
+  rawFactsRead: number;
+  factsExtracted: number;
+  factsDeduped: number;
+  learnedContextLinesAdded: number;
+  archivalConsolidated: number;
+  archivalInvalidated: Array<{ id: string; reason: string }>;
+  steps: Array<{ step: string; ok: boolean; detail: string; ms: number }>;
+  errors: string[];
 }
 
 /** v0.96: kết quả chạy consolidation (dedupe/conflict/promote/archive). */

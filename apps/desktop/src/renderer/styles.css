@@ -326,3 +326,10 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); ou
   .app-body { flex-direction: column; }
   .approval-tray { width: auto; max-height: 45vh; border-left: none; border-top: 1px solid var(--border); }
 }
+
+/* v1.11 (Đội T2): Harbor eval view — task/profile lists + detail. */
+.eval-v111-list { display: flex; flex-direction: column; gap: 6px; margin: 0 20px 12px; }
+.eval-v111-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; cursor: pointer; font-size: 13px; color: var(--text); }
+.eval-v111-item.selected { border-color: var(--accent); }
+.eval-v111-detail { margin: 0 20px 12px; padding: 8px 12px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); font-size: 13px; }
+.eval-v111-detail p { margin: 4px 0; }
