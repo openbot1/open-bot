@@ -62,6 +62,16 @@ import {
 } from './loader';
 import type { Skill, SkillIndexEntry, SkillResources } from './types';
 import { SkillLoadError } from './types';
+// v1.07 (T4): directory-scoped skills (progressive disclosure by
+// working directory) — scope.ts only imports types, no cycle.
+import {
+  buildDirectorySkillIndex,
+  filterSkillsByDirectory,
+  formatDirectorySkillIndexEntries,
+  isSkillInScope,
+  resolveWorkingDir,
+} from './scope';
+import type { DirectorySkillIndex, SkillDirectoryContext } from './scope';
 
 export const SKILLS_ENABLED_FILE = 'skills-enabled.json';
 
@@ -700,6 +710,126 @@ export class SkillRegistry {
       this.matchSkills(task, limit, opts.exclude).map((m) => m.skill),
       opts,
     );
+  }
+
+  // --- v1.07 (T4): directory-scoped skills (progressive disclosure
+  // by working directory) ---
+  //
+  // A skill with `scope` in its frontmatter is only offered while the
+  // agent works inside one of its scoped directories. These methods
+  // are the directory-aware twins of `skillIndex` / `matchSkills` /
+  // `applySkillsForTask` above: same exclusions (disabled,
+  // disable-model-invocation, per-bot deny) PLUS the scope gate.
+  // Global skills (no scope) behave exactly as before.
+
+  /**
+   * Only the ENABLED skills in scope for a working directory, sorted
+   * by name. `workspaceDir` is the root relative scope patterns
+   * resolve against; `workingDir` may be relative to it or absolute
+   * (an empty value means the workspace root itself).
+   */
+  listForDirectory(workingDir: string, workspaceDir: string): Skill[] {
+    const dir = resolveWorkingDir(workingDir, workspaceDir);
+    return filterSkillsByDirectory(this.listEnabled(), dir, workspaceDir);
+  }
+
+  /** Tier-1 index for one working directory (metadata only, bodies stay unloaded). */
+  skillIndexForDirectory(
+    workingDir: string,
+    workspaceDir: string,
+    exclude?: Iterable<string>,
+  ): SkillIndexEntry[] {
+    return this.directorySkillIndex(workingDir, workspaceDir, exclude).entries;
+  }
+
+  /** Tier-1 index + disclosure accounting for one working directory. */
+  directorySkillIndex(
+    workingDir: string,
+    workspaceDir: string,
+    exclude?: Iterable<string>,
+  ): DirectorySkillIndex {
+    // Resolve the working directory against the workspace FIRST:
+    // scope patterns are relative paths, and a relative workingDir
+    // resolved against the process CWD would never match (it would
+    // silently hide every scoped skill — see the v1.07 regression
+    // test in skills-scope-v107.test.mjs).
+    const dir = resolveWorkingDir(workingDir, workspaceDir);
+    return buildDirectorySkillIndex(this.list(), { workspaceDir, workingDir: dir }, exclude);
+  }
+
+  /** The directory-aware tier-1 index as compact prompt text. */
+  formatSkillIndexForDirectory(
+    workingDir: string,
+    workspaceDir: string,
+    exclude?: Iterable<string>,
+  ): string {
+    const dir = resolveWorkingDir(workingDir, workspaceDir);
+    const ctx: SkillDirectoryContext = { workspaceDir, workingDir: dir };
+    return formatDirectorySkillIndexEntries(
+      this.skillIndexForDirectory(workingDir, workspaceDir, exclude),
+      ctx,
+    );
+  }
+
+  /**
+   * Rank enabled, in-scope skills for a task, best first. A scoped
+   * skill outside its directories never matches here — the model is
+   * never offered (or scored on) a skill it cannot use where it is.
+   */
+  matchSkillsForDirectory(
+    task: string,
+    workingDir: string,
+    workspaceDir: string,
+    limit = 3,
+    exclude?: Iterable<string>,
+  ): SkillMatch[] {
+    const excluded = excludeSet(exclude);
+    const dir = resolveWorkingDir(workingDir, workspaceDir);
+    return this.listEnabled()
+      .filter(
+        (s) =>
+          !s.disableModelInvocation &&
+          !excluded.has(s.name) &&
+          isSkillInScope(s, dir, workspaceDir),
+      )
+      .map((skill) => ({ skill, score: scoreSkill(skill, task) }))
+      .filter((m) => m.score > 0)
+      .sort((a, b) => b.score - a.score || a.skill.name.localeCompare(b.skill.name))
+      .slice(0, limit);
+  }
+
+  /** Match a task in a directory and inject the winners into a system prompt (tier 2 loads their bodies). */
+  applySkillsForDirectory(
+    systemPrompt: string,
+    task: string,
+    workingDir: string,
+    workspaceDir: string,
+    limit = 3,
+    opts: ApplySkillsOptions = {},
+  ): string {
+    return applySkills(
+      systemPrompt,
+      this.matchSkillsForDirectory(task, workingDir, workspaceDir, limit, opts.exclude).map(
+        (m) => m.skill,
+      ),
+      opts,
+    );
+  }
+
+  /**
+   * v1.07 (T4): remove every skill that came from one plugin
+   * (bundle deactivation). Built-ins and user skills are untouched.
+   * Returns the removed skill names, sorted.
+   */
+  removeSkillsByPlugin(pluginId: string): string[] {
+    const removed: string[] = [];
+    for (const [name, skill] of [...this.byName.entries()]) {
+      if (skill.source === 'plugin' && skill.pluginId === pluginId) {
+        this.byName.delete(name);
+        removed.push(name);
+      }
+    }
+    return removed.sort();
   }
 
   /**

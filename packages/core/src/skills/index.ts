@@ -60,6 +60,22 @@ export {
 } from './registry';
 export type { ApplySkillsOptions, SkillMatch, SkillRegistryOptions } from './registry';
 
+// --- v1.07 (T4): directory-scoped skills (progressive disclosure by working directory) ---
+export {
+  buildDirectorySkillIndex,
+  describeSkillScope,
+  filterSkillsByDirectory,
+  formatDirectorySkillIndexEntries,
+  isSkillInScope,
+  matchScopePattern,
+  normalizeScopePattern,
+  normalizeSkillScope,
+  resolveWorkingDir,
+  MAX_SKILL_SCOPE_ENTRIES,
+  MAX_SKILL_SCOPE_PATTERN_CHARS,
+} from './scope';
+export type { DirectorySkillIndex, SkillDirectoryContext } from './scope';
+
 // --- v1.02 (rescue port of v0.99/v1.00): discovery, matching, token budget, scripts, evolved skills ---
 export { defaultDiscoveryRoots, scanDiscoveryRoots } from './discovery';
 export type { DiscoveredSkill, DiscoveryScanResult, SkillDiscoveryRoot } from './discovery';

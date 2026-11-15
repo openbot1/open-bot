@@ -117,6 +117,15 @@ export interface SkillFrontmatter {
   disableModelInvocation?: boolean;
   /** Claude Code: `false` hides the skill from the `/` menu. Default true. */
   userInvocable?: boolean;
+  /**
+   * v1.07 (T4) — directory scope (Claude Code progressive disclosure
+   * by directory): list of directory patterns, relative to the
+   * workspace root (`src/server`, `docs/**`) or absolute. The skill
+   * is only offered while the agent works inside one of them.
+   * Absent/empty = global (every existing skill keeps working).
+   * `..` in a relative pattern is rejected at load time.
+   */
+  scope?: string[];
 }
 
 /** One parsed skill: frontmatter + instruction body (see tiers above). */
@@ -142,6 +151,13 @@ export interface Skill {
   disableModelInvocation: boolean;
   /** False hides the skill from the `/` (slash-command) menu. */
   userInvocable: boolean;
+  /**
+   * v1.07 (T4) — directory scope patterns from frontmatter (`scope`).
+   * Undefined/empty = global skill. A scoped skill is only offered
+   * while the agent works inside one of these directories (see
+   * `skills/scope.ts` `isSkillInScope`).
+   */
+  scope?: string[];
   /**
    * Instruction body (everything after the frontmatter fence).
    * Empty until tier-2 loading when `bodyLoaded` is false — do NOT

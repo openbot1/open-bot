@@ -94,3 +94,30 @@ export type {
   RouterDecisionStoreOptions,
   RouterConfigValidation,
 } from './history';
+
+// v1.07 (Đội T6): router biết context window từng model — chọn chiến
+// lược nén/summarize/truncate theo áp lực context thay vì cắt bừa.
+export {
+  CONTEXT_STRATEGY_THRESHOLDS,
+  DEFAULT_CONTEXT_WINDOW_TOKENS,
+  DEFAULT_ROUTER_RESERVE_TOKENS,
+  KNOWN_MODEL_CONTEXT_WINDOWS,
+  MODEL_FAMILY_CONTEXT_WINDOWS,
+  assessContextPressure,
+  assessTurnContext,
+  chooseCompactionStrategy,
+  contextWindowForTarget,
+  estimateTokensFromChars,
+  normalizeModelId,
+  planContextBudget,
+  resolveContextWindow,
+  suggestLargerWindowTarget,
+} from './contextWindow';
+export type {
+  ContextBudgetPlan,
+  ContextCompactionStrategy,
+  ContextPressure,
+  ContextPressureInput,
+  ContextWindowSource,
+  ResolvedContextWindow,
+} from './contextWindow';

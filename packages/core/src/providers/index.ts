@@ -63,6 +63,13 @@ import { MOONSHOT_BASE_URL, MOONSHOT_DEFAULT_MODEL, MoonshotProvider } from './m
 import { OllamaProvider, OLLAMA_BASE_URL, OLLAMA_DEFAULT_MODEL } from './ollama';
 import { OpenAIProvider, OPENAI_BASE_URL, OPENAI_DEFAULT_MODEL } from './openai';
 import { OpenAICompatibleProvider } from './openaiCompatible';
+// v1.08 (Đội T4): OpenRouter + Fireworks AI — promoted from presets
+// (same precedent as DeepSeek/Groq/Mistral/Together in v0.97/v0.98).
+// v1.10 (Đội T6): + Cerebras — promoted from the preset the same way.
+import { CEREBRAS_BASE_URL, CEREBRAS_DEFAULT_MODEL, CerebrasProvider } from './cerebras';
+import { SAMBANOVA_BASE_URL, SAMBANOVA_DEFAULT_MODEL, SambaNovaProvider } from './sambanova';
+import { FIREWORKS_BASE_URL, FIREWORKS_DEFAULT_MODEL, FireworksProvider } from './fireworks';
+import { OPENROUTER_BASE_URL, OPENROUTER_DEFAULT_MODEL, OpenRouterProvider } from './openrouter';
 import { QWEN_BASE_URL, QWEN_DEFAULT_MODEL, QwenProvider } from './qwen';
 import { TOGETHER_BASE_URL, TOGETHER_DEFAULT_MODEL, TogetherProvider } from './together';
 import { XAI_BASE_URL, XAI_DEFAULT_MODEL, XAIProvider } from './xai';
@@ -155,19 +162,48 @@ export type {
 } from './cli/index';
 export { GeminiProvider } from './gemini';
 export { DeepSeekProvider, DEEPSEEK_BASE_URL, DEEPSEEK_DEFAULT_MODEL, DEEPSEEK_KNOWN_MODELS } from './deepseek';
+export { CerebrasProvider, CEREBRAS_BASE_URL, CEREBRAS_DEFAULT_MODEL, CEREBRAS_KNOWN_MODELS } from './cerebras';
+export { SambaNovaProvider, SAMBANOVA_BASE_URL, SAMBANOVA_DEFAULT_MODEL, SAMBANOVA_KNOWN_MODELS } from './sambanova';
+export { FireworksProvider, FIREWORKS_BASE_URL, FIREWORKS_DEFAULT_MODEL, FIREWORKS_KNOWN_MODELS } from './fireworks';
 export { GroqProvider, GROQ_BASE_URL, GROQ_DEFAULT_MODEL, GROQ_KNOWN_MODELS } from './groq';
 export { MistralProvider, MISTRAL_BASE_URL, MISTRAL_DEFAULT_MODEL, MISTRAL_KNOWN_MODELS } from './mistral';
 export { OllamaProvider, OLLAMA_BASE_URL, OLLAMA_DEFAULT_MODEL } from './ollama';
 export type { OllamaLocalModelInfo } from './ollama';
 export { OpenAIProvider } from './openai';
 export { OpenAICompatibleProvider } from './openaiCompatible';
+export { OpenRouterProvider, OPENROUTER_BASE_URL, OPENROUTER_DEFAULT_MODEL, OPENROUTER_KNOWN_MODELS } from './openrouter';
 export { XAIProvider } from './xai';
 // v0.97 (Team T6): 7 dedicated OpenAI-compatible API providers —
 // DeepSeek, Moonshot/Kimi, Qwen, Mistral, Groq, Together, Cohere.
+// v1.08 (Đội T4): + OpenRouter, Fireworks AI (promoted from presets).
 export { CohereProvider } from './cohere';
 export { MoonshotProvider } from './moonshot';
 export { QwenProvider } from './qwen';
 export { TogetherProvider } from './together';
+export {
+  PROVIDER_HEALTH_DEFAULT_INTERVAL_MS,
+  PROVIDER_HEALTH_DOWN_AFTER_FAILURES,
+  PROVIDER_HEALTH_MAX_ALERTS,
+  PROVIDER_HEALTH_MAX_SAMPLES,
+  PROVIDER_HEALTH_MIN_INTERVAL_MS,
+  PROVIDER_HEALTH_QUOTA_LOW_THRESHOLD,
+  ProviderHealthMonitor,
+  parseQuotaHeaders,
+  providerHealthStatusLabel,
+} from './health';
+export type {
+  ProviderHealthAlert,
+  ProviderHealthAlertKind,
+  ProviderHealthAlertListener,
+  ProviderHealthMonitorOptions,
+  ProviderHealthProbeFn,
+  ProviderHealthProbeResult,
+  ProviderHealthQuota,
+  ProviderHealthSample,
+  ProviderHealthSnapshot,
+  ProviderHealthStatus,
+  ProviderHealthSummary,
+} from './health';
 
 export interface ProviderMeta {
   id: string;
@@ -272,11 +308,54 @@ export const PROVIDERS: ProviderMeta[] = [
     defaultBaseUrl: TOGETHER_BASE_URL,
   },
   {
+    // v1.08 (Đội T4): promoted from the `openrouter` preset — a
+    // router over 400+ vendor models under `<vendor>/<model>` ids.
+    // Key in Vault namespace ('provider', 'openrouter'), resolved
+    // generically in providerConfigFor like the other API providers.
+    id: 'openrouter',
+    label: 'OpenRouter',
+    defaultModel: OPENROUTER_DEFAULT_MODEL,
+    needsKey: true,
+    defaultBaseUrl: OPENROUTER_BASE_URL,
+  },
+  {
+    // v1.08 (Đội T4): promoted from the `fireworks` preset —
+    // serverless inference, full model ids
+    // `accounts/fireworks/models/<model>`.
+    id: 'fireworks',
+    label: 'Fireworks AI',
+    defaultModel: FIREWORKS_DEFAULT_MODEL,
+    needsKey: true,
+    defaultBaseUrl: FIREWORKS_BASE_URL,
+  },
+  {
     id: 'cohere',
     label: 'Cohere',
     defaultModel: COHERE_DEFAULT_MODEL,
     needsKey: true,
     defaultBaseUrl: COHERE_BASE_URL,
+  },
+  {
+    // v1.10 (Đội T6): promoted from the `cerebras` preset — fastest
+    // OpenAI-compatible inference (Wafer-Scale Engine). Key in Vault
+    // namespace ('provider', 'cerebras'), resolved generically in
+    // providerConfigFor like the other API providers.
+    id: 'cerebras',
+    label: 'Cerebras',
+    defaultModel: CEREBRAS_DEFAULT_MODEL,
+    needsKey: true,
+    defaultBaseUrl: CEREBRAS_BASE_URL,
+  },
+  {
+    // v1.11 (Đội T6): promoted from the `sambanova` preset — fastest
+    // OpenAI-compatible inference on SambaNova's SN40L RDU. Key in Vault
+    // namespace ('provider', 'sambanova'), resolved generically in
+    // providerConfigFor like the other API providers.
+    id: 'sambanova',
+    label: 'SambaNova',
+    defaultModel: SAMBANOVA_DEFAULT_MODEL,
+    needsKey: true,
+    defaultBaseUrl: SAMBANOVA_BASE_URL,
   },
   {
     id: 'ollama',
@@ -484,6 +563,19 @@ export function createProvider(config: ProviderConfig): Provider {
       break;
     case 'together':
       provider = new TogetherProvider(config);
+      break;
+    // v1.08 (Đội T4): OpenRouter + Fireworks AI (promoted from presets).
+    case 'openrouter':
+      provider = new OpenRouterProvider(config);
+      break;
+    case 'cerebras':
+      provider = new CerebrasProvider(config);
+      break;
+    case 'sambanova':
+      provider = new SambaNovaProvider(config);
+      break;
+    case 'fireworks':
+      provider = new FireworksProvider(config);
       break;
     case 'cohere':
       provider = new CohereProvider(config);

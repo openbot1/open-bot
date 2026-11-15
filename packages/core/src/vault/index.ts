@@ -35,6 +35,31 @@ export type {
   OnePasswordBrokerStatus,
   OnePasswordItemSummary,
 } from './onePasswordBroker';
+// v1.07 (T4): inline secret request in chat (OpenHands v1.28 pattern).
+export {
+  InlineSecretService,
+  SecretRequestError,
+} from './secretRequest';
+export type {
+  InlineSecretServiceOptions,
+  RequestSecretOptions,
+  ResolveSecretOptions,
+  SecretRequestHandle,
+  SecretRequestResult,
+} from './secretRequest';
+export {
+  clampSecretRequestTimeoutMs,
+  createSecretRequestPrompt,
+  formatSecretRequestMessage,
+  isValidSecretName,
+  validateSecretValue,
+  DEFAULT_SECRET_REQUEST_TIMEOUT_MS,
+  MAX_SECRET_REQUEST_HISTORY,
+  MAX_SECRET_REQUEST_TIMEOUT_MS,
+  MAX_SECRET_REQUEST_VALUE_CHARS,
+  MIN_SECRET_REQUEST_TIMEOUT_MS,
+} from './secretPrompt';
+export type { SecretRequest, SecretRequestPrompt, SecretRequestStatus } from './secretPrompt';
 // v1.02 (rescue port of v1.00): scoped vaults, export/import, audit.
 export { ScopedVault, acpScopedVault, gatewayScopedVault } from './scoped';
 export type { ScopedVaultOptions } from './scoped';

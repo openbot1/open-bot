@@ -47,6 +47,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Skill, SkillFrontmatter, SkillResources, SkillSource } from './types';
 import { emptySkillResources, SkillLoadError, SKILL_RESOURCE_DIRS } from './types';
+import { normalizeSkillScope } from './scope';
 
 export const SKILL_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 export const SKILL_NAME_MAX_LENGTH = 64;
@@ -632,6 +633,12 @@ export function parseFrontmatter(block: string, filePath?: string): SkillFrontma
       'user-invocable',
       filePath,
     ),
+    // v1.07 (T4): directory scope — validated + normalised by
+    // scope.ts (a bad pattern fails the skill load, like other bad
+    // frontmatter). Imported lazily here to keep the loader's import
+    // graph acyclic at module-evaluation time is unnecessary:
+    // scope.ts only imports types, so a static import is safe.
+    scope: normalizeSkillScope(raw['scope'], name),
   };
 }
 
@@ -689,6 +696,7 @@ function buildSkill(
     context: fm.context,
     disableModelInvocation: fm.disableModelInvocation ?? false,
     userInvocable: fm.userInvocable ?? true,
+    scope: fm.scope ? [...fm.scope] : undefined,
     body,
     bodyLoaded,
     skillDir,
