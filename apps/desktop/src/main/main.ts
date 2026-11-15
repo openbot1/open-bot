@@ -300,6 +300,7 @@ import {
   buildFleetBotOverview,
   buildFleetOverview,
   buildFleetV6Overview,
+  buildFleetV8Dashboard,
   buildMarketplaceV2Catalog,
   cancelPlacement,
   checkBotQuotas,
@@ -390,6 +391,19 @@ import {
   importFactsFromMemFs,
   MEMFS_BLOCKS_DIR_NAME,
   readBlockHistory,
+} from '@open-bot/core';
+// v1.11 (Doi T1): memory v11 cho IPC `memory-v11:*` — shared supervisor,
+// unified block_history, <memory_blocks> render, sleep agent.
+import {
+  SharedSupervisor,
+  V11SleepConsolidationAgent,
+  detectBlockKind,
+  renderMemoryBlocksXml,
+  listBlockHistory,
+  diffBlockVersions,
+  rollbackBlockToVersion,
+  readUnprocessedRawFacts,
+  readV11SleepLog,
 } from '@open-bot/core';
 // v1.09 (Đội T2): memory v9 kiểu Letta cho IPC `memory-letta:*` — core
 // memory tự sửa qua tool (cô đọng khi đầy) + recall + archival +
@@ -6132,6 +6146,141 @@ function registerIpc(): void {
     },
   );
 
+  // v1.11 (Doi T1): memory v11 IPC — shared blocks (supervisor gate)
+  // + unified block_history + <memory_blocks> render + sleep pass.
+  // Tat ca local; embedding khong bao gio tra ve renderer.
+  const v11SupervisorForBot = (botId: string) =>
+    new SharedSupervisor(lettaWorkspaceForBot(botId));
+  const v11SleepAgentForBot = (botId: string) =>
+    new V11SleepConsolidationAgent(lettaWorkspaceForBot(botId));
+  ipcMain.handle('memory-v11:shared', (_event: unknown, payload: { botId: string }) => {
+    const supervisor = v11SupervisorForBot(payload?.botId);
+    return supervisor.listSharedBlocks().map((v) => ({
+      label: v.block.label,
+      blockId: v.block.id,
+      group: v.groupName,
+      groupId: v.groupId,
+      supervisorBotId: v.supervisorBotId === '' ? null : v.supervisorBotId,
+      memberBotIds: v.memberBotIds,
+      version: v.block.version,
+      usage: v.usage,
+    }));
+  });
+  ipcMain.handle('memory-v11:render', (_event: unknown, payload: { botId: string }) => {
+    const workspaceDir = lettaWorkspaceForBot(payload?.botId);
+    const botId = requireId(payload?.botId, 'botId');
+    const store = new MemoryBlockStore(workspaceDir);
+    return {
+      blocks: store.listAttached(botId).map((b) => ({
+        label: b.label,
+        kind: detectBlockKind(b.label),
+        version: b.version,
+        chars: b.content.length,
+        limit: b.charLimit,
+      })),
+      xml: renderMemoryBlocksXml(botId, store),
+    };
+  });
+  ipcMain.handle(
+    'memory-v11:history',
+    (_event: unknown, payload: { botId: string; blockId: string; limit?: number }) => {
+      const workspaceDir = lettaWorkspaceForBot(payload?.botId);
+      const blockId = requireId(payload?.blockId, 'blockId');
+      const limit =
+        typeof payload?.limit === 'number' && Number.isFinite(payload.limit)
+          ? Math.max(1, Math.min(100, Math.floor(payload.limit)))
+          : 20;
+      return listBlockHistory(workspaceDir, blockId, { limit }).map((e) => ({
+        version: e.version,
+        backend: e.backend,
+        action: e.action,
+        actor: e.actor,
+        at: e.at,
+        chars: e.content.length,
+        note: e.note ?? null,
+      }));
+    },
+  );
+  ipcMain.handle(
+    'memory-v11:diff',
+    (_event: unknown, payload: { botId: string; blockId: string; fromVersion: number; toVersion: number }) => {
+      const workspaceDir = lettaWorkspaceForBot(payload?.botId);
+      const blockId = requireId(payload?.blockId, 'blockId');
+      const fromVersion = payload?.fromVersion;
+      const toVersion = payload?.toVersion;
+      if (!Number.isInteger(fromVersion) || !Number.isInteger(toVersion)) {
+        throw new Error('fromVersion and toVersion must be integers.');
+      }
+      const result = diffBlockVersions(workspaceDir, blockId, fromVersion, toVersion);
+      return {
+        label: result.label,
+        fromVersion: result.fromVersion,
+        toVersion: result.toVersion,
+        added: result.diff.added,
+        removed: result.diff.removed,
+        unified: result.unified,
+      };
+    },
+  );
+  ipcMain.handle(
+    'memory-v11:rollback',
+    (_event: unknown, payload: { botId: string; blockId: string; toVersion: number }) => {
+      const workspaceDir = lettaWorkspaceForBot(payload?.botId);
+      const blockId = requireId(payload?.blockId, 'blockId');
+      const toVersion = payload?.toVersion;
+      if (!Number.isInteger(toVersion) || toVersion < 1) {
+        throw new Error(`Invalid toVersion: "${String(toVersion)}"`);
+      }
+      return rollbackBlockToVersion(workspaceDir, blockId, toVersion, 'user');
+    },
+  );
+  ipcMain.handle('memory-v11:sleep-status', (_event: unknown, payload: { botId: string }) => {
+    const workspaceDir = lettaWorkspaceForBot(payload?.botId);
+    const botId = requireId(payload?.botId, 'botId');
+    const last = readV11SleepLog(workspaceDir, 1)[0] ?? null;
+    return {
+      unprocessedRawFacts: readUnprocessedRawFacts(workspaceDir, botId, 100000).length,
+      lastRun: last
+        ? {
+            at: last.at,
+            dryRun: last.dryRun,
+            rawFactsRead: last.rawFactsRead,
+            factsExtracted: last.factsExtracted,
+            learnedContextLinesAdded: last.learnedContextLinesAdded,
+            archivalConsolidated: last.archivalConsolidated,
+            archivalInvalidated: last.archivalInvalidated,
+            errors: last.errors,
+          }
+        : null,
+    };
+  });
+  ipcMain.handle(
+    'memory-v11:sleep-run',
+    (_event: unknown, payload: { botId: string; dryRun?: boolean; force?: boolean }) => {
+      const botId = requireId(payload?.botId, 'botId');
+      const agent = v11SleepAgentForBot(botId);
+      const report = agent.runSleepPass({
+        botId,
+        dryRun: payload?.dryRun === true,
+        force: payload?.force === true,
+      });
+      return {
+        id: report.id,
+        at: report.at,
+        dryRun: report.dryRun,
+        durationMs: report.durationMs,
+        rawFactsRead: report.rawFactsRead,
+        factsExtracted: report.factsExtracted,
+        factsDeduped: report.factsDeduped,
+        learnedContextLinesAdded: report.learnedContextLinesAdded,
+        archivalConsolidated: report.archivalConsolidated,
+        archivalInvalidated: report.archivalInvalidated,
+        steps: report.steps,
+        errors: report.errors,
+      };
+    },
+  );
+
   // v0.97 (Team T4): memory v2 IPC — graph + hybrid search + sleep
   // agent + provenance/quota. Tất cả local, không rời máy; embedding
   // không bao giờ trả về renderer (chỉ số lượng + điểm xếp hạng).
@@ -11001,6 +11150,10 @@ function registerIpc(): void {
 
   // v1.09 (Đội T6): fleet v6 overview — scheduler + quota nhóm + health.
   ipcMain.handle('fleet:v6-overview', () => buildFleetV6Overview(fleetRootDir()));
+
+  // v1.11 (Đội T6): fleet v8 dashboard — node health + problem bots +
+  // running campaigns + recent incidents (CHỈ ĐỌC, local-first).
+  ipcMain.handle('fleet:v8-dashboard', () => buildFleetV8Dashboard(fleetRootDir()));
 
   // v1.03 (Team T6): fleet overview v3 + scheduler v3 — totals,
   // top consumers, capacity forecast, placement planning, and the

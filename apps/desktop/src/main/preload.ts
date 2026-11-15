@@ -5,7 +5,7 @@
  * KHÔNG expose ipcRenderer trực tiếp, KHÔNG expose API key hay Node API.
  */
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AppliedPluginTemplate, A2aPersistStatus, AppSnapshot, AgUiEvent, AgUiRunState, AppStatusView, AuditEvent, AuditVerifyResult, AutoApproveRule, AutoApproveRuleInput, BotConfig, BotQuota, CanvasDocument, CanvasSummary, Channel, ChannelKind, ChannelMessage, ChannelResponderRules, ComposioPollStatus, ComposioStateView, ComposioToolkitConnection, ComputerBackend, ComputerPlan, ComputerSchedulerState, ComputerStatusView, CreateFleetWorkspaceInput, CreatePluginTemplateInput, CrashReport, CrashReportSummary, DeepLinkRoute, FleetBotOverview, FleetCapacityCheck, FleetConsoleRole, FleetConsoleUser, FleetDecision, FleetRole, FleetStatusView, FleetUsageSummary, FleetV6Overview, FleetWorkspace, GroupBotInterruptedEntry, GroupBotStatusEntry, GroupChat, GroupMessage, GuestAgentHealth, HarnessEvent, HarnessStatusResult, HarnessThreadLogResult, ListBotSkillsResult, ListBotToolsResult, LocalProfile, LongTermMemoryEntry, MachineProfile, MarketplaceV2Entry, McpAppDefinition, MemoryBlock, OnePasswordBrokerStatus, OpenAppInput, PermissionReview, PluginCatalogEntry, PluginTemplate, QuotaAlert, SetBotSkillEnabledResult, SetBotToolEnabledResult, TaskSnapshot, TeamBundle, ThreadItem, ThreadSearchHit, VerbatimRecord, VisionAttachment, RouterConfig, RouterStats, RouterTarget, RoutingDecision, RouterCliStatus, GetRouterConfigResult, GetRouterDecisionsResult, GetRouterStatsResult, GetRouterTargetsResult, RunLogMeta, RunEventQuery, RunLogVerification, AuditIntegrityReport, PauseResumeResult, ForkRunResult, ReplayedRunState, AnyRunEvent, FleetOverview, PlacementPlan, QueuedPlacement, MarketplaceCollection, MarketplaceEntryVersion, MarketplaceInstallRecord, PluginUpdateInfo, PluginDependencyCheck, QueuedPluginInstall, PluginRollbackRecord, EvalSuite, EvalCase, EvalCheck, EvalSuiteReport, EvalCaseResult, EvalComparison, FleetPolicyV4, FleetTaskV4, MemoryEvalReport, RegressionAlert, RunMemoryEvalSuiteResult, EventStreamSummary, EventStreamBucket, AgentTeamV109, TeamV109Summary, TeamV2Dashboard } from '@open-bot/core';
+import type { AppliedPluginTemplate, A2aPersistStatus, AppSnapshot, AgUiEvent, AgUiRunState, AppStatusView, AuditEvent, AuditVerifyResult, AutoApproveRule, AutoApproveRuleInput, BotConfig, BotQuota, CanvasDocument, CanvasSummary, Channel, ChannelKind, ChannelMessage, ChannelResponderRules, ComposioPollStatus, ComposioStateView, ComposioToolkitConnection, ComputerBackend, ComputerPlan, ComputerSchedulerState, ComputerStatusView, CreateFleetWorkspaceInput, CreatePluginTemplateInput, CrashReport, CrashReportSummary, DeepLinkRoute, FleetBotOverview, FleetCapacityCheck, FleetConsoleRole, FleetConsoleUser, FleetDecision, FleetRole, FleetStatusView, FleetUsageSummary, FleetV6Overview, FleetV8DashboardSnapshot, FleetWorkspace, GroupBotInterruptedEntry, GroupBotStatusEntry, GroupChat, GroupMessage, GuestAgentHealth, HarnessEvent, HarnessStatusResult, HarnessThreadLogResult, ListBotSkillsResult, ListBotToolsResult, LocalProfile, LongTermMemoryEntry, MachineProfile, MarketplaceV2Entry, McpAppDefinition, MemoryBlock, OnePasswordBrokerStatus, OpenAppInput, PermissionReview, PluginCatalogEntry, PluginTemplate, QuotaAlert, SetBotSkillEnabledResult, SetBotToolEnabledResult, TaskSnapshot, TeamBundle, ThreadItem, ThreadSearchHit, VerbatimRecord, VisionAttachment, RouterConfig, RouterStats, RouterTarget, RoutingDecision, RouterCliStatus, GetRouterConfigResult, GetRouterDecisionsResult, GetRouterStatsResult, GetRouterTargetsResult, RunLogMeta, RunEventQuery, RunLogVerification, AuditIntegrityReport, PauseResumeResult, ForkRunResult, ReplayedRunState, AnyRunEvent, FleetOverview, PlacementPlan, QueuedPlacement, MarketplaceCollection, MarketplaceEntryVersion, MarketplaceInstallRecord, PluginUpdateInfo, PluginDependencyCheck, QueuedPluginInstall, PluginRollbackRecord, EvalSuite, EvalCase, EvalCheck, EvalSuiteReport, EvalCaseResult, EvalComparison, FleetPolicyV4, FleetTaskV4, MemoryEvalReport, RegressionAlert, RunMemoryEvalSuiteResult, EventStreamSummary, EventStreamBucket, AgentTeamV109, TeamV109Summary, TeamV2Dashboard } from '@open-bot/core';
 // Trace shapes from core (not ../renderer/types: tsconfig.main.json
 // pins rootDir to src/main, so preload cannot import renderer files).
 // The renderer-side mirrors live in ../renderer/types.ts.
@@ -503,6 +503,70 @@ export interface V10QuarantineView {
   detail: string;
   conflictingFactId: string | null;
   createdAt: string;
+}
+
+// v1.11 (Doi T1): memory v11 views — mirror renderer/types.ts
+// (preload khong import file renderer).
+export interface V11SharedBlockView {
+  label: string;
+  blockId: string;
+  group: string;
+  groupId: string;
+  supervisorBotId: string | null;
+  memberBotIds: string[];
+  version: number;
+  usage: { chars: number; limit: number; fillRatio: number; state: 'ok' | 'warm' | 'over'; warning: string };
+}
+export interface V11HistoryEntryView {
+  version: number;
+  backend: string;
+  action: string;
+  actor: string;
+  at: string;
+  chars: number;
+  note: string | null;
+}
+export interface V11HistoryDiffView {
+  label: string;
+  fromVersion: number;
+  toVersion: number;
+  added: number;
+  removed: number;
+  unified: string;
+}
+export interface V11RenderedBlockView {
+  label: string;
+  kind: string;
+  version: number;
+  chars: number;
+  limit: number;
+}
+export interface V11SleepStatusView {
+  unprocessedRawFacts: number;
+  lastRun: {
+    at: string;
+    dryRun: boolean;
+    rawFactsRead: number;
+    factsExtracted: number;
+    learnedContextLinesAdded: number;
+    archivalConsolidated: number;
+    archivalInvalidated: Array<{ id: string; reason: string }>;
+    errors: string[];
+  } | null;
+}
+export interface V11SleepRunView {
+  id: string;
+  at: string;
+  dryRun: boolean;
+  durationMs: number;
+  rawFactsRead: number;
+  factsExtracted: number;
+  factsDeduped: number;
+  learnedContextLinesAdded: number;
+  archivalConsolidated: number;
+  archivalInvalidated: Array<{ id: string; reason: string }>;
+  steps: Array<{ step: string; ok: boolean; detail: string; ms: number }>;
+  errors: string[];
 }
 
 // v0.97 (Team T4): memory v2 views — mirror renderer/types.ts
@@ -1823,6 +1887,8 @@ export interface OpenBotApi {
   'fleet:quotas-alerts'(): Promise<QuotaAlert[]>;
   // v1.09 (Đội T6): fleet v6 overview — scheduler + quota nhóm + health.
   'fleet:v6-overview'(): Promise<FleetV6Overview>;
+  // v1.11 (Đội T6): fleet v8 dashboard.
+  'fleet:v8-dashboard'(): Promise<FleetV8DashboardSnapshot>;
   // Đội D: camelCase aliases (same channels).
   listFleet: () => Promise<FleetStatusView[]>;
   getFleetStatus: (id: string) => Promise<FleetStatusView>;
@@ -1855,6 +1921,8 @@ export interface OpenBotApi {
   getFleetConsoleOverview: () => Promise<{ bots: FleetBotOverview[]; alerts: QuotaAlert[]; quotas: BotQuota[] }>;
   // v1.09 (Đội T6): fleet v6 overview (camelCase alias).
   getFleetV6Overview: () => Promise<FleetV6Overview>;
+  // v1.11 (Đội T6): fleet v8 dashboard (camelCase alias).
+  getFleetV8Dashboard: () => Promise<FleetV8DashboardSnapshot>;
   listBotQuotas: () => Promise<BotQuota[]>;
   // v1.03 (Team T6): fleet overview v3 + scheduler v3.
   'fleet:overview'(): Promise<FleetOverview>;
@@ -2178,6 +2246,15 @@ export interface OpenBotApi {
   rollbackMemoryV10Block: (payload: { botId: string; blockId: string; toVersion: number }) => Promise<{ blockId: string; fromVersion: number; toVersion: number; newVersion: number; branch: string; message: string }>;
   listMemoryV10Quarantine: (payload: { botId: string }) => Promise<V10QuarantineView[]>;
   decideMemoryV10Quarantine: (payload: { botId: string; id: string; approve: boolean }) => Promise<{ id: string; status: string; consolidation: { added: number; updated: number; deleted: number } | null }>;
+  // v1.11 (Doi T1): memory v11 — shared blocks + unified history +
+  // <memory_blocks> render + sleep pass, IPC `memory-v11:*`.
+  listMemoryV11Shared: (payload: { botId: string }) => Promise<V11SharedBlockView[]>;
+  renderMemoryV11Blocks: (payload: { botId: string }) => Promise<{ blocks: V11RenderedBlockView[]; xml: string }>;
+  listMemoryV11History: (payload: { botId: string; blockId: string; limit?: number }) => Promise<V11HistoryEntryView[]>;
+  diffMemoryV11History: (payload: { botId: string; blockId: string; fromVersion: number; toVersion: number }) => Promise<V11HistoryDiffView>;
+  rollbackMemoryV11Block: (payload: { botId: string; blockId: string; toVersion: number }) => Promise<{ blockId: string; label: string; fromVersion: number; restoredVersion: number; newVersion: number; content: string }>;
+  getMemoryV11SleepStatus: (payload: { botId: string }) => Promise<V11SleepStatusView>;
+  runMemoryV11Sleep: (payload: { botId: string; dryRun?: boolean; force?: boolean }) => Promise<V11SleepRunView>;
   runMemoryLettaSleep: (payload: { botId: string; dryRun?: boolean }) => Promise<LettaSleepPassSummaryView>;
   getMemoryLettaSleepLog: (payload: { botId: string; limit?: number }) => Promise<LettaSleepPassSummaryView[]>;
   exportMemoryLettaEntity: (payload: { botId: string }) => Promise<{ filePath: string }>;
@@ -2641,6 +2718,7 @@ const openBot: OpenBotApi = {
   'fleet:quotas-alerts': () => ipcRenderer.invoke('fleet:quotas-alerts'),
   // v1.09 (Đội T6): fleet v6 overview.
   'fleet:v6-overview': () => ipcRenderer.invoke('fleet:v6-overview'),
+  'fleet:v8-dashboard': () => ipcRenderer.invoke('fleet:v8-dashboard'),
   listFleet: () => ipcRenderer.invoke('fleet:list'),
   getFleetStatus: (id) => ipcRenderer.invoke('fleet:status', id),
   createFleetWorkspace: (payload) => ipcRenderer.invoke('fleet:create', payload),
@@ -2672,6 +2750,7 @@ const openBot: OpenBotApi = {
   getFleetConsoleOverview: () => ipcRenderer.invoke('fleet:console-overview'),
   // v1.09 (Đội T6): fleet v6 overview (camelCase alias).
   getFleetV6Overview: () => ipcRenderer.invoke('fleet:v6-overview'),
+  getFleetV8Dashboard: () => ipcRenderer.invoke('fleet:v8-dashboard'),
   listBotQuotas: () => ipcRenderer.invoke('fleet:quotas-list'),
   setBotQuota: (payload) => ipcRenderer.invoke('fleet:quotas-set', payload),
   removeBotQuota: (id) => ipcRenderer.invoke('fleet:quotas-remove', id),
@@ -3182,6 +3261,14 @@ const openBot: OpenBotApi = {
   rollbackMemoryV10Block: (payload) => ipcRenderer.invoke('memory-v10:rollback', payload),
   listMemoryV10Quarantine: (payload) => ipcRenderer.invoke('memory-v10:quarantine-list', payload),
   decideMemoryV10Quarantine: (payload) => ipcRenderer.invoke('memory-v10:quarantine-decide', payload),
+  // v1.11 (Doi T1): memory v11, IPC `memory-v11:*`.
+  listMemoryV11Shared: (payload) => ipcRenderer.invoke('memory-v11:shared', payload),
+  renderMemoryV11Blocks: (payload) => ipcRenderer.invoke('memory-v11:render', payload),
+  listMemoryV11History: (payload) => ipcRenderer.invoke('memory-v11:history', payload),
+  diffMemoryV11History: (payload) => ipcRenderer.invoke('memory-v11:diff', payload),
+  rollbackMemoryV11Block: (payload) => ipcRenderer.invoke('memory-v11:rollback', payload),
+  getMemoryV11SleepStatus: (payload) => ipcRenderer.invoke('memory-v11:sleep-status', payload),
+  runMemoryV11Sleep: (payload) => ipcRenderer.invoke('memory-v11:sleep-run', payload),
   // v0.97 (Team T4): memory v2 — graph + hybrid search + sleep agent + provenance.
   getMemoryV2Graph: (payload) => ipcRenderer.invoke('memory-v2:graph', payload),
   searchMemoryV2: (payload) => ipcRenderer.invoke('memory-v2:search', payload),

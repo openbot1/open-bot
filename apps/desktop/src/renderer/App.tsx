@@ -42,6 +42,7 @@ import FleetView from './components/FleetView';
 import AgentTeamsView from './components/AgentTeamsView';
 // v1.10 (Team T3): Agent Teams v2 dashboard.
 import AgentTeamsV2View from './components/AgentTeamsV2View';
+import AgentTeamsV3View from './components/AgentTeamsV3View';
 // v1.02 (Team T6): fleet console v2 + bot/plugin marketplaces.
 import FleetConsoleView from './components/FleetConsoleView';
 import BotMarketplaceView from './components/BotMarketplaceView';
@@ -49,6 +50,7 @@ import PluginMarketplaceView from './components/PluginMarketplaceView';
 // v1.03 (Team T6): event-stream viewer + eval harness.
 import EventStreamView from './components/EventStreamView';
 import EvalHarnessView from './components/EvalHarnessView';
+import EvalV111View from './components/EvalV111View';
 import EvalFleetDashboardView from './components/EvalFleetDashboardView';
 import ToolsView from './components/ToolsView';
 import BotForm from './components/BotForm';
@@ -124,7 +126,7 @@ export default function App() {
   const [tasks, setTasks] = useState<TaskView[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [showTasks, setShowTasks] = useState(false);
-  const [view, setView] = useState<'chat' | 'dashboard' | 'planner' | 'settings' | 'marketplace' | 'bot-marketplace' | 'plugin-marketplace' | 'mcp' | 'mcp-apps' | 'mcp-tasks' | 'team' | 'agent-teams' | 'agent-teams-v2' | 'computers' | 'fleet' | 'fleet-console' | 'skills' | 'memory' | 'automations' | 'agui' | 'harness2' | 'traces' | 'eventlog' | 'voice-sessions' | 'runlog' | 'event-stream' | 'eval-harness' | 'eval-fleet' | 'plans' | 'a2a' | 'group' | 'channels' | 'tools' | 'connected-apps' | 'canvas' | 'internet-data' | 'mcp-tasks-monitor' | 'doctor-team'>('chat');
+  const [view, setView] = useState<'chat' | 'dashboard' | 'planner' | 'settings' | 'marketplace' | 'bot-marketplace' | 'plugin-marketplace' | 'mcp' | 'mcp-apps' | 'mcp-tasks' | 'team' | 'agent-teams' | 'agent-teams-v2' | 'agent-teams-v3' | 'computers' | 'fleet' | 'fleet-console' | 'skills' | 'memory' | 'automations' | 'agui' | 'harness2' | 'traces' | 'eventlog' | 'voice-sessions' | 'runlog' | 'event-stream' | 'eval-harness' | 'eval-v111' | 'eval-fleet' | 'plans' | 'a2a' | 'group' | 'channels' | 'tools' | 'connected-apps' | 'canvas' | 'internet-data' | 'mcp-tasks-monitor' | 'doctor-team'>('chat');
   // v0.98 (Team T4 — planning v2): run plan attached to the NEXT chat
   // run (one-shot — `send` consumes it). The plan's owner bot must
   // match the bot being sent to, otherwise the run ignores it.
@@ -1326,6 +1328,7 @@ export default function App() {
         onOpenFleet={() => setView('fleet')}
         onOpenAgentTeams={() => setView('agent-teams')}
         onOpenAgentTeamsV2={() => setView('agent-teams-v2')}
+        onOpenAgentTeamsV3={() => setView('agent-teams-v3')}
         onOpenFleetConsole={() => setView('fleet-console')}
         onOpenBotMarketplace={() => setView('bot-marketplace')}
         onOpenPluginMarketplace={() => setView('plugin-marketplace')}
@@ -1342,6 +1345,7 @@ export default function App() {
         onOpenVoiceSessions={() => setView('voice-sessions')}
         onOpenEventStream={() => setView('event-stream')}
         onOpenEvalHarness={() => setView('eval-harness')}
+        onOpenEvalV111={() => setView('eval-v111')}
         onOpenEvalFleet={() => setView('eval-fleet')}
         onOpenRunLog={() => setView('runlog')}
         onOpenAgUi={() => setView('agui')}
@@ -1458,6 +1462,10 @@ export default function App() {
           <div className="main">
             <AgentTeamsV2View onBack={() => setView('chat')} />
           </div>
+        ) : view === 'agent-teams-v3' ? (
+          <div className="main">
+            <AgentTeamsV3View onBack={() => setView('chat')} />
+          </div>
         ) : view === 'fleet-console' ? (
           <div className="main">
             <FleetConsoleView onBack={() => setView('chat')} />
@@ -1549,6 +1557,10 @@ export default function App() {
         ) : view === 'eval-harness' ? (
           <div className="main">
             <EvalHarnessView onBack={() => setView('chat')} />
+          </div>
+        ) : view === 'eval-v111' ? (
+          <div className="main">
+            <EvalV111View onBack={() => setView('chat')} />
           </div>
         ) : view === 'eval-fleet' ? (
           <div className="main">

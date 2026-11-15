@@ -46,6 +46,31 @@ import {
   buildEvalTrends,
   formatEvalReportText,
   formatEvalTrendsText,
+  // v1.11 (Đội T2): Harbor eval + rollout JSONL + Agent Profiles.
+  AgentProfileStore,
+  HarborRunner,
+  aggregateHarborResults,
+  builtinHarborTasks,
+  defaultHarborTasksDir,
+  formatHarborRunSummary,
+  formatHarborSuiteSummary,
+  getBuiltinHarborTask,
+  isAgentProfileKind,
+  loadHarborTaskFromDir,
+  loadHarborTasksFromDir,
+  materializeBuiltinHarborTasks,
+  noopHarborExecutor,
+  readRolloutJsonl,
+  renderHarborReportMarkdown,
+  resolveProfileModel,
+  rolloutToSftJsonl,
+  saveHarborRunResult,
+  saveHarborSuiteResult,
+  scriptedHarborExecutor,
+  summarizeRollouts,
+  validateHarborTask,
+  validateRolloutJsonl,
+  writeRolloutJsonl,
   HeadlessJobRunner,
   HOOK_COMMANDS_FILE,
   JsonFileRoutineStore,
@@ -144,6 +169,7 @@ import type {
   CoordinatorNotification,
   CreateBotProviderConfig,
   DoctorCheckId,
+  HarborRunResult,
   RiskRule,
   HookCommandSettingsEntry,
   HookEventKind,
@@ -241,6 +267,37 @@ DÙNG:
                 (v1.06) Xu hướng eval từ các báo cáo đã lưu: pass rate
                 từng suite, case flaky (lúc pass lúc fail), case fail
                 liên tục. Chỉ đọc, không chạy lại eval.
+  open-bot eval harbor list [--json]
+                (v1.11) Liệt kê task Harbor mẫu + task trên đĩa
+                <dataDir>/harbor-tasks (instruction + environment +
+                tests/test.sh, điểm test = reward).
+  open-bot eval harbor validate <taskId|dir> [--json]
+                (v1.11) Validate một task Harbor (thiếu file, trọng số
+                sai, đường dẫn không an toàn, test.sh phá hoại).
+  open-bot eval harbor run <taskId> [--profile ID] [--agent-files FILE.json] [--json]
+                (v1.11) Chạy một task trong sandbox local, chấm bằng
+                test.sh, ghi rollout ra eval-harbor/rollouts.jsonl.
+                --agent-files là JSON {đường dẫn: nội dung} mà agent
+                (scripted) sẽ tạo; không truyền thì chạy no-op
+                (baseline: đo môi trường ban đầu, reward 0 nếu task
+                thiết kế đúng). Exit 0 khi reward = 1, exit 1 khi
+                reward < 1.
+  open-bot eval harbor suite [--tasks a,b] [--profile ID] [--agent-files-by-task FILE.json] [--json]
+                (v1.11) Chạy tuần tự toàn bộ task (hoặc danh sách
+                --tasks), gom báo cáo tổng hợp + lưu report + JSONL.
+  open-bot eval harbor export [--format rollout|sft] [--json]
+                (v1.11) Validate + thống kê rollout JSONL; format sft
+                xuất thêm eval-harbor/rollouts-sft.jsonl để fine-tune
+                model local. Secret được lược bỏ trước khi ghi.
+  open-bot eval harbor profiles [--json]
+                (v1.11) Liệt kê Agent Profiles (builtin + custom).
+  open-bot eval harbor profile <kind> [--json]
+                (v1.11) Chọn profile cho một loại task (coding,
+                research, writing, review, general, data) + resolve
+                model mặc định qua ModelRegistry.
+  open-bot eval harbor report [--json]
+                (v1.11) Báo cáo tổng hợp từ các lần chạy Harbor đã
+                lưu (pass rate, reward, thời gian, token).
 
 LỆNH:
   run           Chạy 1 prompt qua 1 bot, in kết quả ra stdout.
@@ -2192,6 +2249,257 @@ async function cmdMemoryV6(sub: string | undefined, positional: string[], flags:
 }
 
 /**
+ * Lệnh `eval harbor ...` (v1.11, Đội T2) — Harbor eval từ terminal.
+ *
+ * Các lệnh con (xem HELP): list / validate / run / suite / export /
+ * profiles / profile / report. Mọi lần chạy đều trong BotBoxManager
+ * (loopback-only, bwrap/unshare khi có); agent chạy bằng executor
+ * scripted theo file JSON (--agent-files) hoặc no-op khi không
+ * truyền — CLI không gọi model trực tiếp, nên `eval harbor run`
+ * không cần API key. Exit 0 khi reward = 1 (run/suite), exit 1 khi
+ * reward < 1 để CI/script dùng được.
+ */
+async function cmdEvalHarbor(
+  action: string | undefined,
+  rest: string[],
+  flags: CliFlags,
+  dataDir: string,
+): Promise<number> {
+  const asJson = flags['json'] === true;
+  const out = (obj: unknown, text: string): void => {
+    process.stdout.write(asJson ? `${JSON.stringify(obj, null, 2)}\n` : text);
+  };
+  const tasksDir = defaultHarborTasksDir(dataDir);
+  const rolloutsPath = path.join(dataDir, 'eval-harbor', 'rollouts.jsonl');
+  const loadAvailableTasks = (): ReturnType<typeof loadHarborTasksFromDir> & { tasks: ReturnType<typeof builtinHarborTasks> } => {
+    materializeBuiltinHarborTasks(tasksDir);
+    const loaded = loadHarborTasksFromDir(tasksDir);
+    const byId = new Map(builtinHarborTasks().map((t) => [t.meta.id, t]));
+    for (const task of loaded.tasks) byId.set(task.meta.id, task);
+    return { tasks: [...byId.values()].sort((a, b) => a.meta.id.localeCompare(b.meta.id)), skipped: loaded.skipped };
+  };
+  const readJsonFile = (filePath: string, what: string): Record<string, unknown> => {
+    try {
+      return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as Record<string, unknown>;
+    } catch (err) {
+      fail(`Không đọc được ${what} "${filePath}": ${(err as Error).message}`);
+    }
+  };
+  const readAgentFiles = (filePath: string): Record<string, string> => {
+    const parsed = readJsonFile(filePath, 'agent files');
+    const files: Record<string, string> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (typeof value !== 'string') fail(`agent-files "${filePath}": giá trị của "${key}" phải là chuỗi.`);
+      files[key] = value;
+    }
+    return files;
+  };
+  const resolveProfile = (profileId: string): ReturnType<AgentProfileStore['get']> => {
+    if (profileId === '') return undefined;
+    const store = new AgentProfileStore(dataDir);
+    const profile = store.get(profileId);
+    if (!profile) fail(`Không có Agent Profile "${profileId}". Xem bằng: open-bot eval harbor profiles.`);
+    return profile;
+  };
+
+  switch (action) {
+    case 'list': {
+      const { tasks, skipped } = loadAvailableTasks();
+      out(
+        { tasks: tasks.map((t) => ({ id: t.meta.id, name: t.meta.name, kind: t.meta.kind, description: t.meta.description, tests: Object.keys(t.meta.testWeights).sort(), totalWeight: Object.values(t.meta.testWeights).reduce((a, b) => a + b, 0), timeoutMs: t.meta.timeoutMs })), skippedDirs: skipped.length },
+        tasks.length === 0
+          ? 'Chưa có task Harbor nào.\n'
+          : `${tasks.map((t) => `${t.meta.id}  [${t.meta.kind}] ${t.meta.name} — ${t.meta.description} (tests: ${Object.keys(t.meta.testWeights).sort().join(', ')})`).join('\n')}\n`,
+      );
+      return 0;
+    }
+    case 'validate': {
+      const target = rest[0] ?? '';
+      if (target === '') fail('eval harbor validate cần <taskId|dir>: open-bot eval harbor validate sum-csv.');
+      if (fs.existsSync(target) && fs.statSync(target).isDirectory()) {
+        try {
+          const task = loadHarborTaskFromDir(target);
+          out({ taskId: task.meta.id, valid: true, issues: [] }, `Task "${task.meta.id}" hợp lệ.\n`);
+          return 0;
+        } catch (err) {
+          const issues = (err as { issues?: { field: string; message: string }[] }).issues ?? [{ field: 'task', message: (err as Error).message }];
+          out({ valid: false, issues }, `Task không hợp lệ:\n${issues.map((i) => `  - ${i.field}: ${i.message}`).join('\n')}\n`);
+          return 1;
+        }
+      }
+      const { tasks } = loadAvailableTasks();
+      const found = tasks.find((t) => t.meta.id === target);
+      if (!found) fail(`Không có task Harbor "${target}". Xem bằng: open-bot eval harbor list.`);
+      const result = validateHarborTask(found);
+      out(
+        { taskId: found.meta.id, valid: result.valid, issues: result.issues },
+        result.valid
+          ? `Task "${found.meta.id}" hợp lệ.\n`
+          : `Task "${found.meta.id}" không hợp lệ:\n${result.issues.map((i) => `  - ${i.field}: ${i.message}`).join('\n')}\n`,
+      );
+      return result.valid ? 0 : 1;
+    }
+    case 'run': {
+      const taskId = rest[0] ?? '';
+      if (taskId === '') fail('eval harbor run cần <taskId>: open-bot eval harbor run sum-csv.');
+      const { tasks } = loadAvailableTasks();
+      const task = tasks.find((t) => t.meta.id === taskId);
+      if (!task) fail(`Không có task Harbor "${taskId}". Xem bằng: open-bot eval harbor list.`);
+      const profileId = typeof flags['profile'] === 'string' ? flags['profile'] : '';
+      const profile = resolveProfile(profileId);
+      const agentFilesFlag = typeof flags['agent-files'] === 'string' ? flags['agent-files'] : '';
+      const executor = agentFilesFlag !== '' ? scriptedHarborExecutor(readAgentFiles(agentFilesFlag)) : noopHarborExecutor;
+      const runner = new HarborRunner({ baseDir: path.join(dataDir, 'eval-harbor'), executor });
+      const result = await runner.runTask(task, {
+        ...(profileId !== '' ? { profileId } : {}),
+        ...(profile ? { systemPrompt: profile.systemPrompt } : {}),
+        ...(profile ? { model: resolveProfileModel(profile) } : {}),
+      });
+      const reportPath = saveHarborRunResult(dataDir, result);
+      writeRolloutJsonl(rolloutsPath, [result.rollout], 'append');
+      out(
+        { executor: agentFilesFlag !== '' ? 'scripted' : 'noop', reportPath, rolloutsPath, taskId: result.taskId, passed: result.passed, reward: result.reward, tests: result.testRun.perTest, durationMs: result.durationMs, usage: result.usage, isolation: result.isolation, error: result.error },
+        `${formatHarborRunSummary(result)}\nReport saved to: ${reportPath}\nRollout appended to: ${rolloutsPath}\n`,
+      );
+      return result.passed ? 0 : 1;
+    }
+    case 'suite': {
+      const tasksFlag = typeof flags['tasks'] === 'string' ? flags['tasks'] : '';
+      const requested = tasksFlag === '' ? [] : tasksFlag.split(',').map((s) => s.trim()).filter((s) => s !== '');
+      const { tasks } = loadAvailableTasks();
+      const selected = requested.length === 0 ? tasks : tasks.filter((t) => requested.includes(t.meta.id));
+      if (selected.length === 0) fail('Không có task nào được chọn. Xem bằng: open-bot eval harbor list.');
+      const missing = requested.filter((id) => !tasks.some((t) => t.meta.id === id));
+      if (missing.length > 0) fail(`Không có task Harbor: ${missing.join(', ')}.`);
+      const profileId = typeof flags['profile'] === 'string' ? flags['profile'] : '';
+      const profile = resolveProfile(profileId);
+      const byTaskFlag = typeof flags['agent-files-by-task'] === 'string' ? flags['agent-files-by-task'] : '';
+      const byTaskFiles: Record<string, Record<string, string>> = {};
+      if (byTaskFlag !== '') {
+        const parsed = readJsonFile(byTaskFlag, 'agent files by task');
+        for (const [taskId, files] of Object.entries(parsed)) {
+          if (!files || typeof files !== 'object' || Array.isArray(files)) {
+            fail(`agent-files-by-task "${byTaskFlag}": giá trị của "${taskId}" phải là object {đường dẫn: nội dung}.`);
+          }
+          const mapped: Record<string, string> = {};
+          for (const [key, value] of Object.entries(files as Record<string, unknown>)) {
+            if (typeof value !== 'string') fail(`agent-files-by-task "${byTaskFlag}": giá trị của "${taskId}.${key}" phải là chuỗi.`);
+            mapped[key] = value;
+          }
+          byTaskFiles[taskId] = mapped;
+        }
+      }
+      const runner = new HarborRunner({
+        baseDir: path.join(dataDir, 'eval-harbor'),
+        executor: async (ctx) => {
+          const files = byTaskFiles[ctx.task.meta.id];
+          if (files) return scriptedHarborExecutor(files)(ctx);
+          return noopHarborExecutor();
+        },
+      });
+      const suite = await runner.runSuite(selected, {
+        ...(profileId !== '' ? { profileId } : {}),
+        ...(profile ? { systemPrompt: profile.systemPrompt } : {}),
+        ...(profile ? { model: resolveProfileModel(profile) } : {}),
+      });
+      const suitePath = saveHarborSuiteResult(dataDir, suite);
+      writeRolloutJsonl(rolloutsPath, suite.results.map((r) => r.rollout), 'append');
+      const aggregate = aggregateHarborResults(suite.results);
+      out(
+        { suitePath, rolloutsPath, passed: suite.passed, failed: suite.failed, passRate: suite.passRate, meanReward: suite.meanReward, durationMs: suite.durationMs, totalTokens: suite.totalPromptTokens + suite.totalCompletionTokens, results: suite.results.map((r) => ({ taskId: r.taskId, passed: r.passed, reward: r.reward })) },
+        `${formatHarborSuiteSummary(suite)}\n${renderHarborReportMarkdown(aggregate)}Suite report saved to: ${suitePath}\n`,
+      );
+      return suite.passed === suite.results.length ? 0 : 1;
+    }
+    case 'export': {
+      const format = typeof flags['format'] === 'string' ? flags['format'] : 'rollout';
+      if (format !== 'rollout' && format !== 'sft') fail('eval harbor export cần --format rollout|sft.');
+      if (!fs.existsSync(rolloutsPath)) {
+        out({ rolloutsPath, rollouts: 0 }, 'Chưa có rollout nào — chạy task hoặc suite trước.\n');
+        return 0;
+      }
+      const content = fs.readFileSync(rolloutsPath, 'utf-8');
+      const validation = validateRolloutJsonl(content);
+      const records = readRolloutJsonl(rolloutsPath);
+      const stats = summarizeRollouts(records);
+      let sftPath: string | null = null;
+      let sftLines = 0;
+      if (format === 'sft') {
+        const lines: string[] = [];
+        for (const record of records) lines.push(...rolloutToSftJsonl(record));
+        sftPath = path.join(dataDir, 'eval-harbor', 'rollouts-sft.jsonl');
+        fs.mkdirSync(path.dirname(sftPath), { recursive: true });
+        fs.writeFileSync(sftPath, lines.length > 0 ? `${lines.join('\n')}\n` : '', 'utf-8');
+        sftLines = lines.length;
+      }
+      out(
+        { rolloutsPath, valid: validation.valid, issues: validation.issues.slice(0, 20), stats, ...(sftPath ? { sftPath, sftLines } : {}) },
+        validation.valid
+          ? `Rollouts: ${stats.rollouts} (pass rate ${(stats.passRate * 100).toFixed(1)}%, mean reward ${stats.meanReward.toFixed(3)}, ${stats.totalTokens} tokens).${sftPath ? `\nSFT export: ${sftLines} lines -> ${sftPath}` : ''}\n`
+          : `Rollout JSONL có ${validation.issues.length} lỗi (dòng đầu: ${validation.issues[0]?.line ?? '?'} — ${validation.issues[0]?.message ?? ''}).\n`,
+      );
+      return validation.valid ? 0 : 1;
+    }
+    case 'profiles': {
+      const store = new AgentProfileStore(dataDir);
+      const profiles = store.list();
+      out(
+        { profiles: profiles.map((p) => ({ id: p.id, label: p.label, kind: p.kind, provider: p.provider, model: p.model, tools: p.tools, denyTools: p.denyTools, turnBudget: p.turnBudget, enabled: p.enabled, builtin: p.builtin })) },
+        profiles.length === 0
+          ? 'Chưa có Agent Profile nào.\n'
+          : `${profiles.map((p) => `${p.id}  [${p.kind}] ${p.label} — ${p.provider}/${p.model === '' ? '(registry default)' : p.model} ${p.enabled ? '(enabled)' : '(disabled)'}`).join('\n')}\n`,
+      );
+      return 0;
+    }
+    case 'profile': {
+      const kind = rest[0] ?? '';
+      if (kind === '' || !isAgentProfileKind(kind)) {
+        fail('eval harbor profile cần <kind>: coding | research | writing | review | general | data.');
+      }
+      const store = new AgentProfileStore(dataDir);
+      const profile = store.profileForKind(kind);
+      if (!profile) fail('Không còn Agent Profile nào đang bật (tất cả đều bị tắt).');
+      const resolved = resolveProfileModel(profile);
+      out(
+        { profileId: profile.id, label: profile.label, kind: profile.kind, provider: resolved.provider, model: resolved.model, modelResolved: resolved.model !== '', turnBudget: profile.turnBudget, tools: profile.tools, denyTools: profile.denyTools, systemPrompt: profile.systemPrompt },
+        `Profile cho "${kind}": ${profile.label} (${profile.id}) — ${resolved.provider}/${resolved.model === '' ? '(registry default)' : resolved.model}\n`,
+      );
+      return 0;
+    }
+    case 'report': {
+      const reportsDir = path.join(dataDir, 'eval-harbor-reports');
+      const files = fs.existsSync(reportsDir)
+        ? fs.readdirSync(reportsDir).filter((f) => f.endsWith('.json')).map((f) => path.join(reportsDir, f)).sort().reverse()
+        : [];
+      const runs: HarborRunResult[] = [];
+      for (const file of files) {
+        try {
+          const parsed = JSON.parse(fs.readFileSync(file, 'utf-8')) as HarborRunResult & { results?: HarborRunResult[] };
+          if (parsed && typeof parsed === 'object' && parsed.rolloutId) runs.push(parsed);
+          else if (parsed && Array.isArray(parsed.results)) {
+            for (const item of parsed.results) if (item && typeof item === 'object' && item.rolloutId) runs.push(item);
+          }
+        } catch {
+          // File báo cáo hỏng — bỏ qua.
+        }
+      }
+      if (runs.length === 0) {
+        out({ reportsDir, runs: 0 }, 'Chưa có lần chạy Harbor nào được lưu — chạy task hoặc suite trước.\n');
+        return 0;
+      }
+      const aggregate = aggregateHarborResults(runs);
+      out(
+        { reportsDir, ...aggregate, runs: runs.length },
+        `${renderHarborReportMarkdown(aggregate)}\n`,
+      );
+      return 0;
+    }
+    default:
+      fail('eval harbor cần lệnh con: list | validate | run | suite | export | profiles | profile | report (vd: open-bot eval harbor list).');
+  }
+}
+
+/**
  * Lệnh `eval` (v1.06, Đội T6) — chạy eval benchmark từ terminal:
  *
  *   open-bot eval memory|mcp|all [--json] [--out FILE]
@@ -2204,10 +2512,13 @@ async function cmdMemoryV6(sub: string | undefined, positional: string[], flags:
  */
 async function cmdEval(
   sub: string | undefined,
-  _positional: string[],
+  positional: string[],
   flags: CliFlags,
 ): Promise<number> {
   const suite = sub ?? 'all';
+  if (suite === 'harbor') {
+    return cmdEvalHarbor(positional[0], positional.slice(1), flags, resolveDataDir(flags));
+  }
   if (suite === 'trends') {
     const dataDir = resolveDataDir(flags);
     const trends = buildEvalTrends(loadEvalReportHistory(dataDir));
@@ -2219,7 +2530,7 @@ async function cmdEval(
     return 0;
   }
   if (suite !== 'memory' && suite !== 'mcp' && suite !== 'all') {
-    fail('eval cần suite: memory | mcp | all | trends (vd: open-bot eval all).');
+    fail('eval cần suite: memory | mcp | all | trends | harbor (vd: open-bot eval all).');
   }
   const dataDir = resolveDataDir(flags);
   const asJson = flags['json'] === true;

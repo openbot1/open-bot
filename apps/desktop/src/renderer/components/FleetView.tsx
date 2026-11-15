@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { FleetCapacityCheckView, FleetStatusView, FleetWorkspaceView } from '../types';
+import FleetV8View from './FleetV8View';
 import { useT } from '../i18n/useT';
 
 /**
@@ -67,6 +68,9 @@ export default function FleetView({ onBack }: Props) {
   const [ramGb, setRamGb] = useState('1');
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
   const [removeData, setRemoveData] = useState(false);
+  // v1.11 (Team T6): toggle the fleet v8 dashboard (node health + problem
+  // bots + campaigns + incidents). Hidden by default so the old FleetView is unchanged.
+  const [showV8, setShowV8] = useState(false);
 
   const loadFleet = useCallback(async () => {
     setLoading(true);
@@ -232,6 +236,10 @@ export default function FleetView({ onBack }: Props) {
       </button>
       <h2>{t('fleet.title')}</h2>
       <p>{t('fleet.description')}</p>
+      <button type="button" onClick={() => setShowV8((v) => !v)}>
+        {showV8 ? t('fleetV8.hideDashboard') : t('fleetV8.showDashboard')}
+      </button>
+      {showV8 && <FleetV8View />}
 
       {error && (
         <p role="alert">
