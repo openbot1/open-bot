@@ -202,6 +202,32 @@ test('no hard-coded Vietnamese display strings in renderer components', () => {
   }
 });
 
+test('renderer never value-imports @open-bot/core (CJS crash)', () => {
+  // v1.07 merge regression: BudgetMeter value-imported a core CJS bundle
+  // (`@open-bot/core/dist/conversation/budgetMeterView.js`); vite inlined
+  // the CJS file verbatim (`exports` with no `exports` in scope), so the
+  // renderer threw `ReferenceError: exports is not defined` at startup
+  // and React never mounted (every Electron smoke test failed). The
+  // renderer is self-contained: only `import type` from core is allowed.
+  // Pure logic needed by the UI must be mirrored in a renderer-local
+  // module (see `components/budgetMeterView.ts`).
+  const valueImport = /^\s*import\s+(?!\s*type\b)[^;]*from\s+['"]@open-bot\/core[^'"]*['"]/m;
+  const files = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, entry.name);
+      if (entry.isDirectory()) walk(p);
+      else if (/\.(ts|tsx)$/.test(entry.name)) files.push(p);
+    }
+  };
+  walk(renderer);
+  assert.ok(files.length > 50, `expected many renderer files, found ${files.length}`);
+  for (const file of files) {
+    const src = readFileSync(file, 'utf-8');
+    assert.ok(!valueImport.test(src), `${file} value-imports @open-bot/core (CJS crash) — mirror the logic locally instead`);
+  }
+});
+
 test('every key the renderer uses exists in every locale', () => {
   const used = usedKeys();
   assert.ok(used.size > 50, `expected many used keys, found ${used.size}`);

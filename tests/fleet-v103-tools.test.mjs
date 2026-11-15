@@ -60,7 +60,7 @@ test('fleet v3 tools: all 4 are registered in ALL_TOOLS exactly once', () => {
   try {
     const tools = defaultToolFactory(mem, ws, 'bot-1');
     const names = toolNames(tools);
-    assert.equal(names.length, 345, `expected 345 tools, got ${names.length}`);    assert.equal(new Set(names).size, names.length, 'duplicate tool names in the agent registry');
+    assert.equal(names.length, 710, `expected 710 tools, got ${names.length}`); // v1.09 merge: 500 + 11 teams + 23 letta + 10 fleet_v6 + 10 voice_v8 + 2 a2a_v11 = 556; v1.10 merge: 556 + 84 = 640; v1.11 merge: 640 + 70 = 710; / v1.06: +44    assert.equal(new Set(names).size, names.length, 'duplicate tool names in the agent registry');
     for (const name of FLEET_V103_TOOL_NAMES) assert.ok(names.includes(name), name);
   } finally {
     mem.close();

@@ -130,6 +130,7 @@ test('snapshot matches the IPC models:list shape', () => {
     'aider',
     'amazon-q',
     'anthropic',
+    'cerebras', // v1.10 (Đội T6): provider OpenAI-compatible mới
     'claude-code',
     'codex',
     'cohere', // v0.97 (Team T6): dedicated provider
@@ -138,6 +139,7 @@ test('snapshot matches the IPC models:list shape', () => {
     'cursor-cli',
     'custom-acp',
     'deepseek', // v0.97 (Team T6): dedicated provider
+    'fireworks', // v1.08 (Đội T4): provider OpenAI-compatible mới
     'gemini',
     'gemini-cli',
     'grok-cli',
@@ -149,7 +151,9 @@ test('snapshot matches the IPC models:list shape', () => {
     'openai',
     'openai-compatible',
     'opencode',
+    'openrouter', // v1.08 (Đội T4): provider OpenAI-compatible mới
     'qwen', // v0.97 (Team T6): dedicated provider
+    'sambanova', // v1.11 (Đội T6): provider OpenAI-compatible mới
     'together', // v0.97 (Team T6): dedicated provider
     'windsurf',
     'xai',

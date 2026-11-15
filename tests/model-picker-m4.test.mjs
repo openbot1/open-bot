@@ -200,7 +200,10 @@ test('M4 rail: 3 nhóm subscription / api / custom đúng thành viên', () => {
   assert.deepEqual(
     [...rail.groups.api.map((e) => e.providerId)].sort(),
     // v0.97 (Team T6): 7 dedicated API providers join the api group.
-    ['anthropic', 'cohere', 'deepseek', 'gemini', 'groq', 'mistral', 'moonshot', 'ollama', 'openai', 'qwen', 'together', 'xai'].sort(),
+    // v1.08 (Đội T4): + fireworks + openrouter (providers OpenAI-compatible mới).
+    // v1.10 (Đội T6): + cerebras (provider OpenAI-compatible mới).
+    // v1.11 (Đội T6): + sambanova (provider OpenAI-compatible mới).
+    ['anthropic', 'cerebras', 'cohere', 'deepseek', 'fireworks', 'gemini', 'groq', 'mistral', 'moonshot', 'ollama', 'openai', 'openrouter', 'qwen', 'sambanova', 'together', 'xai'].sort(),
   );
   assert.deepEqual(
     [...rail.groups.custom.map((e) => e.providerId)].sort(),
