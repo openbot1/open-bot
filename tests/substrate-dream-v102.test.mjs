@@ -91,9 +91,16 @@ test('dream scheduler: ticks only at the configured hour', async () => {
   const memory = new LongTermMemory(dir);
   const engine = new DeepDreamEngine({ workspaceDir: dir, memory });
   const scheduler = new DeepDreamScheduler(engine, { hour: 3 });
-  assert.ok(await scheduler.tick(new Date('2026-11-14T03:00:00Z')), 'runs at the configured hour');
-  assert.equal(await scheduler.tick(new Date('2026-11-14T12:00:00Z')), null, 'other hours are skipped');
-  assert.equal(await scheduler.tick(new Date('2026-11-14T03:00:00Z')), null, 'already ran today');
+  // v1.09 merge fix: derive the day from today (local time — the scheduler
+  // compares local days and runOnce() records lastRunAt as real now), not a
+  // hard-coded 2026-11-14: once the calendar moved on, the hard-coded day
+  // never matched "already ran today" and the third tick ran again.
+  const now = new Date();
+  const at3 = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 3, 0, 0);
+  const at12 = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
+  assert.ok(await scheduler.tick(at3), 'runs at the configured hour');
+  assert.equal(await scheduler.tick(at12), null, 'other hours are skipped');
+  assert.equal(await scheduler.tick(at3), null, 'already ran today');
 });
 
 test('job memory: keyed facts per job, overwrite, forget, promote keepers', () => {

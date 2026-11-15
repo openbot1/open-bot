@@ -4,7 +4,7 @@
  *
  *   1. `requireWsUrl` (packages/core/src/ipc/validate.ts): accepts
  *      ws(s) realtime URLs, rejects http(s) and garbage.
- *   2. i18n: all 6 locales carry the 71 `voice.realtime.*` keys
+ *   2. i18n: all 6 locales carry the 95 `voice.realtime.*` keys (71 v1.05 + 16 voice.realtime.v5.* v1.06 T4 + 8 voice.realtime.v6.* v1.07 T5)
  *      (24 in v0.95 + 14 `voice.realtime.live.*` keys added by the
  *      v0.96 live-voice work + 2 barge-in stats keys added by the
  *      v0.98 live-voice work + 14 `voice.realtime.v3.*` keys added
@@ -102,6 +102,15 @@ const REALTIME_KEYS = [
   'voice.realtime.v4.turnHistoryEmpty',
   'voice.realtime.v4.waveform',
   'voice.realtime.v4.interruptedTurn',
+  // v1.07 (Đội T5): 8 voice v6 call-state keys.
+  'voice.realtime.v6.stateIdle',
+  'voice.realtime.v6.stateConnecting',
+  'voice.realtime.v6.stateListening',
+  'voice.realtime.v6.stateSpeaking',
+  'voice.realtime.v6.stateInterrupted',
+  'voice.realtime.v6.stateReconnecting',
+  'voice.realtime.v6.stateDegraded',
+  'voice.realtime.v6.stateEnded',
 ];
 
 test('realtime-ui: requireWsUrl accepts ws/wss realtime URLs', () => {
@@ -122,7 +131,7 @@ test('realtime-ui: requireWsUrl accepts ws/wss realtime URLs', () => {
   assert.throws(() => requireWsUrl('', 'realtimeUrl'), /không rỗng|chuỗi/);
 });
 
-test('realtime-ui: all 6 locales carry the 71 voice.realtime.* keys (parity 6/6)', () => {
+test('realtime-ui: all 6 locales carry the 118 voice.realtime.* keys (parity 6/6)', () => {
   const keySets = [];
   for (const loc of LOCALES) {
     const data = JSON.parse(read(`apps/desktop/src/renderer/i18n/locales/${loc}.json`));
@@ -137,7 +146,7 @@ test('realtime-ui: all 6 locales carry the 71 voice.realtime.* keys (parity 6/6)
   for (let i = 1; i < keySets.length; i++) {
     assert.deepEqual([...keySets[i]].sort(), [...keySets[0]].sort());
   }
-  assert.equal(keySets[0].size, 71);
+  assert.equal(keySets[0].size, 118); // v1.07 merge: 87 + 8 voice.realtime.v6.* = 95; v1.11 merge: 95 + 23 voice.realtime.v10.* = 118
 });
 
 test('realtime-ui: RealtimeVoicePanel renders provider/turn-mode/start/stop/interrupt/talk controls', () => {
