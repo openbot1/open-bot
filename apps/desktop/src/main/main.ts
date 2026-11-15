@@ -299,6 +299,7 @@ import {
   bucketEventStream,
   buildFleetBotOverview,
   buildFleetOverview,
+  buildFleetV6Overview,
   buildMarketplaceV2Catalog,
   cancelPlacement,
   checkBotQuotas,
@@ -351,6 +352,8 @@ import {
   // v0.94c: nhịp kiểm tra digest project tới hạn (15 phút).
   PROJECT_UPDATES_CHECK_MS,
 } from '@open-bot/core';
+// v1.09 (Đội T1): Agent Teams v1 — theo dõi team (IPC `agent-teams-v109:*`).
+import { TeamService, TeamsV109Store } from '@open-bot/core';
 // v0.95d4 (Đội D4): user profile + long-term memory (local-first) cho IPC.
 import { loadLocalProfile, LongTermMemory, OllamaEmbeddings, updateLocalProfile } from '@open-bot/core';
 // v1.05 (Đội T3): model refresh + per-bot computer v2 status.
@@ -385,6 +388,18 @@ import {
   importFactsFromMemFs,
   MEMFS_BLOCKS_DIR_NAME,
   readBlockHistory,
+} from '@open-bot/core';
+// v1.09 (Đội T2): memory v9 kiểu Letta cho IPC `memory-letta:*` — core
+// memory tự sửa qua tool (cô đọng khi đầy) + recall + archival +
+// entity bền vững + sleep pass/proposals.
+import {
+  ArchivalStore,
+  CoreMemoryManager,
+  PersistentAgentMemory,
+  RecallStore,
+  SleepProposalStore,
+  readLettaSleepLog,
+  runLettaSleepPass,
 } from '@open-bot/core';
 // v1.08 (Đội T5): voice v7 sessions cho IPC `voice-v7:*` (mock,
 // local-first — panel quản lý session + transcript streaming).
@@ -5854,6 +5869,165 @@ function registerIpc(): void {
     },
   );
 
+  // v1.09 (Đội T2): memory v9 kiểu Letta IPC — core memory tự sửa qua
+  // tool (đầy thì cô đọng) + recall + archival + entity bền vững +
+  // sleep pass/proposals. Tất cả local, không rời máy; embedding không
+  // bao giờ trả về renderer (chỉ số lượng + điểm xếp hạng).
+  const lettaEntityForBot = (botId: string): PersistentAgentMemory => {
+    const id = requireId(botId, 'botId');
+    const bot = settings.bots.find((b) => b.id === id);
+    if (!bot) throw new Error('Không tìm thấy bot.');
+    return new PersistentAgentMemory(workspaceDirFor(bot), id);
+  };
+  const lettaWorkspaceForBot = (botId: string): string => {
+    const id = requireId(botId, 'botId');
+    const bot = settings.bots.find((b) => b.id === id);
+    if (!bot) throw new Error('Không tìm thấy bot.');
+    return workspaceDirFor(bot);
+  };
+  ipcMain.handle('memory-letta:status', (_event: unknown, payload: { botId: string }) => {
+    const entity = lettaEntityForBot(payload?.botId);
+    const workspaceDir = lettaWorkspaceForBot(payload?.botId);
+    const proposals = new SleepProposalStore(workspaceDir);
+    const lastSleep = readLettaSleepLog(workspaceDir, 1)[0] ?? null;
+    return {
+      stats: entity.stats(),
+      proposalsPending: proposals.stats(entity.botId).pending,
+      lastSleep,
+    };
+  });
+  // Append kiểu Letta: vượt giới hạn thì tự cô đọng nội dung cũ rồi
+  // mới append (khác `memory-blocks:append` vốn throw khi đầy).
+  ipcMain.handle(
+    'memory-letta:block-append',
+    (_event: unknown, payload: { botId: string; idOrLabel: string; text: string }) => {
+      const workspaceDir = lettaWorkspaceForBot(payload?.botId);
+      const core = new CoreMemoryManager(workspaceDir);
+      const result = core.append(
+        requireId(payload?.idOrLabel, 'idOrLabel'),
+        requireString(payload?.text, 'text'),
+        requireId(payload?.botId, 'botId'),
+        'user',
+      );
+      return {
+        block: result.block,
+        usage: result.usage,
+        condensed: result.condensed,
+        condense: result.condense,
+        appendedChars: result.appendedChars,
+      };
+    },
+  );
+  ipcMain.handle(
+    'memory-letta:recall-search',
+    (_event: unknown, payload: { botId: string; query?: string; limit?: number }) => {
+      const workspaceDir = lettaWorkspaceForBot(payload?.botId);
+      const recall = new RecallStore(workspaceDir);
+      const limit =
+        typeof payload?.limit === 'number' && Number.isFinite(payload.limit)
+          ? Math.max(1, Math.min(50, Math.floor(payload.limit)))
+          : 10;
+      return recall
+        .recall({ botId: requireId(payload?.botId, 'botId'), query: payload?.query ?? '', limit })
+        .map((hit) => ({
+          sessionId: hit.session.sessionId,
+          botId: hit.session.botId,
+          startedAt: hit.session.startedAt,
+          endedAt: hit.session.endedAt,
+          turns: hit.session.turns,
+          summary: hit.session.summary,
+          keywordScore: hit.keywordScore,
+          recencyScore: hit.recencyScore,
+          score: hit.score,
+        }));
+    },
+  );
+  ipcMain.handle(
+    'memory-letta:archival-search',
+    async (_event: unknown, payload: { botId: string; query: string; limit?: number; offset?: number }) => {
+      const workspaceDir = lettaWorkspaceForBot(payload?.botId);
+      const archival = new ArchivalStore(workspaceDir);
+      const limit =
+        typeof payload?.limit === 'number' && Number.isFinite(payload.limit)
+          ? Math.max(1, Math.min(50, Math.floor(payload.limit)))
+          : 10;
+      const offset =
+        typeof payload?.offset === 'number' && Number.isFinite(payload.offset)
+          ? Math.max(0, Math.floor(payload.offset))
+          : 0;
+      // Không truyền embedQuery: UI dùng fallback tìm kiếm từ khoá.
+      return archival.search({ query: requireString(payload?.query, 'query'), limit, offset });
+    },
+  );
+  ipcMain.handle(
+    'memory-letta:proposals',
+    (_event: unknown, payload: { botId: string; status?: string; limit?: number }) => {
+      const workspaceDir = lettaWorkspaceForBot(payload?.botId);
+      const proposals = new SleepProposalStore(workspaceDir);
+      const status = payload?.status;
+      const valid = ['pending', 'applied', 'rejected', 'approved'];
+      if (status !== undefined && !valid.includes(status)) {
+        throw new Error('status phải là pending, applied, rejected hoặc approved.');
+      }
+      const limit =
+        typeof payload?.limit === 'number' && Number.isFinite(payload.limit)
+          ? Math.max(1, Math.min(200, Math.floor(payload.limit)))
+          : 50;
+      return proposals.list({
+        botId: requireId(payload?.botId, 'botId'),
+        ...(status !== undefined
+          ? { status: status as 'pending' | 'applied' | 'rejected' | 'approved' }
+          : {}),
+        limit,
+      });
+    },
+  );
+  ipcMain.handle(
+    'memory-letta:proposal-decide',
+    (
+      _event: unknown,
+      payload: { botId: string; proposalId: string; decision: string; note?: string; editedLine?: string },
+    ) => {
+      const workspaceDir = lettaWorkspaceForBot(payload?.botId);
+      const proposals = new SleepProposalStore(workspaceDir);
+      const decision = payload?.decision;
+      if (decision !== 'approve' && decision !== 'reject' && decision !== 'apply-edited') {
+        throw new Error('decision phải là approve, reject hoặc apply-edited.');
+      }
+      return proposals.decide(requireId(payload?.proposalId, 'proposalId'), decision, {
+        decidedBy: 'user',
+        ...(payload?.note !== undefined ? { note: payload.note } : {}),
+        ...(payload?.editedLine !== undefined ? { editedLine: payload.editedLine } : {}),
+      });
+    },
+  );
+  ipcMain.handle(
+    'memory-letta:sleep-run',
+    (_event: unknown, payload: { botId: string; dryRun?: boolean }) => {
+      const workspaceDir = lettaWorkspaceForBot(payload?.botId);
+      return runLettaSleepPass(workspaceDir, requireId(payload?.botId, 'botId'), {
+        dryRun: payload?.dryRun === true,
+      });
+    },
+  );
+  ipcMain.handle('memory-letta:sleep-log', (_event: unknown, payload: { botId: string; limit?: number }) => {
+    const workspaceDir = lettaWorkspaceForBot(payload?.botId);
+    const limit =
+      typeof payload?.limit === 'number' && Number.isFinite(payload.limit)
+        ? Math.max(1, Math.min(50, Math.floor(payload.limit)))
+        : 20;
+    return readLettaSleepLog(workspaceDir, limit);
+  });
+  ipcMain.handle('memory-letta:entity-export', (_event: unknown, payload: { botId: string }) => {
+    const entity = lettaEntityForBot(payload?.botId);
+    const workspaceDir = lettaWorkspaceForBot(payload?.botId);
+    const safeBot = entity.botId.replace(/[^a-z0-9_-]+/gi, '-');
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filePath = path.join(workspaceDir, '.open-bot', 'memory-exports', `letta-${safeBot}-${stamp}.json`);
+    entity.exportToFile(filePath);
+    return { filePath };
+  });
+
   // v0.97 (Team T4): memory v2 IPC — graph + hybrid search + sleep
   // agent + provenance/quota. Tất cả local, không rời máy; embedding
   // không bao giờ trả về renderer (chỉ số lượng + điểm xếp hạng).
@@ -10523,6 +10697,19 @@ function registerIpc(): void {
     getFleetManager().healthCheck(asStringParam(payload)),
   );
 
+  // v1.09 (Đội T1): Agent Teams v1 — theo dõi team (CHỈ ĐỌC, local-first).
+  // Đọc file `<userData>/agent-teams-v109.json` qua TeamsV109Store; tạo
+  // team / claim task do agent làm qua tool team_* (không qua IPC này).
+  ipcMain.handle('agent-teams-v109:list', () => {
+    const store = new TeamsV109Store(app.getPath('userData'));
+    return store.load().teams.map((team) => TeamService.restore(team).summary());
+  });
+
+  ipcMain.handle('agent-teams-v109:status', (_event: unknown, payload: unknown) => {
+    const store = new TeamsV109Store(app.getPath('userData'));
+    return store.find(asStringParam(payload)) ?? null;
+  });
+
   ipcMain.handle('fleet:capacity', async (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     const cpuCores = typeof rec.cpuCores === 'number' ? rec.cpuCores : 1;
@@ -10694,6 +10881,9 @@ function registerIpc(): void {
   });
 
   ipcMain.handle('fleet:quotas-alerts', () => fleetQuotaAlerts());
+
+  // v1.09 (Đội T6): fleet v6 overview — scheduler + quota nhóm + health.
+  ipcMain.handle('fleet:v6-overview', () => buildFleetV6Overview(fleetRootDir()));
 
   // v1.03 (Team T6): fleet overview v3 + scheduler v3 — totals,
   // top consumers, capacity forecast, placement planning, and the

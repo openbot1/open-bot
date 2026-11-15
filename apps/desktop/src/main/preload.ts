@@ -5,7 +5,7 @@
  * KHÔNG expose ipcRenderer trực tiếp, KHÔNG expose API key hay Node API.
  */
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AppliedPluginTemplate, A2aPersistStatus, AppSnapshot, AgUiEvent, AgUiRunState, AppStatusView, AuditEvent, AuditVerifyResult, AutoApproveRule, AutoApproveRuleInput, BotConfig, BotQuota, CanvasDocument, CanvasSummary, Channel, ChannelKind, ChannelMessage, ChannelResponderRules, ComposioPollStatus, ComposioStateView, ComposioToolkitConnection, ComputerBackend, ComputerPlan, ComputerSchedulerState, ComputerStatusView, CreateFleetWorkspaceInput, CreatePluginTemplateInput, CrashReport, CrashReportSummary, DeepLinkRoute, FleetBotOverview, FleetCapacityCheck, FleetConsoleRole, FleetConsoleUser, FleetDecision, FleetRole, FleetStatusView, FleetUsageSummary, FleetWorkspace, GroupBotInterruptedEntry, GroupBotStatusEntry, GroupChat, GroupMessage, GuestAgentHealth, HarnessEvent, HarnessStatusResult, HarnessThreadLogResult, ListBotSkillsResult, ListBotToolsResult, LocalProfile, LongTermMemoryEntry, MachineProfile, MarketplaceV2Entry, McpAppDefinition, MemoryBlock, OnePasswordBrokerStatus, OpenAppInput, PermissionReview, PluginCatalogEntry, PluginTemplate, QuotaAlert, SetBotSkillEnabledResult, SetBotToolEnabledResult, TaskSnapshot, TeamBundle, ThreadItem, ThreadSearchHit, VerbatimRecord, VisionAttachment, RouterConfig, RouterStats, RouterTarget, RoutingDecision, RouterCliStatus, GetRouterConfigResult, GetRouterDecisionsResult, GetRouterStatsResult, GetRouterTargetsResult, RunLogMeta, RunEventQuery, RunLogVerification, AuditIntegrityReport, PauseResumeResult, ForkRunResult, ReplayedRunState, AnyRunEvent, FleetOverview, PlacementPlan, QueuedPlacement, MarketplaceCollection, MarketplaceEntryVersion, MarketplaceInstallRecord, PluginUpdateInfo, PluginDependencyCheck, QueuedPluginInstall, PluginRollbackRecord, EvalSuite, EvalCase, EvalCheck, EvalSuiteReport, EvalCaseResult, EvalComparison, FleetPolicyV4, FleetTaskV4, MemoryEvalReport, RegressionAlert, RunMemoryEvalSuiteResult, EventStreamSummary, EventStreamBucket } from '@open-bot/core';
+import type { AppliedPluginTemplate, A2aPersistStatus, AppSnapshot, AgUiEvent, AgUiRunState, AppStatusView, AuditEvent, AuditVerifyResult, AutoApproveRule, AutoApproveRuleInput, BotConfig, BotQuota, CanvasDocument, CanvasSummary, Channel, ChannelKind, ChannelMessage, ChannelResponderRules, ComposioPollStatus, ComposioStateView, ComposioToolkitConnection, ComputerBackend, ComputerPlan, ComputerSchedulerState, ComputerStatusView, CreateFleetWorkspaceInput, CreatePluginTemplateInput, CrashReport, CrashReportSummary, DeepLinkRoute, FleetBotOverview, FleetCapacityCheck, FleetConsoleRole, FleetConsoleUser, FleetDecision, FleetRole, FleetStatusView, FleetUsageSummary, FleetV6Overview, FleetWorkspace, GroupBotInterruptedEntry, GroupBotStatusEntry, GroupChat, GroupMessage, GuestAgentHealth, HarnessEvent, HarnessStatusResult, HarnessThreadLogResult, ListBotSkillsResult, ListBotToolsResult, LocalProfile, LongTermMemoryEntry, MachineProfile, MarketplaceV2Entry, McpAppDefinition, MemoryBlock, OnePasswordBrokerStatus, OpenAppInput, PermissionReview, PluginCatalogEntry, PluginTemplate, QuotaAlert, SetBotSkillEnabledResult, SetBotToolEnabledResult, TaskSnapshot, TeamBundle, ThreadItem, ThreadSearchHit, VerbatimRecord, VisionAttachment, RouterConfig, RouterStats, RouterTarget, RoutingDecision, RouterCliStatus, GetRouterConfigResult, GetRouterDecisionsResult, GetRouterStatsResult, GetRouterTargetsResult, RunLogMeta, RunEventQuery, RunLogVerification, AuditIntegrityReport, PauseResumeResult, ForkRunResult, ReplayedRunState, AnyRunEvent, FleetOverview, PlacementPlan, QueuedPlacement, MarketplaceCollection, MarketplaceEntryVersion, MarketplaceInstallRecord, PluginUpdateInfo, PluginDependencyCheck, QueuedPluginInstall, PluginRollbackRecord, EvalSuite, EvalCase, EvalCheck, EvalSuiteReport, EvalCaseResult, EvalComparison, FleetPolicyV4, FleetTaskV4, MemoryEvalReport, RegressionAlert, RunMemoryEvalSuiteResult, EventStreamSummary, EventStreamBucket, AgentTeamV109, TeamV109Summary } from '@open-bot/core';
 // Trace shapes from core (not ../renderer/types: tsconfig.main.json
 // pins rootDir to src/main, so preload cannot import renderer files).
 // The renderer-side mirrors live in ../renderer/types.ts.
@@ -362,6 +362,78 @@ export interface MemoryBlocksImportView {
   dir: string;
   blocks: { imported: number; updated: number; skipped: number; conflicts: Array<{ label: string; reason: string }> };
   facts: { imported: number; updated: number; skipped: number };
+}
+
+// v1.09 (Đội T2): memory v9 kiểu Letta — views cho IPC `memory-letta:*`
+// (preload không import file renderer; embedding không bao giờ qua đây).
+export interface LettaEntityStatsView {
+  botId: string;
+  coreBlocks: Array<{ label: string; chars: number; limit: number; version: number }>;
+  recallSessions: number;
+  recallEpisodes: number;
+  archivalItems: number;
+  archivalEmbedded: number;
+  proposalsPending: number;
+  proposalsApplied: number;
+}
+export interface LettaSleepPassSummaryView {
+  id: string;
+  botId: string;
+  at: string;
+  dryRun: boolean;
+  durationMs: number;
+  sessionsPruned: number;
+  sessionsCondensed: number;
+  factsExtracted: number;
+  factsStored: number;
+  archivalDuplicatesRemoved: number;
+  proposalsCreated: number;
+  proposalsSkippedDuplicate: number;
+  errors: string[];
+}
+export interface LettaStatusView {
+  stats: LettaEntityStatsView;
+  proposalsPending: number;
+  lastSleep: LettaSleepPassSummaryView | null;
+}
+export interface LettaRecallHitView {
+  sessionId: string;
+  botId: string;
+  startedAt: string;
+  endedAt: string;
+  turns: number;
+  summary: string;
+  keywordScore: number;
+  recencyScore: number;
+  score: number;
+}
+export interface LettaArchivalHitView {
+  item: { id: string; text: string; source: string; sourceId?: string; tags: string[]; confidence: number; createdAt: string; updatedAt: string; lastAccessedAt: string | null; accessCount: number };
+  keywordScore: number;
+  embeddingScore: number | null;
+  score: number;
+}
+export interface LettaProposalView {
+  id: string;
+  botId: string;
+  targetLabel: string;
+  proposedLine: string;
+  reason: string;
+  confidence: number;
+  source: string;
+  status: 'pending' | 'approved' | 'rejected' | 'applied';
+  createdAt: string;
+  decidedAt: string | null;
+  decidedBy: string | null;
+  decisionNote: string | null;
+  appliedLine: string | null;
+}
+export interface LettaBlockAppendView {
+  block: MemoryBlockView;
+  usage: { label: string; chars: number; limit: number; fillRatio: number; state: 'ok' | 'warm' | 'full' };
+  condensed: boolean;
+  condense: { text: string; originalChars: number; condensedChars: number; originalSentences: number; keptSentences: number; duplicatesRemoved: number; condensed: boolean } | null;
+  appendedChars: number;
 }
 export interface MemoryConsolidateView {
   action: string;
@@ -1678,6 +1750,11 @@ export interface OpenBotApi {
   'fleet:set-member-role'(payload: { id: string; userId: string; role: FleetRole }): Promise<FleetWorkspace>;
   // v1.02 (Team T6): fleet console v2 + per-bot quotas.
   'fleet:console-users'(): Promise<FleetConsoleUser[]>;
+  // v1.09 (Đội T1): Agent Teams v1 — theo dõi team (chỉ đọc).
+  'agent-teams-v109:list'(): Promise<TeamV109Summary[]>;
+  'agent-teams-v109:status'(id: string): Promise<AgentTeamV109 | null>;
+  agentTeamsV109List: () => Promise<TeamV109Summary[]>;
+  agentTeamsV109Status: (id: string) => Promise<AgentTeamV109 | null>;
   'fleet:console-add-user'(payload: { userId: string; displayName?: string; role: FleetConsoleRole }): Promise<FleetConsoleUser>;
   'fleet:console-set-role'(payload: { userId: string; role: FleetConsoleRole }): Promise<FleetConsoleUser>;
   'fleet:console-remove-user'(id: string): Promise<{ removed: boolean }>;
@@ -1688,6 +1765,8 @@ export interface OpenBotApi {
   'fleet:quotas-set'(payload: { botId: string; cpuCoresMax: number; ramBytesMax: number; diskBytesMax: number; warnPercent?: number; enabled?: boolean }): Promise<BotQuota>;
   'fleet:quotas-remove'(id: string): Promise<{ removed: boolean }>;
   'fleet:quotas-alerts'(): Promise<QuotaAlert[]>;
+  // v1.09 (Đội T6): fleet v6 overview — scheduler + quota nhóm + health.
+  'fleet:v6-overview'(): Promise<FleetV6Overview>;
   // Đội D: camelCase aliases (same channels).
   listFleet: () => Promise<FleetStatusView[]>;
   getFleetStatus: (id: string) => Promise<FleetStatusView>;
@@ -1718,6 +1797,8 @@ export interface OpenBotApi {
   assignFleetConsoleWorkspace: (payload: { userId: string; workspaceId: string }) => Promise<FleetConsoleUser>;
   unassignFleetConsoleWorkspace: (payload: { userId: string; workspaceId: string }) => Promise<FleetConsoleUser>;
   getFleetConsoleOverview: () => Promise<{ bots: FleetBotOverview[]; alerts: QuotaAlert[]; quotas: BotQuota[] }>;
+  // v1.09 (Đội T6): fleet v6 overview (camelCase alias).
+  getFleetV6Overview: () => Promise<FleetV6Overview>;
   listBotQuotas: () => Promise<BotQuota[]>;
   // v1.03 (Team T6): fleet overview v3 + scheduler v3.
   'fleet:overview'(): Promise<FleetOverview>;
@@ -2023,6 +2104,18 @@ export interface OpenBotApi {
   exportMemoryBlocks: (payload: { botId: string }) => Promise<MemoryBlocksExportView>;
   importMemoryBlocks: (payload: { botId: string }) => Promise<MemoryBlocksImportView>;
   consolidateMemory: (payload: { botId: string; action: string; enabled?: boolean; idleMinutes?: number }) => Promise<MemoryConsolidateView>;
+  // v1.09 (Đội T2): memory v9 kiểu Letta — status + block append (cô
+  // đọng khi đầy) + recall/archival search + proposals + sleep pass +
+  // entity export, IPC `memory-letta:*`.
+  getMemoryLettaStatus: (payload: { botId: string }) => Promise<LettaStatusView>;
+  appendMemoryLettaBlock: (payload: { botId: string; idOrLabel: string; text: string }) => Promise<LettaBlockAppendView>;
+  searchMemoryLettaRecall: (payload: { botId: string; query?: string; limit?: number }) => Promise<LettaRecallHitView[]>;
+  searchMemoryLettaArchival: (payload: { botId: string; query: string; limit?: number; offset?: number }) => Promise<{ hits: LettaArchivalHitView[]; total: number; limit: number; offset: number }>;
+  listMemoryLettaProposals: (payload: { botId: string; status?: string; limit?: number }) => Promise<LettaProposalView[]>;
+  decideMemoryLettaProposal: (payload: { botId: string; proposalId: string; decision: string; note?: string; editedLine?: string }) => Promise<{ proposal: LettaProposalView; appendedLine: string | null; condensed: boolean }>;
+  runMemoryLettaSleep: (payload: { botId: string; dryRun?: boolean }) => Promise<LettaSleepPassSummaryView>;
+  getMemoryLettaSleepLog: (payload: { botId: string; limit?: number }) => Promise<LettaSleepPassSummaryView[]>;
+  exportMemoryLettaEntity: (payload: { botId: string }) => Promise<{ filePath: string }>;
   // v0.97 (Team T4): memory v2 — graph + hybrid search + sleep agent + provenance.
   getMemoryV2Graph: (payload: { botId: string; at?: string }) => Promise<MemoryV2GraphView>;
   searchMemoryV2: (payload: { botId: string; query: string; topK?: number }) => Promise<MemoryV2SearchView>;
@@ -2463,6 +2556,11 @@ const openBot: OpenBotApi = {
   'fleet:set-member-role': (payload) => ipcRenderer.invoke('fleet:set-member-role', payload),
   // v1.02 (Team T6): fleet console v2 + per-bot quotas.
   'fleet:console-users': () => ipcRenderer.invoke('fleet:console-users'),
+  // v1.09 (Đội T1): Agent Teams v1 — theo dõi team (chỉ đọc).
+  'agent-teams-v109:list': () => ipcRenderer.invoke('agent-teams-v109:list'),
+  'agent-teams-v109:status': (id) => ipcRenderer.invoke('agent-teams-v109:status', id),
+  agentTeamsV109List: () => ipcRenderer.invoke('agent-teams-v109:list'),
+  agentTeamsV109Status: (id) => ipcRenderer.invoke('agent-teams-v109:status', id),
   'fleet:console-add-user': (payload) => ipcRenderer.invoke('fleet:console-add-user', payload),
   'fleet:console-set-role': (payload) => ipcRenderer.invoke('fleet:console-set-role', payload),
   'fleet:console-remove-user': (id) => ipcRenderer.invoke('fleet:console-remove-user', id),
@@ -2473,6 +2571,8 @@ const openBot: OpenBotApi = {
   'fleet:quotas-set': (payload) => ipcRenderer.invoke('fleet:quotas-set', payload),
   'fleet:quotas-remove': (id) => ipcRenderer.invoke('fleet:quotas-remove', id),
   'fleet:quotas-alerts': () => ipcRenderer.invoke('fleet:quotas-alerts'),
+  // v1.09 (Đội T6): fleet v6 overview.
+  'fleet:v6-overview': () => ipcRenderer.invoke('fleet:v6-overview'),
   listFleet: () => ipcRenderer.invoke('fleet:list'),
   getFleetStatus: (id) => ipcRenderer.invoke('fleet:status', id),
   createFleetWorkspace: (payload) => ipcRenderer.invoke('fleet:create', payload),
@@ -2502,6 +2602,8 @@ const openBot: OpenBotApi = {
   assignFleetConsoleWorkspace: (payload) => ipcRenderer.invoke('fleet:console-assign-workspace', payload),
   unassignFleetConsoleWorkspace: (payload) => ipcRenderer.invoke('fleet:console-unassign-workspace', payload),
   getFleetConsoleOverview: () => ipcRenderer.invoke('fleet:console-overview'),
+  // v1.09 (Đội T6): fleet v6 overview (camelCase alias).
+  getFleetV6Overview: () => ipcRenderer.invoke('fleet:v6-overview'),
   listBotQuotas: () => ipcRenderer.invoke('fleet:quotas-list'),
   setBotQuota: (payload) => ipcRenderer.invoke('fleet:quotas-set', payload),
   removeBotQuota: (id) => ipcRenderer.invoke('fleet:quotas-remove', id),
@@ -2994,6 +3096,16 @@ const openBot: OpenBotApi = {
   exportMemoryBlocks: (payload) => ipcRenderer.invoke('memory-blocks:export', payload),
   importMemoryBlocks: (payload) => ipcRenderer.invoke('memory-blocks:import', payload),
   consolidateMemory: (payload) => ipcRenderer.invoke('memory-blocks:consolidate', payload),
+  // v1.09 (Đội T2): memory v9 kiểu Letta, IPC `memory-letta:*`.
+  getMemoryLettaStatus: (payload) => ipcRenderer.invoke('memory-letta:status', payload),
+  appendMemoryLettaBlock: (payload) => ipcRenderer.invoke('memory-letta:block-append', payload),
+  searchMemoryLettaRecall: (payload) => ipcRenderer.invoke('memory-letta:recall-search', payload),
+  searchMemoryLettaArchival: (payload) => ipcRenderer.invoke('memory-letta:archival-search', payload),
+  listMemoryLettaProposals: (payload) => ipcRenderer.invoke('memory-letta:proposals', payload),
+  decideMemoryLettaProposal: (payload) => ipcRenderer.invoke('memory-letta:proposal-decide', payload),
+  runMemoryLettaSleep: (payload) => ipcRenderer.invoke('memory-letta:sleep-run', payload),
+  getMemoryLettaSleepLog: (payload) => ipcRenderer.invoke('memory-letta:sleep-log', payload),
+  exportMemoryLettaEntity: (payload) => ipcRenderer.invoke('memory-letta:entity-export', payload),
   // v0.97 (Team T4): memory v2 — graph + hybrid search + sleep agent + provenance.
   getMemoryV2Graph: (payload) => ipcRenderer.invoke('memory-v2:graph', payload),
   searchMemoryV2: (payload) => ipcRenderer.invoke('memory-v2:search', payload),

@@ -39,6 +39,7 @@ import A2aClientView from './components/A2aClientView';
 import TeamView from './components/TeamView';
 import ComputersView from './components/ComputersView';
 import FleetView from './components/FleetView';
+import AgentTeamsView from './components/AgentTeamsView';
 // v1.02 (Team T6): fleet console v2 + bot/plugin marketplaces.
 import FleetConsoleView from './components/FleetConsoleView';
 import BotMarketplaceView from './components/BotMarketplaceView';
@@ -121,7 +122,7 @@ export default function App() {
   const [tasks, setTasks] = useState<TaskView[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [showTasks, setShowTasks] = useState(false);
-  const [view, setView] = useState<'chat' | 'dashboard' | 'planner' | 'settings' | 'marketplace' | 'bot-marketplace' | 'plugin-marketplace' | 'mcp' | 'mcp-apps' | 'mcp-tasks' | 'team' | 'computers' | 'fleet' | 'fleet-console' | 'skills' | 'memory' | 'automations' | 'agui' | 'harness2' | 'traces' | 'eventlog' | 'voice-sessions' | 'runlog' | 'event-stream' | 'eval-harness' | 'eval-fleet' | 'plans' | 'a2a' | 'group' | 'channels' | 'tools' | 'connected-apps' | 'canvas' | 'internet-data' | 'mcp-tasks-monitor' | 'doctor-team'>('chat');
+  const [view, setView] = useState<'chat' | 'dashboard' | 'planner' | 'settings' | 'marketplace' | 'bot-marketplace' | 'plugin-marketplace' | 'mcp' | 'mcp-apps' | 'mcp-tasks' | 'team' | 'agent-teams' | 'computers' | 'fleet' | 'fleet-console' | 'skills' | 'memory' | 'automations' | 'agui' | 'harness2' | 'traces' | 'eventlog' | 'voice-sessions' | 'runlog' | 'event-stream' | 'eval-harness' | 'eval-fleet' | 'plans' | 'a2a' | 'group' | 'channels' | 'tools' | 'connected-apps' | 'canvas' | 'internet-data' | 'mcp-tasks-monitor' | 'doctor-team'>('chat');
   // v0.98 (Team T4 — planning v2): run plan attached to the NEXT chat
   // run (one-shot — `send` consumes it). The plan's owner bot must
   // match the bot being sent to, otherwise the run ignores it.
@@ -1321,6 +1322,7 @@ export default function App() {
         onOpenTeam={() => setView('team')}
         onOpenComputers={() => setView('computers')}
         onOpenFleet={() => setView('fleet')}
+        onOpenAgentTeams={() => setView('agent-teams')}
         onOpenFleetConsole={() => setView('fleet-console')}
         onOpenBotMarketplace={() => setView('bot-marketplace')}
         onOpenPluginMarketplace={() => setView('plugin-marketplace')}
@@ -1444,6 +1446,10 @@ export default function App() {
         ) : view === 'fleet' ? (
           <div className="main">
             <FleetView onBack={() => setView('chat')} />
+          </div>
+        ) : view === 'agent-teams' ? (
+          <div className="main">
+            <AgentTeamsView onBack={() => setView('chat')} />
           </div>
         ) : view === 'fleet-console' ? (
           <div className="main">

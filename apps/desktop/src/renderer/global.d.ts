@@ -70,6 +70,13 @@ import type {
   MemoryBlocksExportView,
   MemoryBlocksImportView,
   MemoryConsolidateView,
+  // v1.09 (Đội T2): memory v9 kiểu Letta views.
+  LettaStatusView,
+  LettaRecallHitView,
+  LettaArchivalHitView,
+  LettaProposalView,
+  LettaBlockAppendView,
+  LettaSleepPassSummaryView,
   MemoryEntryView,
   MemoryV2GraphView,
   MemoryV2ProvenanceView,
@@ -1080,6 +1087,16 @@ export interface OpenBotApi {
   exportMemoryBlocks(payload: { botId: string }): Promise<MemoryBlocksExportView>;
   importMemoryBlocks(payload: { botId: string }): Promise<MemoryBlocksImportView>;
   consolidateMemory(payload: { botId: string; action: string; enabled?: boolean; idleMinutes?: number }): Promise<MemoryConsolidateView>;
+  // v1.09 (Đội T2): memory v9 kiểu Letta, IPC `memory-letta:*`.
+  getMemoryLettaStatus(payload: { botId: string }): Promise<LettaStatusView>;
+  appendMemoryLettaBlock(payload: { botId: string; idOrLabel: string; text: string }): Promise<LettaBlockAppendView>;
+  searchMemoryLettaRecall(payload: { botId: string; query?: string; limit?: number }): Promise<LettaRecallHitView[]>;
+  searchMemoryLettaArchival(payload: { botId: string; query: string; limit?: number; offset?: number }): Promise<{ hits: LettaArchivalHitView[]; total: number; limit: number; offset: number }>;
+  listMemoryLettaProposals(payload: { botId: string; status?: string; limit?: number }): Promise<LettaProposalView[]>;
+  decideMemoryLettaProposal(payload: { botId: string; proposalId: string; decision: string; note?: string; editedLine?: string }): Promise<{ proposal: LettaProposalView; appendedLine: string | null; condensed: boolean }>;
+  runMemoryLettaSleep(payload: { botId: string; dryRun?: boolean }): Promise<LettaSleepPassSummaryView>;
+  getMemoryLettaSleepLog(payload: { botId: string; limit?: number }): Promise<LettaSleepPassSummaryView[]>;
+  exportMemoryLettaEntity(payload: { botId: string }): Promise<{ filePath: string }>;
   // v0.97 (Team T4): memory v2 — graph + hybrid search + sleep agent + provenance.
   getMemoryV2Graph(payload: { botId: string; at?: string }): Promise<MemoryV2GraphView>;
   searchMemoryV2(payload: { botId: string; query: string; topK?: number }): Promise<MemoryV2SearchView>;

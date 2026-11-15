@@ -11,6 +11,8 @@ import { useT } from '../i18n/useT';
 // v1.03 (Team T6): overview + scheduling tabs live in their own files.
 import FleetOverviewTab from './FleetOverviewTab';
 import FleetScheduleTab from './FleetScheduleTab';
+// v1.09 (Team T6): fleet v6 tab (scheduler + group quotas + health).
+import FleetV6View from './FleetV6View';
 
 /**
  * Fleet console v2 — one place for the whole fleet: per-bot status and
@@ -80,7 +82,7 @@ function usageBar(percent: number | null): ReactNode {
   );
 }
 
-type Tab = 'bots' | 'users' | 'quotas' | 'overview' | 'schedule';
+type Tab = 'bots' | 'users' | 'quotas' | 'overview' | 'schedule' | 'v6';
 
 interface Props {
   onBack: () => void;
@@ -298,6 +300,9 @@ export default function FleetConsoleView({ onBack }: Props) {
         <button className={tab === 'schedule' ? 'btn' : 'btn secondary'} onClick={() => setTab('schedule')}>
           {t('fleetConsole.tabSchedule')}
         </button>
+        <button className={tab === 'v6' ? 'btn' : 'btn secondary'} onClick={() => setTab('v6')}>
+          {t('fleetConsole.tabV6')}
+        </button>
       </div>
 
       {loading && <p>{t('marketplace.loading')}</p>}
@@ -497,6 +502,8 @@ export default function FleetConsoleView({ onBack }: Props) {
       {!loading && !error && tab === 'overview' && <FleetOverviewTab />}
 
       {!loading && !error && tab === 'schedule' && <FleetScheduleTab />}
+
+      {!loading && !error && tab === 'v6' && <FleetV6View />}
     </div>
   );
 }

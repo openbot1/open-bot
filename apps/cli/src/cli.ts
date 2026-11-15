@@ -114,6 +114,28 @@ import {
   startHeadlessServer,
   writePidFile,
 } from '@open-bot/core';
+// v1.09 (Đội T6): fleet v6 — scheduler + quota nhóm + health (CLI `fleet v6`).
+import {
+  buildFleetV6Overview,
+  checkFleetV6BotHealth,
+  cpuRateFromSamples,
+  evaluateFleetV6Quotas,
+  formatFleetV6IncidentLine,
+  formatFleetV6OverviewLine,
+  listFleetV6Incidents,
+  loadBotQuotas,
+  loadFleetV6HealthStates,
+  loadFleetV6Queue,
+  loadFleetV6QuotaGroups,
+  loadFleetV6Schedules,
+  pickNextFleetV6Entry,
+  planFleetV6Day,
+  readUsageSamplesFor,
+  saveFleetV6Queue,
+  saveFleetV6Schedules,
+  summarizeBotUsage,
+  tickFleetV6Scheduler,
+} from '@open-bot/core';
 import { createHarnessV2Tools } from '@open-bot/tools';
 import { cmdContext } from './contextCommand';
 import type {
@@ -169,6 +191,13 @@ DÙNG:
   open-bot fleet add-member <id> --user <userId> --role <admin|member|chat-only> [--json]
   open-bot fleet remove-member <id> --user <userId> [--json]
   open-bot fleet set-role <id> --user <userId> --role <admin|member|chat-only> [--json]
+  open-bot fleet v6 overview [--json]
+  open-bot fleet v6 schedules [--bot <id>] [--json]
+  open-bot fleet v6 queue [--json]
+  open-bot fleet v6 tick [--max-concurrent N] [--json]
+  open-bot fleet v6 quota-check [--group <id>] [--bot <id>] [--json]
+  open-bot fleet v6 health <botId> [--json]
+  open-bot fleet v6 incidents [--bot <id>] [--kind <kind>] [--limit N] [--json]
   open-bot risk check --tool <name> --args '<json>' [--workspace DIR] [--policy <policy>] [--json]
   open-bot risk rules list [--json]
   open-bot risk rules add --id <id> --level <low|medium|high> --score <0-100> --description <text> [--tool <name>] [--tool-pattern <re>] [--args-pattern <re>] [--args-key <key>]
@@ -2609,6 +2638,11 @@ async function cmdFleet(
   };
   // start/restart để service chạy tiếp sau khi CLI thoát.
   const leavesRunningService = sub === 'start' || sub === 'restart';
+  // v1.09 (Đội T6): `fleet v6` — scheduler + quota nhóm + health (chỉ
+  // đọc/ghi file dưới fleet root, không đụng service).
+  if (sub === 'v6') {
+    return cmdFleetV6(positional, flags, path.join(dataDir, 'fleet'));
+  }
   try {
     switch (sub) {
       case 'list': {
@@ -2762,6 +2796,203 @@ async function cmdFleet(
     // start/restart: service phải chạy tiếp sau khi CLI thoát.
     if (!leavesRunningService) await manager.dispose();
   }
+}
+
+/**
+ * Lệnh `fleet v6` (v1.09, Đội T6) — scheduler + quota nhóm + health từ
+ * terminal, không cần mở app. Chỉ đọc/ghi file dưới fleet root
+ * (fleet-schedules-v109.json, fleet-queue-v109.json,
+ * fleet-quota-groups-v109.json, fleet-health-v109.json,
+ * fleet-incidents-v109.jsonl, usage.jsonl) — không spawn process,
+ * không chạm mạng, không đụng service. `tick` là lệnh duy nhất đổi
+ * trạng thái (enqueue lịch tới giờ + start entry theo maxConcurrent);
+ * các lệnh còn lại chỉ đọc.
+ *
+ * Exit code: 0 = xong; 1 = lỗi dùng/sai tham số/file.
+ */
+async function cmdFleetV6(
+  positional: string[],
+  flags: CliFlags,
+  fleetRoot: string,
+): Promise<number> {
+  const sub = positional[0];
+  const asJson = flags['json'] === true;
+  const out = (obj: unknown, text: string): void => {
+    process.stdout.write(asJson ? `${JSON.stringify(obj)}\n` : text);
+  };
+  const flagStr = (key: string): string | undefined => {
+    const raw = flags[key];
+    return typeof raw === 'string' && raw.trim() !== '' ? raw.trim() : undefined;
+  };
+  const numFlag = (key: string, fallback: number): number => {
+    const raw = flags[key];
+    if (typeof raw !== 'string') return fallback;
+    const n = Number.parseFloat(raw);
+    return Number.isFinite(n) && n > 0 ? n : fallback;
+  };
+  const usageForBot = (botId: string): { cpuCoresUsed: number | null; ramBytesUsed: number | null; diskBytesUsed: number | null } => {
+    let samples: ReturnType<typeof readUsageSamplesFor> = [];
+    try {
+      samples = readUsageSamplesFor(fleetRoot, botId);
+    } catch {
+      samples = [];
+    }
+    const summary = summarizeBotUsage(botId, samples);
+    return {
+      cpuCoresUsed: cpuRateFromSamples(samples),
+      ramBytesUsed: summary?.latestRssBytes ?? null,
+      diskBytesUsed: summary?.latestDiskBytes ?? null,
+    };
+  };
+
+  switch (sub) {
+    case 'overview': {
+      const overview = buildFleetV6Overview(fleetRoot);
+      out(overview, `${formatFleetV6OverviewLine(overview)}\n`);
+      return 0;
+    }
+    case 'schedules': {
+      const botId = flagStr('bot');
+      const schedules = loadFleetV6Schedules(fleetRoot).filter((s) => !botId || s.botId === botId);
+      const dayStart = new Date();
+      dayStart.setHours(0, 0, 0, 0);
+      const dayPlan = planFleetV6Day(schedules, dayStart.getTime());
+      out(
+        { schedules, dayPlan },
+        schedules.length === 0
+          ? 'Chưa có lịch fleet v6 nào.\n'
+          : `${schedules
+              .map(
+                (s) =>
+                  `${s.id}  ${s.botId}  ${s.kind}  ${s.priority}  ${s.enabled ? 'enabled' : 'disabled'}  next=${s.nextRunAt === null ? '—' : new Date(s.nextRunAt).toLocaleString()}  ${s.summary}`,
+              )
+              .join('\n')}\nTimeslot hôm nay: ${dayPlan.slots.length} slot, ${dayPlan.unscheduled.length} lịch không xếp được${
+              dayPlan.unscheduled.length > 0
+                ? ` (${dayPlan.unscheduled.map((u) => `${u.botId}: ${u.reason}`).join('; ')})`
+                : ''
+            }.\n`,
+      );
+      return 0;
+    }
+    case 'queue': {
+      const queue = loadFleetV6Queue(fleetRoot);
+      const waiting = queue.filter((e) => e.status === 'waiting');
+      const running = queue.filter((e) => e.status === 'running');
+      const next = pickNextFleetV6Entry(queue, Date.now());
+      out(
+        { waiting, running, next },
+        queue.length === 0
+          ? 'Hàng đợi v6 trống.\n'
+          : `Chờ: ${waiting.length}, đang chạy: ${running.length}.\n${waiting
+              .map((e) => `  ${e.id}  ${e.botId}  ${e.priority}  ${e.summary}${e.notBefore !== null && e.notBefore > Date.now() ? `  (backoff tới ${new Date(e.notBefore).toLocaleTimeString()})` : ''}`)
+              .join('\n')}\n${next ? `Tiếp theo: ${next.botId} (${next.priority}) — ${next.summary}.\n` : ''}`,
+      );
+      return 0;
+    }
+    case 'tick': {
+      const now = Date.now();
+      const schedules = loadFleetV6Schedules(fleetRoot);
+      const queue = loadFleetV6Queue(fleetRoot);
+      const { schedules: nextSchedules, queue: nextQueue, result } = tickFleetV6Scheduler(schedules, queue, now, {
+        maxConcurrent: numFlag('max-concurrent', 4),
+      });
+      saveFleetV6Schedules(fleetRoot, nextSchedules);
+      saveFleetV6Queue(fleetRoot, nextQueue);
+      out(
+        result,
+        `Tick: ${result.due.length} lịch tới giờ, ${result.started.length} entry bắt đầu, ${result.preempted.length} entry bị preempt.\n${result.started
+          .map((e) => `  start ${e.botId} (${e.priority}) — ${e.summary}`)
+          .join('\n')}${result.started.length > 0 ? '\n' : ''}`,
+      );
+      return 0;
+    }
+    case 'quota-check': {
+      const groupId = flagStr('group');
+      const botId = flagStr('bot');
+      let groups = loadFleetV6QuotaGroups(fleetRoot);
+      if (groupId) groups = groups.filter((g) => g.id === groupId);
+      if (botId) groups = groups.filter((g) => g.botIds.includes(botId));
+      const botQuotas = loadBotQuotas(fleetRoot).filter((q) => !botId || q.botId === botId);
+      const botIds = new Set<string>();
+      for (const g of groups) for (const id of g.botIds) botIds.add(id);
+      for (const q of botQuotas) botIds.add(q.botId);
+      const usageByBot: Record<string, { cpuCoresUsed: number | null; ramBytesUsed: number | null; diskBytesUsed: number | null }> = {};
+      for (const id of botIds) usageByBot[id] = usageForBot(id);
+      const evaluations = evaluateFleetV6Quotas(groups, usageByBot, botQuotas);
+      const paused = [...new Set(evaluations.flatMap((e) => e.pausedBotIds))];
+      out(
+        { evaluations, pausedBotIds: paused },
+        evaluations.length === 0
+          ? 'Chưa có quota nhóm/bot nào.\n'
+          : `${evaluations
+              .map(
+                (e) =>
+                  `${e.scope === 'group' ? 'nhóm' : 'bot'} "${e.name}": ${e.overall} (action ${e.action})${
+                    e.pausedBotIds.length > 0 ? ` — pause: ${e.pausedBotIds.join(', ')}` : ''
+                  }${e.throttleMaxConcurrent !== null ? ` — throttle ≤ ${e.throttleMaxConcurrent}` : ''}`,
+              )
+              .join('\n')}\n`,
+      );
+      return 0;
+    }
+    case 'health': {
+      const botId = positional[1] ?? flagStr('bot');
+      if (!botId) fail('fleet v6 health cần <botId>: open-bot fleet v6 health <botId> [--json].');
+      const states = loadFleetV6HealthStates(fleetRoot);
+      const state = states.find((s) => s.botId === botId);
+      const samples = readUsageSamplesFor(fleetRoot, botId);
+      const lastSample = samples[samples.length - 1];
+      const incidents = listFleetV6Incidents(fleetRoot, { botId, kind: 'crash', limit: 10 });
+      const quota = loadBotQuotas(fleetRoot).find((q) => q.botId === botId);
+      const summary = summarizeBotUsage(botId, samples);
+      const result = checkFleetV6BotHealth(
+        {
+          botId,
+          lastHeartbeatAt: lastSample ? lastSample.at : null,
+          serviceState: lastSample?.servicePid ? 'running' : state?.lastStatus === 'down' ? 'error' : 'stopped',
+          usage: summary
+            ? { cpuCoresUsed: cpuRateFromSamples(samples), ramBytesUsed: summary.latestRssBytes, diskBytesUsed: summary.latestDiskBytes }
+            : null,
+          ...(quota ? { quota } : {}),
+          recentErrors: incidents.map((i) => ({ at: i.at, message: i.message })),
+          consecutiveFailures: state?.consecutiveFailures ?? 0,
+        },
+        Date.now(),
+      );
+      out(
+        result,
+        `Bot "${botId}": ${result.status} (lỗi liên tiếp ${state?.consecutiveFailures ?? 0}, restart gần đây ${state?.restartHistory.length ?? 0}).\n${result.checks
+          .map((c) => `  ${c.ok ? '✓' : '✗'} ${c.name}: ${c.detail}`)
+          .join('\n')}\n`,
+      );
+      return 0;
+    }
+    case 'incidents': {
+      const botId = flagStr('bot');
+      const kind = flagStr('kind');
+      const kinds = ['crash', 'health-degraded', 'health-unhealthy', 'health-down', 'restart', 'restart-exhausted', 'quota-over', 'recovered'] as const;
+      if (kind && !(kinds as readonly string[]).includes(kind)) {
+        fail(`fleet v6 incidents: --kind phải là một trong: ${kinds.join(', ')}.`);
+      }
+      const incidents = listFleetV6Incidents(fleetRoot, {
+        ...(botId ? { botId } : {}),
+        ...(kind ? { kind: kind as (typeof kinds)[number] } : {}),
+        limit: numFlag('limit', 20),
+      });
+      out(
+        incidents,
+        incidents.length === 0 ? 'Không có incident nào.\n' : `${incidents.map(formatFleetV6IncidentLine).join('\n')}\n`,
+      );
+      return 0;
+    }
+    case undefined:
+      fail('fleet v6 cần subcommand: overview | schedules | queue | tick | quota-check | health <botId> | incidents.');
+      break;
+    default:
+      fail(`Không rõ lệnh fleet v6 "${sub}".`);
+      break;
+  }
+  return 0;
 }
 
 /**

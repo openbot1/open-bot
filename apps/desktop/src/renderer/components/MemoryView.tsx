@@ -21,6 +21,7 @@ import MemoryNotesView from './MemoryNotesView';
 import VerbatimMemoryView from './VerbatimMemoryView';
 import MemoryV3View from './MemoryV3View';
 import MemoryV5View from './MemoryV5View';
+import MemoryLettaView from './MemoryLettaView';
 import MemoryTimelineView from './MemoryTimelineView';
 
 interface Props {
@@ -64,7 +65,8 @@ export default function MemoryView({ bots, botId, onBack, onSelectBot }: Props) 
   // v1.04 (Team T1): memory v5 tab (health dashboard + consolidation v2).
   // v1.06 (Team T5): timeline tab — chronological memory events.
   // v1.08 (Team T5): blocks editor tab — versions + diff + restore.
-  const [tab, setTab] = useState<'memories' | 'blocks' | 'blocks-editor' | 'v2' | 'graph' | 'verbatim' | 'notes' | 'v3' | 'v5' | 'timeline'>('memories');
+  // v1.09 (Team T2): Letta-style memory v9 tab (core/recall/archival + sleep).
+  const [tab, setTab] = useState<'memories' | 'blocks' | 'blocks-editor' | 'v2' | 'graph' | 'verbatim' | 'notes' | 'v3' | 'v5' | 'timeline' | 'letta'>('memories');
 
   const activeBot = bots.find((b) => b.id === botId) ?? bots[0] ?? null;
 
@@ -257,8 +259,18 @@ export default function MemoryView({ bots, botId, onBack, onSelectBot }: Props) 
         >
           {t('memory.tabTimeline')}
         </button>
+        <button
+          className="btn secondary"
+          data-testid="memory-tab-letta"
+          onClick={() => setTab('letta')}
+          disabled={tab === 'letta'}
+        >
+          {t('memory.tabLetta')}
+        </button>
       </div>
-      {tab === 'timeline' ? (
+      {tab === 'letta' ? (
+        <MemoryLettaView bots={bots} botId={botId} onSelectBot={onSelectBot} />
+      ) : tab === 'timeline' ? (
         <MemoryTimelineView bots={bots} botId={botId} onSelectBot={onSelectBot} />
       ) : tab === 'verbatim' ? (
         <VerbatimMemoryView bots={bots} botId={botId} onSelectBot={onSelectBot} />
