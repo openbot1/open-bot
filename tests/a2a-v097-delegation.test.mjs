@@ -278,9 +278,9 @@ test('tool a2a_delegate: ủy thác sang agent ngoài ĐÃ tin tưởng (fallbac
   assert.equal(parsed.via, 'http');
 });
 
-test('tool registry: 8 tool A2A, đủ tên mới', async () => {
+test('tool registry: 14 tool A2A, đủ tên mới', async () => {
   const { A2A_TOOLS, A2A_TOOL_NAMES } = await import('../packages/tools/dist/a2aTools.js');
-  assert.equal(A2A_TOOLS.length, 8);
+  assert.equal(A2A_TOOLS.length, 14); // v1.09 (Đội T4): + 2 tool A2A v1.1
   assert.deepEqual([...A2A_TOOL_NAMES], [
     'a2a_discover',
     'a2a_list_agents',
@@ -290,6 +290,12 @@ test('tool registry: 8 tool A2A, đủ tên mới', async () => {
     'a2a_list_tasks',
     'a2a_delegate',
     'a2a_verify_card',
+    'a2a_registry_register',
+    'a2a_registry_search',
+    'a2a_registry_list',
+    'a2a_registry_remove',
+    'a2a_verify_card_v11',
+    'a2a_negotiate_version',
   ]);
   // Client vẫn gọi được server thật qua A2aClient (sanity loopback).
   const srv = await startA2aHttpServer({ token: TEST_TOKEN, runner: echoRunner('z') }, { port: 0 });
