@@ -72,6 +72,11 @@ import type {
   MemoryConsolidateView,
   // v1.09 (Đội T2): memory v9 kiểu Letta views.
   LettaStatusView,
+  V10BlockView,
+  V10QuarantineView,
+  V10RetrievalHitView,
+  V10StatsView,
+  V10TimelineEntryView,
   LettaRecallHitView,
   LettaArchivalHitView,
   LettaProposalView,
@@ -1097,6 +1102,14 @@ export interface OpenBotApi {
   runMemoryLettaSleep(payload: { botId: string; dryRun?: boolean }): Promise<LettaSleepPassSummaryView>;
   getMemoryLettaSleepLog(payload: { botId: string; limit?: number }): Promise<LettaSleepPassSummaryView[]>;
   exportMemoryLettaEntity(payload: { botId: string }): Promise<{ filePath: string }>;
+  // v1.10 (Đội T1): memory v10, IPC `memory-v10:*`.
+  getMemoryV10Stats(payload: { botId: string }): Promise<V10StatsView>;
+  searchMemoryV10(payload: { botId: string; query: string; topK?: number; asOf?: string }): Promise<{ hits: V10RetrievalHitView[]; candidatesScored: number; asOf: string | null }>;
+  getMemoryV10Timeline(payload: { botId: string; subject: string }): Promise<V10TimelineEntryView[]>;
+  listMemoryV10Blocks(payload: { botId: string }): Promise<V10BlockView[]>;
+  rollbackMemoryV10Block(payload: { botId: string; blockId: string; toVersion: number }): Promise<{ blockId: string; fromVersion: number; toVersion: number; newVersion: number; branch: string; message: string }>;
+  listMemoryV10Quarantine(payload: { botId: string }): Promise<V10QuarantineView[]>;
+  decideMemoryV10Quarantine(payload: { botId: string; id: string; approve: boolean }): Promise<{ id: string; status: string; consolidation: { added: number; updated: number; deleted: number } | null }>;
   // v0.97 (Team T4): memory v2 — graph + hybrid search + sleep agent + provenance.
   getMemoryV2Graph(payload: { botId: string; at?: string }): Promise<MemoryV2GraphView>;
   searchMemoryV2(payload: { botId: string; query: string; topK?: number }): Promise<MemoryV2SearchView>;

@@ -354,6 +354,8 @@ import {
 } from '@open-bot/core';
 // v1.09 (Đội T1): Agent Teams v1 — theo dõi team (IPC `agent-teams-v109:*`).
 import { TeamService, TeamsV109Store } from '@open-bot/core';
+// v1.10 (Đội T3): Agent Teams v2 — dashboard (IPC `agent-teams-v2:dashboard`).
+import { TeamServiceV2 } from '@open-bot/core';
 // v0.95d4 (Đội D4): user profile + long-term memory (local-first) cho IPC.
 import { loadLocalProfile, LongTermMemory, OllamaEmbeddings, updateLocalProfile } from '@open-bot/core';
 // v1.05 (Đội T3): model refresh + per-bot computer v2 status.
@@ -564,6 +566,7 @@ import {
   searchMarketplacePlugins,
   ToolCallHistoryStore,
   uninstallMarketplacePlugin,
+  getMemoryV10Manager,
   validatePluginMarketplaceEntry,
 } from '@open-bot/tools';
 import type { PluginMarketplaceEntry, PreparedPlugin } from '@open-bot/tools';
@@ -6028,6 +6031,107 @@ function registerIpc(): void {
     return { filePath };
   });
 
+  // v1.10 (Đội T1): memory v10 IPC — Mem0 pipeline stats + fused
+  // recall (vector + BM25 + entity, bảng điểm giải thích được) +
+  // bi-temporal timeline + versioned blocks + quarantine review.
+  // Tất cả local; embedding KHÔNG bao giờ trả về renderer (chỉ điểm
+  // xếp hạng + lý do chọn).
+  const v10ManagerForBot = (botId: string) => getMemoryV10Manager(lettaWorkspaceForBot(botId));
+  ipcMain.handle('memory-v10:stats', (_event: unknown, payload: { botId: string }) => {
+    return v10ManagerForBot(payload?.botId).stats();
+  });
+  ipcMain.handle(
+    'memory-v10:query',
+    async (_event: unknown, payload: { botId: string; query: string; topK?: number; asOf?: string }) => {
+      const manager = v10ManagerForBot(payload?.botId);
+      const query = requireString(payload?.query, 'query');
+      const topK =
+        typeof payload?.topK === 'number' && Number.isFinite(payload.topK)
+          ? Math.max(1, Math.min(50, Math.floor(payload.topK)))
+          : 10;
+      const asOf = payload?.asOf ? new Date(payload.asOf) : undefined;
+      if (asOf && Number.isNaN(asOf.getTime())) throw new Error(`Invalid asOf date: "${payload.asOf}"`);
+      const result = await manager.recall(query, { topK, asOf });
+      return {
+        hits: result.hits.map((h) => ({ id: h.id, kind: h.kind, text: h.text, scores: h.scores, reasons: h.reasons })),
+        candidatesScored: result.candidatesScored,
+        asOf: result.asOf,
+      };
+    },
+  );
+  ipcMain.handle('memory-v10:timeline', (_event: unknown, payload: { botId: string; subject: string }) => {
+    const manager = v10ManagerForBot(payload?.botId);
+    const subject = requireString(payload?.subject, 'subject');
+    return manager.timeline(subject).map((e) => ({
+      fact: `${e.fact.subject} —${e.fact.predicate}→ ${e.fact.object}`,
+      status: e.fact.status,
+      startsAt: e.startsAt,
+      endsAt: e.endsAt,
+      learnedAt: e.fact.learnedAt,
+      replacedBy: e.replacedBy
+        ? `${e.replacedBy.subject} —${e.replacedBy.predicate}→ ${e.replacedBy.object}`
+        : null,
+    }));
+  });
+  ipcMain.handle('memory-v10:blocks', (_event: unknown, payload: { botId: string }) => {
+    const manager = v10ManagerForBot(payload?.botId);
+    return manager.blocks.listBlocks().map((b) => ({
+      id: b.id,
+      label: b.label,
+      kind: b.kind,
+      currentBranch: b.currentBranch,
+      currentVersion: b.currentVersion,
+      currentContent: manager.blocks.readCurrent(b.id)?.content ?? '',
+      versions: b.versions.map((v) => ({
+        version: v.version,
+        branch: v.branch,
+        message: v.message,
+        author: v.author,
+        createdAt: v.createdAt,
+      })),
+    }));
+  });
+  ipcMain.handle(
+    'memory-v10:rollback',
+    (_event: unknown, payload: { botId: string; blockId: string; toVersion: number }) => {
+      const manager = v10ManagerForBot(payload?.botId);
+      const blockId = requireId(payload?.blockId, 'blockId');
+      const toVersion = payload?.toVersion;
+      if (typeof toVersion !== 'number' || !Number.isInteger(toVersion) || toVersion < 1) {
+        throw new Error(`Invalid toVersion: "${String(toVersion)}"`);
+      }
+      const report = manager.blocks.rollback(blockId, toVersion, undefined, 'user');
+      manager.save();
+      return report;
+    },
+  );
+  ipcMain.handle('memory-v10:quarantine-list', (_event: unknown, payload: { botId: string }) => {
+    const manager = v10ManagerForBot(payload?.botId);
+    return manager.listQuarantine(true).map((q) => ({
+      id: q.id,
+      candidate: `${q.candidate.subject} —${q.candidate.predicate}→ ${q.candidate.object}`,
+      detail: q.detail,
+      conflictingFactId: q.conflictingFactId ?? null,
+      createdAt: q.createdAt,
+    }));
+  });
+  ipcMain.handle(
+    'memory-v10:quarantine-decide',
+    async (_event: unknown, payload: { botId: string; id: string; approve: boolean }) => {
+      const manager = v10ManagerForBot(payload?.botId);
+      const id = requireId(payload?.id, 'id');
+      const { item, consolidation } = await manager.reviewQuarantine(id, payload?.approve === true);
+      manager.save();
+      return {
+        id: item.id,
+        status: item.status,
+        consolidation: consolidation
+          ? { added: consolidation.added, updated: consolidation.updated, deleted: consolidation.deleted }
+          : null,
+      };
+    },
+  );
+
   // v0.97 (Team T4): memory v2 IPC — graph + hybrid search + sleep
   // agent + provenance/quota. Tất cả local, không rời máy; embedding
   // không bao giờ trả về renderer (chỉ số lượng + điểm xếp hạng).
@@ -10708,6 +10812,19 @@ function registerIpc(): void {
   ipcMain.handle('agent-teams-v109:status', (_event: unknown, payload: unknown) => {
     const store = new TeamsV109Store(app.getPath('userData'));
     return store.find(asStringParam(payload)) ?? null;
+  });
+
+  // v1.10 (Đội T3): Agent Teams v2 — dashboard (CHỈ ĐỌC, local-first).
+  // Đọc team v1 + trạng thái v2 (`teams-v2/<teamId>/`) rồi gom thành
+  // snapshot dashboard; tạo team / claim task do agent làm qua tool
+  // teams_v2_* (không qua IPC này).
+  ipcMain.handle('agent-teams-v2:dashboard', () => {
+    const baseDir = app.getPath('userData');
+    const store = new TeamsV109Store(baseDir);
+    return store.load().teams.flatMap((team) => {
+      const { service } = TeamServiceV2.load(baseDir, team.id);
+      return service ? [service.dashboard()] : [];
+    });
   });
 
   ipcMain.handle('fleet:capacity', async (_event: unknown, payload: unknown) => {

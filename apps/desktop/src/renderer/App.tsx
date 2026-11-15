@@ -40,6 +40,8 @@ import TeamView from './components/TeamView';
 import ComputersView from './components/ComputersView';
 import FleetView from './components/FleetView';
 import AgentTeamsView from './components/AgentTeamsView';
+// v1.10 (Team T3): Agent Teams v2 dashboard.
+import AgentTeamsV2View from './components/AgentTeamsV2View';
 // v1.02 (Team T6): fleet console v2 + bot/plugin marketplaces.
 import FleetConsoleView from './components/FleetConsoleView';
 import BotMarketplaceView from './components/BotMarketplaceView';
@@ -122,7 +124,7 @@ export default function App() {
   const [tasks, setTasks] = useState<TaskView[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [showTasks, setShowTasks] = useState(false);
-  const [view, setView] = useState<'chat' | 'dashboard' | 'planner' | 'settings' | 'marketplace' | 'bot-marketplace' | 'plugin-marketplace' | 'mcp' | 'mcp-apps' | 'mcp-tasks' | 'team' | 'agent-teams' | 'computers' | 'fleet' | 'fleet-console' | 'skills' | 'memory' | 'automations' | 'agui' | 'harness2' | 'traces' | 'eventlog' | 'voice-sessions' | 'runlog' | 'event-stream' | 'eval-harness' | 'eval-fleet' | 'plans' | 'a2a' | 'group' | 'channels' | 'tools' | 'connected-apps' | 'canvas' | 'internet-data' | 'mcp-tasks-monitor' | 'doctor-team'>('chat');
+  const [view, setView] = useState<'chat' | 'dashboard' | 'planner' | 'settings' | 'marketplace' | 'bot-marketplace' | 'plugin-marketplace' | 'mcp' | 'mcp-apps' | 'mcp-tasks' | 'team' | 'agent-teams' | 'agent-teams-v2' | 'computers' | 'fleet' | 'fleet-console' | 'skills' | 'memory' | 'automations' | 'agui' | 'harness2' | 'traces' | 'eventlog' | 'voice-sessions' | 'runlog' | 'event-stream' | 'eval-harness' | 'eval-fleet' | 'plans' | 'a2a' | 'group' | 'channels' | 'tools' | 'connected-apps' | 'canvas' | 'internet-data' | 'mcp-tasks-monitor' | 'doctor-team'>('chat');
   // v0.98 (Team T4 — planning v2): run plan attached to the NEXT chat
   // run (one-shot — `send` consumes it). The plan's owner bot must
   // match the bot being sent to, otherwise the run ignores it.
@@ -1323,6 +1325,7 @@ export default function App() {
         onOpenComputers={() => setView('computers')}
         onOpenFleet={() => setView('fleet')}
         onOpenAgentTeams={() => setView('agent-teams')}
+        onOpenAgentTeamsV2={() => setView('agent-teams-v2')}
         onOpenFleetConsole={() => setView('fleet-console')}
         onOpenBotMarketplace={() => setView('bot-marketplace')}
         onOpenPluginMarketplace={() => setView('plugin-marketplace')}
@@ -1450,6 +1453,10 @@ export default function App() {
         ) : view === 'agent-teams' ? (
           <div className="main">
             <AgentTeamsView onBack={() => setView('chat')} />
+          </div>
+        ) : view === 'agent-teams-v2' ? (
+          <div className="main">
+            <AgentTeamsV2View onBack={() => setView('chat')} />
           </div>
         ) : view === 'fleet-console' ? (
           <div className="main">
