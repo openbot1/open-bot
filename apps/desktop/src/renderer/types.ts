@@ -1940,6 +1940,92 @@ export interface FleetConsoleOverviewView {
   quotas: BotQuotaView[];
 }
 
+// v1.09 (Đội T6): fleet v6 — mirror of core FleetV6Overview /
+// FleetV6BotOverview / FleetV6QueueEntry / FleetV6Incident (see
+// packages/core/src/fleet/fleetV6Overview.ts, fleetV6Scheduler.ts,
+// fleetV6Health.ts). Renderer chỉ dùng để hiển thị.
+export interface FleetV6BotOverviewView {
+  botId: string;
+  status: 'healthy' | 'degraded' | 'unhealthy' | 'down';
+  running: boolean;
+  waiting: number;
+  restarts: number;
+  consecutiveFailures: number;
+  unhealthy: boolean;
+  pausedByQuota: boolean;
+  throttleMaxConcurrent: number | null;
+  usage: { cpuCores: number | null; ramBytes: number | null; diskBytes: number | null };
+  usageKnown: boolean;
+  quotaLevel: 'ok' | 'warning' | 'breach' | 'unknown' | null;
+  nextRunAt: number | null;
+  lastError: string | null;
+  lastCheckAt: number | null;
+}
+
+export interface FleetV6QueueEntryView {
+  id: string;
+  botId: string;
+  scheduleId: string | null;
+  summary: string;
+  priority: 'critical' | 'high' | 'normal' | 'low';
+  status: 'waiting' | 'running' | 'done' | 'cancelled';
+  enqueuedAt: number;
+  notBefore: number | null;
+  preemptions: number;
+  maxPreemptions: number;
+  attempts: number;
+}
+
+export interface FleetV6IncidentView {
+  id: string;
+  at: number;
+  botId: string;
+  kind: 'crash' | 'health-degraded' | 'health-unhealthy' | 'health-down' | 'restart' | 'restart-exhausted' | 'quota-over' | 'recovered';
+  message: string;
+}
+
+export interface FleetV6OverviewTotalsView {
+  botsTotal: number;
+  botsHealthy: number;
+  botsDegraded: number;
+  botsUnhealthy: number;
+  botsDown: number;
+  botsPaused: number;
+  botsThrottled: number;
+  schedulesTotal: number;
+  schedulesEnabled: number;
+  schedulesUnscheduled: number;
+  queueWaiting: number;
+  queueRunning: number;
+  queueDone: number;
+  incidentsTotal: number;
+  incidentsLastHour: number;
+}
+
+export interface FleetV6OverviewView {
+  at: number;
+  bots: FleetV6BotOverviewView[];
+  totals: FleetV6OverviewTotalsView;
+  warnings: Array<{ level: 'warning' | 'critical'; code: string; message: string; botId?: string; groupId?: string }>;
+  dayPlan: {
+    dayStart: number;
+    slots: Array<{ start: number; end: number; botId: string; scheduleId: string; priority: string; heavy: boolean }>;
+    unscheduled: Array<{ scheduleId: string; botId: string; reason: string }>;
+    maxHeavyOverlap: number;
+    peakCpuCores: number;
+    peakRamBytes: number;
+  } | null;
+  incidents: FleetV6IncidentView[];
+  queue: FleetV6QueueEntryView[];
+  quotaEvaluations: Array<{
+    scope: 'bot' | 'group';
+    id: string;
+    name: string;
+    overall: 'ok' | 'warning' | 'breach' | 'unknown';
+    action: 'none' | 'warn' | 'throttle' | 'pause';
+  }>;
+}
+
 // v1.03 (Team T6): fleet overview + scheduling v3 — mirror of core
 // FleetOverview / PlacementPlan / QueuedPlacement (see
 // packages/core/src/fleet/overview.ts and scheduling.ts).
@@ -2341,6 +2427,77 @@ export interface MemoryBlocksImportView {
   dir: string;
   blocks: { imported: number; updated: number; skipped: number; conflicts: Array<{ label: string; reason: string }> };
   facts: { imported: number; updated: number; skipped: number };
+}
+
+/** v1.09 (Đội T2): memory v9 kiểu Letta — views cho IPC `memory-letta:*`. */
+export interface LettaEntityStatsView {
+  botId: string;
+  coreBlocks: Array<{ label: string; chars: number; limit: number; version: number }>;
+  recallSessions: number;
+  recallEpisodes: number;
+  archivalItems: number;
+  archivalEmbedded: number;
+  proposalsPending: number;
+  proposalsApplied: number;
+}
+export interface LettaSleepPassSummaryView {
+  id: string;
+  botId: string;
+  at: string;
+  dryRun: boolean;
+  durationMs: number;
+  sessionsPruned: number;
+  sessionsCondensed: number;
+  factsExtracted: number;
+  factsStored: number;
+  archivalDuplicatesRemoved: number;
+  proposalsCreated: number;
+  proposalsSkippedDuplicate: number;
+  errors: string[];
+}
+export interface LettaStatusView {
+  stats: LettaEntityStatsView;
+  proposalsPending: number;
+  lastSleep: LettaSleepPassSummaryView | null;
+}
+export interface LettaRecallHitView {
+  sessionId: string;
+  botId: string;
+  startedAt: string;
+  endedAt: string;
+  turns: number;
+  summary: string;
+  keywordScore: number;
+  recencyScore: number;
+  score: number;
+}
+export interface LettaArchivalHitView {
+  item: { id: string; text: string; source: string; sourceId?: string; tags: string[]; confidence: number; createdAt: string; updatedAt: string; lastAccessedAt: string | null; accessCount: number };
+  keywordScore: number;
+  embeddingScore: number | null;
+  score: number;
+}
+export interface LettaProposalView {
+  id: string;
+  botId: string;
+  targetLabel: string;
+  proposedLine: string;
+  reason: string;
+  confidence: number;
+  source: string;
+  status: 'pending' | 'approved' | 'rejected' | 'applied';
+  createdAt: string;
+  decidedAt: string | null;
+  decidedBy: string | null;
+  decisionNote: string | null;
+  appliedLine: string | null;
+}
+export interface LettaBlockAppendView {
+  block: MemoryBlockView;
+  usage: { label: string; chars: number; limit: number; fillRatio: number; state: 'ok' | 'warm' | 'full' };
+  condensed: boolean;
+  condense: { text: string; originalChars: number; condensedChars: number; originalSentences: number; keptSentences: number; duplicatesRemoved: number; condensed: boolean } | null;
+  appendedChars: number;
 }
 
 /** v0.96: kết quả chạy consolidation (dedupe/conflict/promote/archive). */
