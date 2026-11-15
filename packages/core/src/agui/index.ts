@@ -115,3 +115,110 @@ export {
   replayFromForLastEventId,
 } from './sse';
 export type { AgUiSseFrame } from './sse';
+// --- v1.09 (Đội T4): AG-UI streaming v1.1 — resumable sessions, renderer, checkpoints ---
+export {
+  AgUiStreamSession,
+  AgUiStreamSessionManager,
+  isAgUiTerminalType,
+} from './streaming';
+export type {
+  AgUiStreamCheckpoint,
+  AgUiStreamSessionOptions,
+  AgUiStreamSessionStats,
+  AgUiStreamSessionStatus,
+  AgUiStreamSessionHandler,
+} from './streaming';
+export { AgUiRenderer } from './renderer';
+export type {
+  AgUiRendererComponent,
+  AgUiRendererMessage,
+  AgUiRendererRunStatus,
+  AgUiRendererRunSummary,
+  AgUiRendererRunView,
+  AgUiRendererToolCall,
+} from './renderer';
+export {
+  AG_UI_CHECKPOINT_FORMAT,
+  AG_UI_CHECKPOINT_MAX_AGE_MS,
+  AG_UI_CHECKPOINT_MAX_RUNS,
+  AgUiCheckpointStore,
+  bufferWindow,
+  detectStreamGap,
+  planResume,
+} from './resume';
+export type {
+  AgUiCheckpointFile,
+  AgUiResumePlan,
+  AgUiResumeStrategy,
+  AgUiCheckpointStoreOptions,
+  StoredAgUiCheckpoint,
+} from './resume';
+// --- v1.10 (Đội T5): AG-UI generative UI v2 — card/chart, suggester, fallback ---
+export {
+  AgUiV2Registry,
+  AgUiV2Error,
+  AG_UI_V2_KINDS,
+  isAgUiV2Kind,
+  validateAgUiV2Request,
+  validateAgUiV2Response,
+  suggestAgUiV2Component,
+  negotiateAgUiV2,
+  agUiV2RequestMarkdown,
+  agUiV2Summary,
+} from './genuiV2';
+export type {
+  AgUiV2Kind,
+  AgUiV2ComponentKind,
+  AgUiV2CardAction,
+  AgUiV2CardField,
+  AgUiV2CardProps,
+  AgUiV2ChartPoint,
+  AgUiV2ChartSeries,
+  AgUiV2ChartProps,
+  AgUiV2ComponentProps,
+  AgUiV2ComponentRequest,
+  AgUiV2ComponentRecord,
+  AgUiV2ClientCapabilities,
+  AgUiV2Negotiation,
+  AgUiV2Context,
+  AgUiV2Suggestion,
+} from './genuiV2';
+// --- v1.11 (Đội T5): AG-UI voice events v3 — 7 voice event types, CUSTOM bridge, level smoother, event log ---
+export {
+  AG_UI_VOICE_PROTOCOL_VERSION,
+  AG_UI_VOICE_CUSTOM_NAMESPACE,
+  AG_UI_VOICE_EVENT_TYPES,
+  AG_UI_VOICE_MAX_TEXT_CHARS,
+  AG_UI_VOICE_MAX_LOG_EVENTS,
+  isAgUiVoiceEventType,
+  makeAgUiVoiceEvent,
+  validateAgUiVoiceEvent,
+  voiceEventToCustom,
+  voiceEventFromCustom,
+  voiceStartedEvent,
+  voiceStoppedEvent,
+  voicePartialEvent,
+  voiceFinalEvent,
+  voiceAudioLevelEvent,
+  voiceStateEvent,
+  voiceFallbackEvent,
+  VoiceAudioLevelSmoother,
+  VoiceV3EventLog,
+  buildVoiceStateSnapshot,
+} from './voiceV3';
+export type {
+  AgUiVoiceEventType,
+  AgUiVoiceMode,
+  AgUiVoiceStatus,
+  AgUiVoiceStopReason,
+  AgUiVoiceStartedData,
+  AgUiVoiceStoppedData,
+  AgUiVoiceTranscriptPartialData,
+  AgUiVoiceTranscriptFinalData,
+  AgUiVoiceAudioLevelData,
+  AgUiVoiceStateSnapshot,
+  AgUiVoiceStateData,
+  AgUiVoiceFallbackData,
+  AgUiVoiceEventData,
+  AgUiVoiceEvent,
+} from './voiceV3';

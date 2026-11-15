@@ -175,3 +175,131 @@ export {
   loadEvalReportHistory,
 } from './trends';
 export type { EvalCaseTrend, EvalSuiteTrend, EvalTrends } from './trends';
+
+// --- v1.11 (Đội T2): Harbor-format eval task + runner trong sandbox + rollout JSONL + Agent Profiles ---
+export {
+  AGENT_PROFILE_ID_RE,
+  AGENT_PROFILE_KINDS,
+  AGENT_PROFILES_FILE,
+  AgentProfileError,
+  AgentProfileStore,
+  buildProfileSystemPrompt,
+  builtinAgentProfiles,
+  defaultAgentProfileStoreFile,
+  filterToolsForProfile,
+  getBuiltinAgentProfile,
+  isAgentProfileId,
+  isAgentProfileKind,
+  profileForTaskKind,
+  resolveProfileModel,
+  validateAgentProfile,
+} from './profiles';
+export type { AgentProfile, AgentProfileKind, AgentProfileOverride, AgentProfileStoreFile } from './profiles';
+export {
+  BUILTIN_HARBOR_TASK_IDS,
+  builtinHarborTasks,
+  builtinHarborTaskDir,
+  defaultHarborTasksDir,
+  getBuiltinHarborTask,
+  materializeBuiltinHarborTasks,
+} from './harborLibrary';
+export type { BuiltinHarborTaskId } from './harborLibrary';
+export {
+  HARBOR_DEFAULT_MAX_TURNS,
+  HARBOR_DEFAULT_TIMEOUT_MS,
+  HARBOR_ENVIRONMENT_DIR,
+  HARBOR_FORBIDDEN_TEST_PATTERNS,
+  HARBOR_INSTRUCTION_FILE,
+  HARBOR_MAX_TIMEOUT_MS,
+  HARBOR_META_FILE,
+  HARBOR_MIN_TIMEOUT_MS,
+  HARBOR_SUSPICIOUS_TEST_PATTERNS,
+  HARBOR_TASK_ID_RE,
+  HARBOR_TASK_KINDS,
+  HARBOR_TEST_SCRIPT,
+  HARBOR_TESTS_DIR,
+  HarborTaskError,
+  defaultHarborTaskMeta,
+  harborTestScriptWarnings,
+  isHarborTaskId,
+  isHarborTaskKind,
+  isSafeRelativePath,
+  listHarborTaskDirs,
+  loadHarborTaskFromDir,
+  loadHarborTasksFromDir,
+  parseHarborTestOutput,
+  scoreHarborTests,
+  validateHarborEnvironment,
+  validateHarborInstruction,
+  validateHarborTask,
+  validateHarborTaskMeta,
+  validateHarborTestScript,
+  writeHarborTaskToDir,
+} from './harborTask';
+export type {
+  HarborEnvironmentFile,
+  HarborTask,
+  HarborTaskKind,
+  HarborTaskMeta,
+  HarborTestOutput,
+  HarborValidationIssue,
+  HarborValidationResult,
+} from './harborTask';
+export {
+  HARBOR_DEFAULT_TEST_TIMEOUT_MS,
+  HARBOR_RUN_REPORTS_DIR,
+  HarborRunner,
+  getHarborReportsDir,
+  harborBoxBotId,
+  listHarborRunReports,
+  noopHarborExecutor,
+  runHarborTestsInBox,
+  saveHarborRunResult,
+  saveHarborSuiteResult,
+  scriptedHarborExecutor,
+  stageHarborEnvironment,
+  truncateHarborOutput,
+} from './harborRunner';
+export type {
+  HarborAgentContext,
+  HarborAgentExecutor,
+  HarborRunResult,
+  HarborRunnerOptions,
+  HarborSuiteResult,
+  HarborTestRun,
+} from './harborRunner';
+export {
+  ROLLOUT_JSONL_FILE,
+  ROLLOUT_MAX_CONTENT_CHARS,
+  ROLLOUT_MAX_TURNS,
+  ROLLOUT_SCHEMA,
+  readRolloutJsonl,
+  redactRolloutSecrets,
+  rolloutToSftJsonl,
+  sanitizeRolloutForExport,
+  sumRolloutUsage,
+  summarizeRollouts,
+  truncateRolloutContent,
+  validateRolloutJsonl,
+  validateRolloutRecord,
+  writeRolloutJsonl,
+} from './rollout';
+export type {
+  RolloutRecord,
+  RolloutStats,
+  RolloutTestResult,
+  RolloutToolCall,
+  RolloutToolResult,
+  RolloutTurn,
+  RolloutUsage,
+  RolloutValidationIssue,
+  RolloutValidationResult,
+} from './rollout';
+export {
+  aggregateHarborResults,
+  aggregateHarborSuite,
+  formatHarborRunSummary,
+  formatHarborSuiteSummary,
+  renderHarborReportMarkdown,
+} from './harborReport';
+export type { HarborAggregateReport, HarborProfileSummary, HarborTaskSummary } from './harborReport';

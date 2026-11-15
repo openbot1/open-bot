@@ -103,6 +103,8 @@ import { VoiceSessionManagerV2, FileVoiceSessionLogStore } from '../voice/voiceS
 import { VoiceV5Manager } from '../voice/voiceSessionV5';
 import { VoiceV6Manager } from '../voice/voiceSessionV6';
 import { VoiceV7Manager } from '../voice/voiceSessionV7';
+import { VoiceV8Manager } from '../voice/voiceSessionV8';
+import { VoiceV9Manager } from '../voice/voiceSessionV9';
 import {
   GROUP_BOT_STATUS_FILE_NAME,
   GROUP_CHATS_FILE_NAME,
@@ -1010,6 +1012,11 @@ export function defaultToolFactory(
      * mcp2_list_deprecated). Optional + guarded tại call site, giống
      * createMcpV097Tools. */
     createMcpV106Tools?(): Tool[];
+    /** v1.10 (Đội T2): MCP 2026-07-28 (mcp_mrtr_input_required,
+     * mcp_mrtr_validate_result, mcp_tasks_wait/send_input/
+     * auto_background, mcp_files_upload/download/info/list/delete).
+     * Optional + guarded tại call site, giống createMcpV097Tools. */
+    createMcpV110Tools?(): Tool[];
     createMemoryBlockTools?(opts?: {
       blocksStore?: MemoryBlockStore;
       longTermStore?: LongTermMemory;
@@ -1172,6 +1179,36 @@ export function defaultToolFactory(
      * like createVoiceV6Tools. */
     createVoiceV7Tools?(opts?: {
       getManager?: () => unknown;    }): Tool[];
+    /** v1.09 (Đội T5): voice v8 tools (voice_v8_session_create /
+     * list / stats / stop / delete / resume / vad / barge_in / ptt
+     * / simulate_turn) on the v8 session manager. Optional until
+     * the tools package ships the factory — guarded at the call
+     * site, like createVoiceV7Tools. */
+    createVoiceV8Tools?(opts?: {
+      getManager?: () => unknown;    }): Tool[];
+    /** v1.10 (Đội T5): voice v9 tools (voice_v9_session_create /
+     * list / stats / stop / delete / simulate_turn / vad / barge_in
+     * / ptt / live_probe) on the v9 session manager. Optional until
+     * the tools package ships the factory — guarded at the call
+     * site, like createVoiceV8Tools. */
+    createVoiceV9Tools?(opts?: {
+      getManager?: () => unknown;
+      hasLiveKey?: () => boolean;
+    }): Tool[];
+    /** v1.10 (Đội T5): AG-UI generative UI v2 tools (agui_v2_suggest
+     * / validate / request / answer / pending / capabilities).
+     * Optional until the tools package ships the factory — guarded
+     * at the call site, like createVoiceV8Tools. */
+    createAguiV2Tools?(opts?: {
+      getRegistry?: () => unknown;
+    }): Tool[];
+    /** v1.10 (Đội T5): agent teams dashboard tools
+     * (teams_dashboard_summary / list / team / tasks / mailbox,
+     * read-only). Optional until the tools package ships the
+     * factory — guarded at the call site, like createVoiceV8Tools. */
+    createTeamsDashboardTools?(opts?: {
+      getProvider?: () => unknown;
+    }): Tool[];
     /** v0.31 (P1-2): A2A client tools (call trusted external agents).
      * Optional until the tools package ships the factory — guarded at
      * the call site, like createSkillMarketplaceTools. */
@@ -1427,6 +1464,13 @@ export function defaultToolFactory(
     if (typeof toolsMod.createMcpV106Tools === 'function') {
       registry.registerMany(toolsMod.createMcpV106Tools());
     }
+    // v1.10 (Đội T2): MCP 2026-07-28 (mcp_mrtr_input_required,
+    // mcp_mrtr_validate_result, mcp_tasks_wait/send_input/
+    // auto_background, mcp_files_upload/download/info/list/delete).
+    // Guarded — giống khối v0.97 phía trên.
+    if (typeof toolsMod.createMcpV110Tools === 'function') {
+      registry.registerMany(toolsMod.createMcpV110Tools());
+    }
     // v0.96 (Đội T1): memory block tools (memory_block_* + memory_
     // consolidate) trên cùng workspace với long-term memory
     // (`.open-bot/memory-blocks.json`). Guarded — thiếu factory thì bot
@@ -1631,6 +1675,45 @@ export function defaultToolFactory(
           getManager: () => voiceV7Manager,
         }),
       );
+    }
+    // v1.09 (Đội T5): voice v8 tools (voice_v8_* — spectral VAD,
+    // AEC barge-in, durable resume, push-to-talk, scripted mock
+    // turns) trên VoiceV8Manager (in-memory; mock transport mặc
+    // định, không key, không mạng). Guarded như factory khác.
+    if (typeof toolsMod.createVoiceV8Tools === 'function') {
+      const voiceV8Manager = new VoiceV8Manager();
+      registry.registerMany(
+        toolsMod.createVoiceV8Tools({
+          getManager: () => voiceV8Manager,
+        }),
+      );
+    }
+    // v1.10 (Đội T5): voice v9 tools (voice_v9_* — VAD v9, barge-in,
+    // streaming transcript, session state machine idle/listening/
+    // speaking/processing, durable resume, PTT, scripted mock turns)
+    // trên VoiceV9Manager (in-memory; mock transport mặc định, không
+    // key, không mạng). Guarded như factory khác.
+    if (typeof toolsMod.createVoiceV9Tools === 'function') {
+      const voiceV9Manager = new VoiceV9Manager();
+      registry.registerMany(
+        toolsMod.createVoiceV9Tools({
+          getManager: () => voiceV9Manager,
+        }),
+      );
+    }
+    // v1.10 (Đội T5): AG-UI generative UI v2 (agui_v2_* — suggest/
+    // validate/request/answer/pending/capabilities; registry v2 với
+    // fallback giữ dữ liệu khi client không hỗ trợ kind). Không cần
+    // host registry — factory tự tạo fallback khi chưa bind.
+    if (typeof toolsMod.createAguiV2Tools === 'function') {
+      registry.registerMany(toolsMod.createAguiV2Tools({}));
+    }
+    // v1.10 (Đội T5): agent teams dashboard (teams_dashboard_* —
+    // summary/list/team/tasks/mailbox, read-only). Chạy mock provider
+    // cho tới khi service teams v2 thật được nối qua
+    // TeamDashboardProvider; mọi response đều ghi source: 'mock'.
+    if (typeof toolsMod.createTeamsDashboardTools === 'function') {
+      registry.registerMany(toolsMod.createTeamsDashboardTools({}));
     }
     // v0.31 (P1-2): A2A client tools (call trusted external agents).
     // Guarded — the factory ships with the tools package; without it

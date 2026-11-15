@@ -101,6 +101,19 @@ export {
   toolkitForComposioAppId,
 } from './toolkits';
 export type { ComposioToolkitDef } from './toolkits';
+export {
+  COMPOSIO_V110_MOCK_TOOLKITS,
+  MockComposioV110Executor,
+  createMockComposioV110AppDefinitions,
+  executeMockComposioV110Tool,
+  findMockComposioV110Toolkit,
+  isMockComposioV110Slug,
+  mockComposioV110AppId,
+  mockComposioV110DeterministicId,
+  mockComposioV110Slugs,
+  mockComposioV110ToolNeedsApproval,
+} from './toolkitsV110';
+export type { ComposioV110MockToolkitDef, MockComposioV110Result } from './toolkitsV110';
 export { ComposioToolRouter, isTrustedComposioMcpUrl } from './router';
 export type { ComposioFetchFn, ComposioToolRouterOptions } from './router';
 export { ComposioAppSource } from './source';
@@ -260,3 +273,82 @@ export {
   setComposioTriggerSigningSecret,
 } from './triggerKeys';
 export type { ComposioTriggerKey, ComposioTriggerKeyVault } from './triggerKeys';
+export {
+  COMPOSIO_V111_MOCK_TOOLKITS,
+  MockComposioV111Executor,
+  createMockComposioV111AppDefinitions,
+  executeMockComposioV111Tool,
+  findMockComposioV111Toolkit,
+  isMockComposioV111Slug,
+  mockComposioV111AppId,
+  mockComposioV111DeterministicId,
+  mockComposioV111Slugs,
+  mockComposioV111ToolNeedsApproval,
+} from './toolkitsV111';
+export type { ComposioV111MockToolkitDef, MockComposioV111Result } from './toolkitsV111';
+export {
+  COMPOSIO_V111_CONNECTIONS_FILE,
+  COMPOSIO_V111_CONNECTION_AUDIT_FILE,
+  COMPOSIO_V111_DEFAULT_MAX_RECONNECTS,
+  COMPOSIO_V111_DEFAULT_RECONNECT_BASE_BACKOFF_MS,
+  COMPOSIO_V111_DEFAULT_RECONNECT_MAX_BACKOFF_MS,
+  COMPOSIO_V111_DEFAULT_RECONNECT_WINDOW_MS,
+  COMPOSIO_V111_LIFECYCLE_STATUSES,
+  COMPOSIO_V111_MAX_AUDIT_LINES,
+  COMPOSIO_V111_MAX_TRACKED_TOOLKITS,
+  DEFAULT_COMPOSIO_V111_RECONNECT_POLICY,
+  appendComposioV111Audit,
+  composioV111ReconnectBackoffMs,
+  createComposioV111AuditEntry,
+  decideComposioV111AutoReconnect,
+  disconnectComposioV111Connection,
+  emptyComposioV111ConnectionEntry,
+  getComposioV111AuditPath,
+  getComposioV111ConnectionsPath,
+  isComposioV111ManagedToolkit,
+  listComposioV111Audit,
+  loadComposioV111Connections,
+  reconnectComposioV111Connection,
+  saveComposioV111Connections,
+  summarizeComposioV111Connections,
+  syncComposioV111SessionStatus,
+  validateComposioV111AuditEntry,
+  validateComposioV111ConnectionEntry,
+} from './connectionLifecycle';
+export type {
+  ComposioV111AuditAction,
+  ComposioV111ConnectionAuditEntry,
+  ComposioV111ConnectionEntry,
+  ComposioV111ConnectionSummary,
+  ComposioV111LifecycleStatus,
+  ComposioV111ReconnectDecision,
+  ComposioV111ReconnectPolicy,
+} from './connectionLifecycle';
+export {
+  COMPOSIO_V111_DEFAULT_DEDUPE_WINDOW_MS,
+  COMPOSIO_V111_DEFAULT_ERROR_FACTOR,
+  COMPOSIO_V111_DEFAULT_HIT_FACTOR,
+  COMPOSIO_V111_DEFAULT_JITTER_FRACTION,
+  COMPOSIO_V111_DEFAULT_MAX_INTERVAL_MS,
+  COMPOSIO_V111_DEFAULT_MAX_SEEN_IDS,
+  COMPOSIO_V111_DEFAULT_MIN_INTERVAL_MS,
+  COMPOSIO_V111_DEFAULT_MISS_FACTOR,
+  DEFAULT_COMPOSIO_V111_POLL_POLICY,
+  applyComposioV111Jitter,
+  clampComposioV111IntervalMs,
+  emptyComposioV111PollPolicyState,
+  isComposioV111Duplicate,
+  missedPollsBetween,
+  nextComposioV111Poll,
+  pruneComposioV111SeenIds,
+  recordComposioV111SeenIds,
+  summarizeComposioV111CatchUp,
+  summarizeComposioV111PollState,
+  validateComposioV111PollPolicy,
+} from './pollPolicyV111';
+export type {
+  ComposioV111CatchUpSummary,
+  ComposioV111PollOutcome,
+  ComposioV111PollPolicy,
+  ComposioV111PollPolicyState,
+} from './pollPolicyV111';
