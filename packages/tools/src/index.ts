@@ -126,6 +126,8 @@ export {
 export { createMcpTools, MCP_TOOLS } from './mcpTools';
 export { createMcpV097Tools, MCP_V097_TOOLS } from './mcpV097Tools';
 export { createMcpV2Tools, MCP_V2_TOOLS } from './mcpV2Tools';
+export { createMcpV106Tools, MCP_V106_TOOLS } from './mcpV106Tools';
+export { createMcpV110Tools, MCP_V110_TOOLS } from './mcpV110Tools';
 export {
   addMcpAppListener,
   addMcpTaskListener,
@@ -327,6 +329,68 @@ export type { VoiceV4ToolOptions, VoiceV4ManagerLike, VoiceV4SessionLike } from 
 // --- v1.05 (Đội T4): context v2 tools (tiered compaction, verified summaries, 1M window, per-bot policy, inspector, snapshots) ---
 export { createContextV2Tools, CONTEXT_V2_TOOLS, CONTEXT_V2_TOOL_NAMES } from './contextV2Tools';
 export type { ContextV2ToolOptions } from './contextV2Tools';
+// --- v1.06 (Đội T1): memory v7 tools (git-backed blocks, 4-tier promote/demote, prompt recompile, history, episodic search, tiers status) ---
+export { createMemoryV7Tools, MEMORY_V7_TOOLS, MEMORY_V7_TOOL_NAMES, importV96BlocksIntoV7 } from './memoryV7Tools';
+export type { MemoryV7ToolOptions } from './memoryV7Tools';
+// --- v1.07 (Đội T1): memory v8 tools (sleep policy + nén block, fused retrieval local, provenance, review chống poisoning, fleet sync, xóa GDPR) ---
+export { createMemoryV8Tools, MEMORY_V8_TOOLS, MEMORY_V8_TOOL_NAMES } from './memoryV8Tools';
+export type { MemoryV8ToolOptions } from './memoryV8Tools';
+// --- v1.08 (Đội T1): memory v9 tools (sleep daemon nền tự động, git-backed versioning snapshot/diff/rollback, shared-block registry ACL/change feed/xung đột) ---
+export { createMemoryV9Tools, MEMORY_V9_TOOLS, MEMORY_V9_TOOL_NAMES, getMemoryV9Agent, resetMemoryV9AgentsForTests } from './memoryV9Tools';
+export type { MemoryV9ToolOptions } from './memoryV9Tools';
+// --- v1.09 (Đội T2): memory v9 kiểu Letta tools (core memory tự sửa qua tool, recall, archival, entity bền vững, sleep pass/proposals) ---
+export { createMemoryV9LettaTools, MEMORY_V9_LETTA_TOOLS, MEMORY_V9_LETTA_TOOL_NAMES } from './memoryV9LettaTools';
+// --- v1.10 (Đội T1): memory v10 tools (Mem0 pipeline, fused 3-signal retrieval, bi-temporal timeline, versioned blocks, quarantine review) ---
+export { createMemoryV10Tools, MEMORY_V10_TOOLS, MEMORY_V10_TOOL_NAMES, getMemoryV10Manager, resetMemoryV10ManagersForTests, memoryV10Dir } from './memoryV10Tools';
+export type { MemoryV10ToolOptions } from './memoryV10Tools';
+export type { MemoryV9LettaToolOptions } from './memoryV9LettaTools';
+// --- v1.08 (Đội T2): coding agent v2 tools (repo map PageRank symbol-level, architect mode planner/editor, git-first commit/diff/revert/squash) ---
+export { createCodingV2Tools, CODING_V2_TOOLS, CODING_V2_TOOL_NAMES, isCodingV2ToolName } from './codingV2Tools';
+export type { CodingV2ToolOptions, CodingV2ToolName } from './codingV2Tools';
+export { CodingV2RepoMapStore, parseCodingV2File, scanCodingV2Idents, resolveCodingV2CachePath, CODING_V2_DEFAULT_CACHE_REL_PATH, CODING_V2_MAX_FILES } from './codingV2RepoMap';
+export type { CodingV2MapBuildOptions, CodingV2MapBuildResult } from './codingV2RepoMap';
+// --- v1.10 (Đội T4): coding agent v3 tools (repo map call edges + module graph + token-budget map, manager/explorer/worker, eval harness Terminal-Bench, router model local) ---
+export { createCodingV3Tools, CODING_V3_TOOLS, CODING_V3_TOOL_NAMES, isCodingV3ToolName } from './codingV3Tools';
+export type { CodingV3ToolOptions, CodingV3ToolName } from './codingV3Tools';
+export { CodingV3RepoMapStore, resolveCodingV3CachePath, CODING_V3_DEFAULT_CACHE_REL_PATH } from './codingV3RepoMap';
+export type { CodingV3MapBuildResult } from './codingV3RepoMap';
+// --- v1.11 (Đội T4): coding agent v4 tools (repo map PageRank v2, sub-agent task visualizer, ACP-style model switching, coding profiles) ---
+export { createCodingV4Tools, CODING_V4_TOOLS, CODING_V4_TOOL_NAMES, isCodingV4ToolName } from './codingV4Tools';
+export type { CodingV4ToolOptions, CodingV4ToolName } from './codingV4Tools';
+export { CodingV4RepoMapStore, resolveCodingV4CachePath, scanCodingV4Fingerprints, CODING_V4_DEFAULT_CACHE_REL_PATH, CODING_V4_MAX_SCAN_FILES } from './codingV4RepoMap';
+export type { CodingV4MapBuildResult } from './codingV4RepoMap';
+// --- v1.06 (Đội T4): voice realtime v5 tools (multi-model router,
+// adaptive VAD config, diarized speakers + transcript, sessions) ---
+export { createVoiceV5Tools, VOICE_V5_TOOLS, VOICE_V5_TOOL_NAMES, isVoiceV5ToolName } from './voiceV5Tools';
+export type { VoiceV5ToolOptions, VoiceV5ManagerLike, VoiceV5SessionLike } from './voiceV5Tools';
+// --- v1.07 (Đội T5): voice realtime v6 tools (explicit call state,
+// mid-call voice switching, network guard, reconnect, stats) ---
+export { createVoiceV6Tools, VOICE_V6_TOOLS, VOICE_V6_TOOL_NAMES, isVoiceV6ToolName } from './voiceV6Tools';
+export type { VoiceV6ToolOptions, VoiceV6ManagerLike, VoiceV6SessionLike } from './voiceV6Tools';
+// --- v1.08 (Đội T5): voice realtime v7 tools (sessions, streaming
+// transcript, VAD config/status, barge-in, scripted mock turns) ---
+export { createVoiceV7Tools, VOICE_V7_TOOLS, VOICE_V7_TOOL_NAMES, isVoiceV7ToolName } from './voiceV7Tools';
+export type { VoiceV7ToolOptions, VoiceV7ManagerLike, VoiceV7SessionLike } from './voiceV7Tools';
+// --- v1.09 (Đội T5): voice realtime v8 tools (spectral VAD, AEC
+// barge-in, durable resume, push-to-talk, scripted mock turns) ---
+export { createVoiceV8Tools, VOICE_V8_TOOLS, VOICE_V8_TOOL_NAMES, isVoiceV8ToolName } from './voiceV8Tools';
+export type { VoiceV8ToolOptions, VoiceV8ManagerLike, VoiceV8SessionLike } from './voiceV8Tools';
+// --- v1.10 (Đội T5): voice realtime v9 tools (VAD mock, barge-in,
+// streaming transcript, tool calls mid-speech, PTT, live-key probe) ---
+export { createVoiceV9Tools, VOICE_V9_TOOLS, VOICE_V9_TOOL_NAMES, isVoiceV9ToolName } from './voiceV9Tools';
+export type { VoiceV9ToolOptions, VoiceV9ManagerLike, VoiceV9SessionLike } from './voiceV9Tools';
+// --- v1.11 (Đội T5): voice realtime v10 tools (realtime v2 + fallback,
+// VAD v10, noise suppression, bot voice presets, AG-UI voice v3) ---
+export { createVoiceV10Tools, VOICE_V10_TOOLS, VOICE_V10_TOOL_NAMES, isVoiceV10ToolName } from './voiceV10Tools';
+export type { VoiceV10ToolOptions, VoiceV10ManagerLike, VoiceV10SessionLike, VoiceV10PresetStoreLike } from './voiceV10Tools';
+// --- v1.10 (Đội T5): AG-UI generative UI v2 tools (suggest, validate,
+// request, answer, pending, capabilities) ---
+export { createAguiV2Tools, AGUI_V2_TOOLS, AGUI_V2_TOOL_NAMES, isAguiV2ToolName, AGUI_V2_DEFAULT_CAPABILITIES } from './aguiV2Tools';
+export type { AguiV2ToolOptions } from './aguiV2Tools';
+// --- v1.10 (Đội T5): agent teams dashboard tools (summary, list,
+// team, tasks, mailbox — read-only, mock provider until T3 wires in) ---
+export { createTeamsDashboardTools, TEAMS_DASHBOARD_TOOLS, TEAMS_DASHBOARD_TOOL_NAMES, isTeamsDashboardToolName } from './teamsDashboardTools';
+export type { TeamsDashboardToolOptions } from './teamsDashboardTools';
 export { createSessionHandoffTools, SESSION_HANDOFF_TOOLS, SESSION_HANDOFF_TOOL_NAMES } from './handoffTools';
 export type { SessionHandoffToolOptions } from './handoffTools';
 export { createA2aTools, A2A_TOOLS } from './a2aTools';
@@ -366,6 +430,18 @@ export {
   foldRunLog,
 } from './harnessV103Tools';
 export type { CodeActObservation, HarnessV103ToolOptions } from './harnessV103Tools';
+export {
+  HARNESS_V107_TOOL_NAMES,
+  HARNESS_V107_TOOLS,
+  createHarnessV107Tools,
+} from './harnessV107Tools';
+export type { HarnessV107ToolOptions } from './harnessV107Tools';
+export {
+  HARNESS_V4_TOOL_NAMES,
+  HARNESS_V4_TOOLS,
+  createHarnessV4Tools,
+} from './harnessV4Tools';
+export type { HarnessV4ToolOptions } from './harnessV4Tools';
 export { createAcpHostingTools, ACP_HOSTING_TOOLS } from './acpHostingTools';
 export type { AcpHostingToolOptions } from './acpHostingTools';
 export { createAgentDataTools, AGENT_DATA_TOOLS } from './agentDataTools';
@@ -433,6 +509,15 @@ export { createIntegrationTools, INTEGRATION_TOOLS } from './integrationTools';
 export type { IntegrationToolOptions } from './integrationTools';
 export { createSkillMarketplaceTools, SKILL_MARKETPLACE_TOOLS } from './skillMarketplaceTools';
 export type { SkillMarketplaceToolOptions } from './skillMarketplaceTools';
+// --- v1.07 (T4): skills & plugins — directory skills + plugin bundle + hooks config + inline secret (8 tools) ---
+export {
+  activateInstalledBundle,
+  createSkillsPluginsV107Tools,
+  SKILLS_PLUGINS_V107_TOOLS,
+  SKILLS_PLUGINS_V107_TOOL_NAMES,
+  SKILL_SHOW_MAX_CHARS,
+} from './skillsPluginsV107Tools';
+export type { SkillsPluginsV107ToolOptions } from './skillsPluginsV107Tools';
 // --- v0.14: out-of-process plugin sandbox + plugin bundles ---
 export {
   SandboxedPluginHost,
@@ -513,3 +598,28 @@ export { createFleetV103Tools, FLEET_V103_TOOLS, FLEET_V103_TOOL_NAMES } from '.
 // --- v1.05 (Đội T3): OpenMausBot parity — doctor, team YAML, model refresh, per-bot computer v2, headless status ---
 export { createOpenmausbotV105Tools, OPENMAUSBOT_V105_TOOLS, OPENMAUSBOT_V105_TOOL_NAMES } from './openmausbotV105Tools';
 export type { OpenmausbotV105ToolOptions } from './openmausbotV105Tools';
+// --- v1.06 (Đội T3): doctor + team YAML + driver registry + engine picker tools ---
+export { createDoctorTools, DOCTOR_TOOLS, DOCTOR_TOOL_NAMES } from './doctorTools';
+export type { DoctorToolOptions } from './doctorTools';
+export { createTeamYamlTools, TEAM_YAML_TOOLS, TEAM_YAML_TOOL_NAMES } from './teamYamlTools';
+export type { TeamYamlToolOptions } from './teamYamlTools';
+export { createDriverTools, DRIVER_TOOLS, DRIVER_TOOL_NAMES } from './driverTools';
+export type { DriverToolOptions } from './driverTools';
+export { createEnginePickerTools, ENGINE_PICKER_TOOLS, ENGINE_PICKER_TOOL_NAMES } from './enginePickerTools';
+export type { EnginePickerToolOptions } from './enginePickerTools';
+// --- v1.06 (Đội T6): platform v4 tools — fleet bot scheduling + fleet status + eval ---
+export { createPlatformV4Tools, PLATFORM_V4_TOOLS, PLATFORM_V4_TOOL_NAMES } from './platformV4Tools';
+// --- v1.07 (Đội T6): fleet v4 teams tools — Agent Teams + worktree isolation + router context window + prompt-cache ---
+export { createFleetV4TeamsTools, FLEET_V4_TEAMS_TOOLS, FLEET_V4_TEAMS_TOOL_NAMES } from './fleetV4TeamsTools';
+// --- v1.08 (Đội T4): providers v2 tools — Composio v2 (8) + provider health (5) + OpenRouter/Fireworks models + info (4) ---
+export { createProvidersV108Tools, PROVIDERS_V108_TOOLS, PROVIDERS_V108_TOOL_NAMES } from './providersV108Tools';
+export type { ProvidersV108ToolOptions } from './providersV108Tools';
+// --- v1.09 (Đội T1): Agent Teams v1 tools — lead + teammate, shared task list, mailbox, worktree plan ---
+export { createAgentTeamsV109Tools, TEAM_V109_TOOLS, TEAM_V109_TOOL_NAMES } from './agentTeamsV109Tools';
+// --- v1.10 (Đội T3): Agent Teams v2 tools — file-locked claiming, disk mailbox theo tên, fork, hook TaskCompleted, chi phí token ---
+export { createAgentTeamsV2Tools, TEAM_V2_TOOLS, TEAM_V2_TOOL_NAMES } from './agentTeamsV2Tools';
+// --- v1.11 (Đội T2): Harbor eval + rollout JSONL + Agent Profiles tools ---
+export { createEvalV111Tools, EVAL_V111_TOOLS, EVAL_V111_TOOL_NAMES, isEvalV111ToolName, evalV111TasksDir, evalV111RolloutsPath } from './evalV111Tools';
+export type { EvalV111ToolOptions } from './evalV111Tools';
+// --- v1.11 (Đội T3): Agent Teams v3 tools — 7 primitives, waves, challenge, lead mode, panes tmux, chi phí tuyến tính ---
+export { createAgentTeamsV3Tools, TEAM_V3_TOOLS, TEAM_V3_TOOL_NAMES } from './agentTeamsV3Tools';

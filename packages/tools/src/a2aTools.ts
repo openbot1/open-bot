@@ -29,14 +29,17 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Tool, ToolContext } from '@open-bot/core';
 import {
+  A2aAgentRegistry,
   A2aClient,
   A2aDelegator,
   createA2aDelegator,
   fetchAgentCard,
   fetchCheckedAgentCard,
   isA2aTerminalState,
+  negotiateProtocolVersionV11,
   partsToText,
   verifyAgentCardTrust,
+  verifyCardForConnect,
 } from '@open-bot/core';
 import type {
   A2aAgentCard,
@@ -110,6 +113,15 @@ export interface A2aToolOptions {
   sourceKind?: string;
   /** v0.97: fingerprint key card đã trust (để `a2a_verify_card` báo key mới/cũ). */
   knownCardKeyIds?: readonly string[];
+  /**
+   * v1.07: registry agent local kiểu AGNTCY (xem `A2aAgentRegistry`
+   * trong @open-bot/core). Không truyền → tạo registry trong bộ nhớ
+   * (trống). `registryFile` là đường dẫn file JSON persistence cho
+   * registry (vd userData/a2a-registry.json); `registry` có sẵn
+   * thắng `registryFile` khi cả hai có.
+   */
+  registry?: A2aAgentRegistry;
+  registryFile?: string;
 }
 
 function errorResult(message: string): string {
@@ -156,6 +168,15 @@ function getNumberArg(args: Record<string, unknown>, name: string): number | und
   if (value === undefined || value === null) return undefined;
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw new Error(`Argument "${name}" must be a number, got ${typeof value}`);
+  }
+  return value;
+}
+
+function getOptionalBooleanArg(args: Record<string, unknown>, name: string): boolean | undefined {
+  const value = args[name];
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'boolean') {
+    throw new Error(`Argument "${name}" must be a boolean, got ${typeof value}`);
   }
   return value;
 }
@@ -323,6 +344,12 @@ export function createA2aTools(opts: A2aToolOptions = {}): Tool[] {
       ? createFileTrustedAgentStore(opts.trustedAgentsFile)
       : createMemoryTrustedAgentStore());
   const defaultTimeoutMs = opts.timeoutMs ?? A2A_DEFAULT_TIMEOUT_MS;
+  // v1.07: registry agent local kiểu AGNTCY — đăng ký/tìm agent theo
+  // capability. Registry KHÔNG tin tưởng agent: tool `a2a_send` vẫn
+  // chỉ gọi agent user đã trust ở màn hình A2A Agents.
+  const registry: A2aAgentRegistry =
+    opts.registry ??
+    new A2aAgentRegistry(opts.registryFile ? { filePath: opts.registryFile } : {});
 
   async function resolveTrustedAgent(ref: string): Promise<TrustedA2aAgent> {
     const agents = await store.list();
@@ -670,7 +697,257 @@ export function createA2aTools(opts: A2aToolOptions = {}): Tool[] {
     },
   };
 
-  return [discover, listAgents, send, status, cancel, listTasks, delegate, verifyCard];
+  // --- v1.07 (Đội T3): registry agent local kiểu AGNTCY -----------
+  // Đăng ký/tìm agent theo capability. Registry chỉ giúp TÌM agent —
+  // không tin tưởng agent nào: `a2a_send` vẫn chỉ gọi agent user đã
+  // trust ở màn hình "A2A Agents". `a2a_registry_register` fetch card
+  // qua mạng nên needsApproval; search/list chỉ đọc registry local.
+
+  function summarizeRegistryEntry(entry: {
+    baseUrl: string;
+    card: A2aAgentCard;
+    source: string;
+    health: string;
+    signatureOk: boolean | null;
+    keyId: string | null;
+    trusted: boolean;
+    registeredAt: string;
+    lastSeenAt: string | null;
+  }): Record<string, unknown> {
+    return {
+      baseUrl: entry.baseUrl,
+      name: entry.card.name,
+      description: entry.card.description,
+      url: entry.card.url,
+      source: entry.source,
+      health: entry.health,
+      signatureOk: entry.signatureOk,
+      keyId: entry.keyId,
+      trusted: entry.trusted,
+      streaming: entry.card.capabilities?.streaming ?? false,
+      skills: (entry.card.skills ?? []).map((s) => s.id),
+      registeredAt: entry.registeredAt,
+      lastSeenAt: entry.lastSeenAt,
+    };
+  }
+
+  const registryRegister: Tool = {
+    definition: toolDef(
+      'a2a_registry_register',
+      'Đăng ký một agent A2A vào registry local (kiểu AGNTCY): đọc Agent Card từ URL gốc qua /.well-known/agent-card.json (fallback /.well-known/agent.json), validate + verify chữ ký nếu có, rồi lưu vào registry để tìm lại theo capability. CHỈ ĐĂNG KÝ — không tin tưởng agent này; chỉ user mới được tin tưởng agent ở màn hình "A2A Agents".',
+      {
+        url: { type: 'string', description: 'URL gốc của agent, vd http://127.0.0.1:8080/.' },
+        source: { type: 'string', description: 'Nguồn agent: local, discovered hoặc manual (mặc định discovered).' },
+      },
+      ['url'],
+    ),
+    needsApproval: true,
+    execute: async (args: Record<string, unknown>): Promise<string> => {
+      try {
+        const url = normalizeBaseUrl(getStringArg(args, 'url'));
+        const sourceRaw = getOptionalStringArg(args, 'source');
+        const source = sourceRaw === 'local' || sourceRaw === 'manual' ? sourceRaw : 'discovered';
+        const entry = await registry.registerFromUrl(url, {
+          source,
+          timeoutMs: defaultTimeoutMs,
+        });
+        return JSON.stringify({ registered: true, ...summarizeRegistryEntry(entry) }, null, 2);
+      } catch (err) {
+        return errorResult(err instanceof Error ? err.message : String(err));
+      }
+    },
+  };
+
+  const registrySearch: Tool = {
+    definition: toolDef(
+      'a2a_registry_search',
+      'Tìm agent A2A trong registry local theo tên, mô tả, skill hoặc tag — chấm điểm relevance (khớp tên/skill nặng hơn mô tả), có thể lọc theo skill, streaming, push notifications, trạng thái trust hoặc chỉ agent đang khoẻ. CHỈ ĐỌC registry local, không gọi mạng.',
+      {
+        query: { type: 'string', description: 'Từ khoá tìm (tên agent, skill id, tag...). Bỏ trống = liệt kê toàn bộ.' },
+        skillId: { type: 'string', description: 'Chỉ agent có skill id này.' },
+        streaming: { type: 'boolean', description: 'true = chỉ agent hỗ trợ streaming.' },
+        pushNotifications: { type: 'boolean', description: 'true = chỉ agent hỗ trợ push notifications.' },
+        trusted: { type: 'boolean', description: 'true = chỉ agent đã trust, false = chỉ agent chưa trust.' },
+        healthyOnly: { type: 'boolean', description: 'true = chỉ agent health ok.' },
+      },
+      [],
+    ),
+    needsApproval: false,
+    execute: async (args: Record<string, unknown>): Promise<string> => {
+      try {
+        const query = getOptionalStringArg(args, 'query') ?? '';
+        const results = registry.search(query, {
+          ...(getOptionalStringArg(args, 'skillId')
+            ? { skillId: getOptionalStringArg(args, 'skillId') as string }
+            : {}),
+          ...(getOptionalBooleanArg(args, 'streaming') !== undefined
+            ? { streaming: getOptionalBooleanArg(args, 'streaming') }
+            : {}),
+          ...(getOptionalBooleanArg(args, 'pushNotifications') !== undefined
+            ? { pushNotifications: getOptionalBooleanArg(args, 'pushNotifications') }
+            : {}),
+          ...(getOptionalBooleanArg(args, 'trusted') !== undefined
+            ? { trusted: getOptionalBooleanArg(args, 'trusted') }
+            : {}),
+          ...(getOptionalBooleanArg(args, 'healthyOnly') !== undefined
+            ? { healthyOnly: getOptionalBooleanArg(args, 'healthyOnly') }
+            : {}),
+        });
+        if (results.length === 0) {
+          return 'Không tìm thấy agent nào trong registry khớp điều kiện. Đăng ký agent bằng a2a_registry_register trước.';
+        }
+        return JSON.stringify(
+          results.map((r) => ({ score: r.score, matchedOn: r.matchedOn, ...summarizeRegistryEntry(r.entry) })),
+          null,
+          2,
+        );
+      } catch (err) {
+        return errorResult(err instanceof Error ? err.message : String(err));
+      }
+    },
+  };
+
+  const registryList: Tool = {
+    definition: toolDef(
+      'a2a_registry_list',
+      'Liệt kê mọi agent A2A trong registry local (tên, URL, skill, health, chữ ký, trust). CHỈ ĐỌC registry local, không gọi mạng.',
+      {},
+      [],
+    ),
+    needsApproval: false,
+    execute: async (): Promise<string> => {
+      try {
+        const entries = registry.list();
+        if (entries.length === 0) {
+          return 'Registry local chưa có agent nào. Đăng ký agent bằng a2a_registry_register trước.';
+        }
+        return JSON.stringify(entries.map((e) => summarizeRegistryEntry(e)), null, 2);
+      } catch (err) {
+        return errorResult(err instanceof Error ? err.message : String(err));
+      }
+    },
+  };
+
+  const registryRemove: Tool = {
+    definition: toolDef(
+      'a2a_registry_remove',
+      'Xoá một agent khỏi registry local theo URL gốc. Chỉ xoá khỏi danh sách tìm kiếm — không ảnh hưởng tới danh sách agent đã trust của user (đó là store riêng ở màn hình "A2A Agents").',
+      {
+        url: { type: 'string', description: 'URL gốc của agent cần xoá, vd http://127.0.0.1:8080/.' },
+      },
+      ['url'],
+    ),
+    needsApproval: true,
+    execute: async (args: Record<string, unknown>): Promise<string> => {
+      try {
+        const url = normalizeBaseUrl(getStringArg(args, 'url'));
+        const removed = registry.deregister(url);
+        return removed ? `Đã xoá agent ${url} khỏi registry local.` : `Agent ${url} không có trong registry local.`;
+      } catch (err) {
+        return errorResult(err instanceof Error ? err.message : String(err));
+      }
+    },
+  };
+
+  // --- v1.09 (Đội T4): A2A v1.1 — verify card qua cổng kết nối + đàm phán version ---
+  // `a2a_verify_card_v11` đọc card rồi chạy cổng `verifyCardForConnect`:
+  // validate + đàm phán version 1.1 + chữ ký + hạn card + trust store
+  // (key đổi bị chặn trừ khi card khai keyRotation). CHỈ ĐỌC — không
+  // tin tưởng agent này. `a2a_negotiate_version` thuần tính toán
+  // (không gọi mạng): đàm phán bản chung + tính năng dùng được.
+  const verifyCardV11: Tool = {
+    definition: toolDef(
+      'a2a_verify_card_v11',
+      'Đọc Agent Card của một agent A2A ngoài rồi kiểm tra toàn diện trước khi kết nối (A2A v1.1): card hợp lệ không, đàm phán được protocol version nào (1.1/1.0.1/1.0) và tính năng gì, chữ ký Ed25519 có khớp không, card còn hạn không (validUntil), key ký có đổi so với key đã trust không. CHỈ ĐỌC — không tin tưởng agent này.',
+      {
+        url: { type: 'string', description: 'URL gốc của agent ngoài, vd http://127.0.0.1:8080/.' },
+        token: { type: 'string', description: 'Bearer <redacted> nếu agent yêu cầu (mặc định không có).' },
+        requireSigned: { type: 'boolean', description: 'true = chặn card không có chữ ký hợp lệ (mặc định false).' },
+        minVersion: { type: 'string', description: 'Bản protocol tối thiểu chấp nhận, vd 1.1 (mặc định 1.0).' },
+      },
+      ['url'],
+    ),
+    needsApproval: false,
+    execute: async (args: Record<string, unknown>): Promise<string> => {
+      try {
+        const url = normalizeBaseUrl(getStringArg(args, 'url'));
+        const token = getOptionalStringArg(args, 'token');
+        const card = await fetchAgentCard(url, {
+          timeoutMs: defaultTimeoutMs,
+          token,
+          networkPolicy: opts.networkPolicy,
+        });
+        const result = verifyCardForConnect(card, {
+          policy: {
+            ...(getOptionalBooleanArg(args, 'requireSigned') !== undefined
+              ? { requireSigned: getOptionalBooleanArg(args, 'requireSigned') }
+              : {}),
+            ...(getOptionalStringArg(args, 'minVersion') !== undefined
+              ? { minVersion: getOptionalStringArg(args, 'minVersion') as string }
+              : {}),
+          },
+        });
+        return JSON.stringify(
+          {
+            name: card.name,
+            url: card.url,
+            allowed: result.allowed,
+            negotiatedVersion: result.negotiatedVersion,
+            features: result.features,
+            checks: result.checks,
+            warnings: result.warnings,
+            ...(result.reason ? { reason: result.reason } : {}),
+            signature: {
+              valid: result.signature.ok,
+              keyId: result.signature.keyId,
+              firstSeenKey: result.firstSeenKey,
+              keyChanged: result.keyChanged,
+            },
+            trusted: (await store.list()).some((a) => a.baseUrl === url),
+          },
+          null,
+          2,
+        );
+      } catch (err) {
+        return errorResult(err instanceof Error ? err.message : String(err));
+      }
+    },
+  };
+
+  const negotiateVersion: Tool = {
+    definition: toolDef(
+      'a2a_negotiate_version',
+      'Đàm phán protocol version A2A chung giữa client và server (v1.1): cho hai danh sách bản (cách nhau bằng dấu phẩy, vd "1.1,1.0.1" và "1.0"), trả bản chung cao nhất và tính năng dùng được ở bản đó (resumableStreams, multiTenancy...). CHỈ TÍNH TOÁN, không gọi mạng.',
+      {
+        clientVersions: { type: 'string', description: 'Các bản client nói được, cách nhau bằng dấu phẩy (vd "1.1,1.0.1"). Bỏ trống = mặc định open-bot (1.1).' },
+        serverVersions: { type: 'string', description: 'Các bản server nói được, cách nhau bằng dấu phẩy (vd "1.0"). Bỏ trống = mặc định open-bot (1.1).' },
+        wantedFeatures: { type: 'string', description: 'Tính năng muốn dùng, cách nhau bằng dấu phẩy (vd "resumableStreams,multiTenancy"). Bỏ trống = không yêu cầu.' },
+      },
+      [],
+    ),
+    needsApproval: false,
+    execute: async (args: Record<string, unknown>): Promise<string> => {
+      try {
+        const split = (raw: string | undefined): string[] | undefined => {
+          if (raw === undefined) return undefined;
+          const list = raw.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+          return list.length > 0 ? list : undefined;
+        };
+        const result = negotiateProtocolVersionV11(
+          split(getOptionalStringArg(args, 'clientVersions')),
+          split(getOptionalStringArg(args, 'serverVersions')),
+          (split(getOptionalStringArg(args, 'wantedFeatures')) ?? []) as Parameters<
+            typeof negotiateProtocolVersionV11
+          >[2],
+        );
+        return JSON.stringify(result, null, 2);
+      } catch (err) {
+        return errorResult(err instanceof Error ? err.message : String(err));
+      }
+    },
+  };
+
+  return [discover, listAgents, send, status, cancel, listTasks, delegate, verifyCard, registryRegister, registrySearch, registryList, registryRemove, verifyCardV11, negotiateVersion];
 }
 
 /** Placeholder chưa gắn store (theo mẫu SUBAGENT_TOOLS) — dùng createA2aTools(opts) để có store thật. */
@@ -686,6 +963,12 @@ export const A2A_TOOL_NAMES: readonly string[] = [
   'a2a_list_tasks',
   'a2a_delegate',
   'a2a_verify_card',
+  'a2a_registry_register',
+  'a2a_registry_search',
+  'a2a_registry_list',
+  'a2a_registry_remove',
+  'a2a_verify_card_v11',
+  'a2a_negotiate_version',
 ];
 
 export type { Tool, ToolContext };
