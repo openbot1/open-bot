@@ -54,3 +54,8 @@ export type {
 // v0.97 (Team T5): harness v2 — signed webhooks, routines v2, headless
 // jobs, versioned NDJSON export, per-bot-computer health probe.
 export * from './v2/index';
+
+// v1.07 (Đội T2): harness v3 — vòng lặp Agent/Conversation/EventLog
+// gọn, sub-agent delegation (TaskToolSet), critic inline, budget meter
+// token/cost/thời gian, LLM profiles + lệnh /model.
+export * from './v3/index';

@@ -98,6 +98,16 @@ function validateServer(name: string, raw: unknown): McpServerConfig {
   return config;
 }
 
+/**
+ * v1.07 (T4): validate one MCP server config — the same rules
+ * `loadMcpConfig` applies to mcp.json, reused by plugin-bundle
+ * manifests so a bundle cannot smuggle in a server that mcp.json
+ * itself would reject. Throws a clear Error (never echoes secrets).
+ */
+export function validateMcpServerConfig(name: string, raw: unknown): McpServerConfig {
+  return validateServer(name, raw);
+}
+
 export function loadMcpConfig(workspaceDir: string): McpConfig {
   const filePath = path.join(workspaceDir, MCP_CONFIG_REL_PATH);
   if (!fs.existsSync(filePath)) return { servers: {} };

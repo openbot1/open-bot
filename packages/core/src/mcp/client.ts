@@ -67,6 +67,7 @@ import {
 import { runToolCallMultiRoundTrip } from './mrtrClient';
 import type { MrtrHandlers, MrtrRoundRecord } from './mrtr';
 import { StreamableHttpTransport } from './transport';
+import { ClientDeprecationTracker } from './clientDeprecation';
 import { summarizeMcpResult, type McpAuditLog } from './auditLog';
 import { registerMcpListChangedHandlers, type McpListKind } from './notifications';
 import type {
@@ -1220,6 +1221,12 @@ export class StdioMcpClient implements McpClient {
   /** v1.04: kết quả thương lượng của `connectMcp` (null trước khi connect xong). */
   statelessNegotiation: StatelessNegotiation | null = null;
   /**
+   * v1.06: tracker deprecation phía client (Roots/Sampling/Logging).
+   * Ghi notice + cảnh báo một lần/method khi server dùng surface
+   * cũ; coordinator đọc qua `client.deprecationTracker.getNotices()`.
+   */
+  readonly deprecationTracker: ClientDeprecationTracker;
+  /**
    * Dispatcher cho mọi message do server khởi xướng (v0.13, W5a).
    * Public để coordinator đăng ký handler elicitation / sampling /
    * roots... — client chỉ đăng ký sẵn `notifications/progress` (route
@@ -1236,6 +1243,7 @@ export class StdioMcpClient implements McpClient {
   constructor(config: McpServerConfig) {
     if (!config.command) throw new McpError('Stdio MCP server needs a "command" in its config');
     this.config = config;
+    this.deprecationTracker = new ClientDeprecationTracker({ serverName: config.name });
     this.reconnectConfig = resolveMcpReconnectConfig(config.reconnect);
     this.dispatcher.register('notifications/progress', (params) => {
       dispatchProgress(this.progressHandlers, params);
@@ -1858,6 +1866,11 @@ export class StreamableHttpMcpClient implements McpClient {
   /** v1.04: kết quả thương lượng của `connectMcp` (null trước khi connect xong). */
   statelessNegotiation: StatelessNegotiation | null = null;
   /**
+   * v1.06: tracker deprecation phía client (Roots/Sampling/Logging) —
+   * giống stdio client (xem trên).
+   */
+  readonly deprecationTracker: ClientDeprecationTracker;
+  /**
    * Dispatcher cho mọi message do server khởi xướng (v0.13, W5a) —
    * giống stdio client. Từ v0.13 (integration), response cho
    * server-initiated *request* ĐƯỢC gửi trả qua transport (POST) thay
@@ -1883,6 +1896,7 @@ export class StreamableHttpMcpClient implements McpClient {
       );
     }
     this.config = config;
+    this.deprecationTracker = new ClientDeprecationTracker({ serverName: config.name });
     this.reconnectConfig = resolveMcpReconnectConfig(config.reconnect);
     this.reconnectPolicy = new McpReconnectPolicy(this.reconnectConfig);
     this.dispatcher.register('notifications/progress', (params) => {
@@ -2030,6 +2044,16 @@ export class StreamableHttpMcpClient implements McpClient {
 
   isClosed(): boolean {
     return this.closed;
+  }
+
+  /**
+   * v1.06: bỏ session id đang giữ (dùng khi negotiation ra mode
+   * stateless — vd server trả session id trong response của
+   * `server/discover` trước khi `statelessActive` được bật).
+   * Không gửi gì tới server: phía stateless không có session để dọn.
+   */
+  dropSessionId(): void {
+    this.sessionId = null;
   }
 
   /**
@@ -2709,6 +2733,12 @@ export async function connectMcp(config: McpServerConfig): Promise<McpClient> {
       client.statelessActive = negotiation.mode === 'stateless';
       client.statelessNegotiation = negotiation;
       client.negotiatedProtocolVersion = negotiation.protocolVersion;
+      // v1.06: stateless thì bỏ session id server có thể đã cấp
+      // trong response `server/discover` (stdio client không có
+      // session nên gọi này là no-op an toàn qua optional call).
+      if (negotiation.mode === 'stateless') {
+        (client as { dropSessionId?: () => void }).dropSessionId?.();
+      }
     } catch (err) {
       await client.close().catch(() => undefined);
       throw err;

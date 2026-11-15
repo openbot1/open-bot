@@ -40,6 +40,7 @@ import {
   ElicitationUrlTracker,
   createElicitationHandler,
   handleElicitationRequest,
+  isSensitiveElicitationField,
   parseElicitationRequest,
   validateElicitedContent,
   type ElicitResult,
@@ -48,6 +49,7 @@ import {
 } from './elicitation';
 import {
   MCP_MRTR_MAX_ROUNDS_DEFAULT,
+  MrtrError,
   runMultiRoundTrip,
   type MrtrCallOutcome,
   type MrtrHandlers,
@@ -542,3 +544,360 @@ export function describeMrtrElicitationState(state: MrtrElicitationState): strin
 
 /** Kiểu kết quả MRTR (re-export để caller không import lẻ). */
 export type { MrtrResultType };
+
+// ---------------------------------------------------------------------------
+// v1.06 (Đội T2): handler onNeedsElicitation + secret guard + audit —
+// gộp từ bản v1.06 (cùng file, API khác, không trùng tên với section trên).
+// ---------------------------------------------------------------------------
+
+/** Lỗi khi server xin secret qua form-mode — từ chối thẳng. */
+export class MrtrElicitationRefusedError extends MrtrError {
+  /** Tên các field nhạy cảm đã bị từ chối (chỉ tên, không giá trị). */
+  readonly refusedFields: string[];
+  constructor(refusedFields: string[], round?: number) {
+    super(
+      `MRTR elicitation: từ chối — server xin dữ liệu nhạy cảm qua form-mode: ${refusedFields.join(', ')}. ` +
+        `Mật khẩu / API key / token phải đi URL-mode (OAuth / trang của provider), không điền qua form.`,
+      'needs_elicitation',
+      round,
+    );
+    this.name = 'MrtrElicitationRefusedError';
+    this.refusedFields = [...refusedFields];
+  }
+}
+
+/** Loại sự kiện audit của MRTR elicitation. */
+export type MrtrElicitationAuditKind =
+  | 'form-accepted'
+  | 'form-declined'
+  | 'secret-refused'
+  | 'url-opened'
+  | 'url-completed'
+  | 'url-timeout'
+  | 'parse-error';
+
+/** Một sự kiện audit — chỉ metadata, không giá trị user nhập. */
+export interface MrtrElicitationAuditEvent {
+  kind: MrtrElicitationAuditKind;
+  round: number;
+  serverName: string;
+  mode?: 'form' | 'url';
+  /** Tên field (form-mode) hoặc elicitationId (url-mode). */
+  detail?: string;
+  atMs: number;
+}
+
+export type MrtrElicitationAuditListener = (event: MrtrElicitationAuditEvent) => void;
+
+/** Nguồn dữ liệu / callback cho handler MRTR elicitation. */
+export interface MrtrElicitationSources {
+  /** Tên server MCP đang hỏi (UI phải hiển thị rõ cho user). */
+  serverName: string;
+  /** Hàm hỏi user (modal / prompt). Bắt buộc. */
+  prompt: ElicitationPrompt;
+  /**
+   * Mở URL ngoài cho URL-mode (desktop: mở trình duyệt hệ thống).
+   * Không có thì URL-mode lỗi rõ ràng thay vì lặng lẽ bỏ qua.
+   */
+  openUrl?: (url: string) => Promise<void> | void;
+  /** Tracker chờ `notifications/elicitation/complete` (URL-mode). */
+  urlTracker?: ElicitationUrlTracker;
+  /** Timeout chờ hoàn tất URL-mode (ms). Mặc định 10 phút. */
+  urlCompletionTimeoutMs?: number;
+  /** Gọi khi server xin secret qua form (để UI/audit báo riêng). */
+  onSecretRefused?: (fields: string[], round: number) => void;
+  /** Nghe mọi sự kiện audit (activity feed). */
+  onAudit?: MrtrElicitationAuditListener;
+  /** Signal huỷ lượt chờ (đóng app / user huỷ tool call). */
+  signal?: AbortSignal;
+  /** Đồng hồ (test tiêm giờ cố định). */
+  nowMs?: () => number;
+}
+
+/** Timeout mặc định chờ hoàn tất URL-mode (10 phút). */
+export const DEFAULT_MRTR_ELICITATION_URL_TIMEOUT_MS = 10 * 60 * 1000;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Quét schema elicitation, trả danh sách tên field nhạy cảm.
+ * Khác với `parseElicitationSchema` (ném lỗi ở field nhạy cảm
+ * đầu tiên): hàm này liệt kê HẾT các field nhạy cảm để thông báo
+ * từ chối đầy đủ. Schema không phải object → trả [] (caller sẽ
+ * báo lỗi parse riêng).
+ */
+export function findSensitiveElicitationFields(schema: unknown): string[] {
+  if (!isRecord(schema)) return [];
+  const properties = schema['properties'];
+  if (!isRecord(properties)) return [];
+  const sensitive: string[] = [];
+  for (const [name, propSchema] of Object.entries(properties)) {
+    if (
+      isRecord(propSchema) &&
+      isSensitiveElicitationField(name, propSchema)
+    ) {
+      sensitive.push(name);
+    } else if (!isRecord(propSchema) && isSensitiveElicitationField(name, {})) {
+      sensitive.push(name);
+    }
+  }
+  return sensitive;
+}
+
+/**
+ * Parse `MrtrNeed` của một round `needs_elicitation` thành
+ * `ElicitationRequest` để UI/prompt dùng chung với đường
+ * server-initiated cũ. Server gửi:
+ *   - form-mode: `need.schema` (JSON Schema) + `need.prompt` làm message.
+ *   - url-mode: `need.detail.url` (+ `need.detail.mode: 'url'`,
+ *     `need.detail.elicitationId` khi có) + `need.prompt`.
+ * Ném `MrtrError` khi need thiếu cả schema lẫn url (server sai spec).
+ */
+export function parseMrtrElicitationNeed(
+  need: MrtrNeed,
+  serverName: string,
+): ElicitationRequest {
+  const detail = isRecord(need.detail) ? need.detail : {};
+  const message = need.prompt ?? (typeof detail['message'] === 'string' ? detail['message'] : '');
+  const url =
+    typeof detail['url'] === 'string'
+      ? detail['url']
+      : typeof detail['elicitationUrl'] === 'string'
+        ? detail['elicitationUrl']
+        : undefined;
+  const modeHint =
+    detail['mode'] === 'url' || detail['mode'] === 'form'
+      ? detail['mode']
+      : undefined;
+  const mode = modeHint ?? (url ? 'url' : 'form');
+  const elicitationId =
+    typeof detail['elicitationId'] === 'string' ? detail['elicitationId'] : undefined;
+  const params: Record<string, unknown> = {
+    message: message || 'Server cần thêm thông tin từ bạn.',
+    mode,
+    ...(elicitationId ? { elicitationId } : {}),
+    ...(mode === 'url'
+      ? { url }
+      : { requestedSchema: need.schema ?? detail['requestedSchema'] }),
+  };
+  try {
+    return parseElicitationRequest(params, serverName);
+  } catch (err) {
+    throw new MrtrError(
+      `MRTR elicitation: need không hợp lệ: ${(err as Error).message}`,
+      'needs_elicitation',
+    );
+  }
+}
+
+/**
+ * Handler `onNeedsElicitation` đầy đủ cho MRTR: form-mode có
+ * secret guard, url-mode có mở URL + chờ callback. Dùng với
+ * `runToolCallMultiRoundTrip` qua `MrtrHandlerSources.
+ * onNeedsElicitation`, hoặc qua `buildDefaultMrtrHandlers`.
+ */
+export class MrtrElicitationHandler {
+  private readonly serverName: string;
+  private readonly prompt: ElicitationPrompt;
+  private readonly openUrl?: (url: string) => Promise<void> | void;
+  private readonly urlTracker?: ElicitationUrlTracker;
+  private readonly urlCompletionTimeoutMs: number;
+  private readonly onSecretRefused?: (fields: string[], round: number) => void;
+  private readonly onAudit?: MrtrElicitationAuditListener;
+  private readonly signal?: AbortSignal;
+  private readonly nowMs: () => number;
+  private readonly auditLog: MrtrElicitationAuditEvent[] = [];
+  private secretRefusalCount = 0;
+
+  constructor(sources: MrtrElicitationSources) {
+    this.serverName = sources.serverName;
+    this.prompt = sources.prompt;
+    this.openUrl = sources.openUrl;
+    this.urlTracker = sources.urlTracker;
+    this.urlCompletionTimeoutMs =
+      sources.urlCompletionTimeoutMs ?? DEFAULT_MRTR_ELICITATION_URL_TIMEOUT_MS;
+    this.onSecretRefused = sources.onSecretRefused;
+    this.onAudit = sources.onAudit;
+    this.signal = sources.signal;
+    this.nowMs = sources.nowMs ?? Date.now;
+  }
+
+  /** Số lần đã từ chối secret qua form-mode. */
+  get secretRefusals(): number {
+    return this.secretRefusalCount;
+  }
+
+  /** Toàn bộ audit đã ghi (bản sao). */
+  get audit(): MrtrElicitationAuditEvent[] {
+    return [...this.auditLog];
+  }
+
+  private record(
+    kind: MrtrElicitationAuditKind,
+    round: number,
+    mode?: 'form' | 'url',
+    detail?: string,
+  ): void {
+    const event: MrtrElicitationAuditEvent = {
+      kind,
+      round,
+      serverName: this.serverName,
+      ...(mode ? { mode } : {}),
+      ...(detail ? { detail } : {}),
+      atMs: this.nowMs(),
+    };
+    this.auditLog.push(event);
+    this.onAudit?.(event);
+  }
+
+  /**
+   * Trả lời một round `needs_elicitation`. Trả về `answer` cho
+   * round sau (form-mode: object content đã validate; url-mode:
+   * `{ completed: true }`). Ném `MrtrError` khi user từ chối/huỷ,
+   * `MrtrElicitationRefusedError` khi server xin secret qua form,
+   * hoặc lỗi timeout URL-mode — driver dừng cả tool call thay vì
+   * bịa câu trả lời.
+   */
+  async handle(need: MrtrNeed, round: number): Promise<Record<string, unknown>> {
+    if (this.signal?.aborted) {
+      throw new MrtrError(
+        `MRTR elicitation: đã bị huỷ ở round ${round}`,
+        'needs_elicitation',
+        round,
+      );
+    }
+    let request: ElicitationRequest;
+    // Secret guard chạy TRƯỚC KHI parse: `parseElicitationRequest`
+    // ném lỗi ngay ở field nhạy cảm đầu tiên, nên quét ở đây để
+    // liệt kê hết field + ném đúng `MrtrElicitationRefusedError`
+    // (kèm audit + onSecretRefused) thay vì lỗi parse chung chung.
+    // Chỉ áp cho form-mode (url-mode không dùng schema).
+    const detail = isRecord(need.detail) ? need.detail : {};
+    const isUrlMode =
+      detail['mode'] === 'url' ||
+      typeof detail['url'] === 'string' ||
+      typeof detail['elicitationUrl'] === 'string';
+    if (!isUrlMode) {
+      const preSensitive = findSensitiveElicitationFields(
+        need.schema ?? detail['requestedSchema'],
+      );
+      if (preSensitive.length > 0) {
+        this.secretRefusalCount += 1;
+        this.record('secret-refused', round, 'form', preSensitive.join(','));
+        this.onSecretRefused?.(preSensitive, round);
+        throw new MrtrElicitationRefusedError(preSensitive, round);
+      }
+    }
+    try {
+      request = parseMrtrElicitationNeed(need, this.serverName);
+    } catch (err) {
+      this.record('parse-error', round, undefined, (err as Error).message);
+      throw err;
+    }
+    if (request.mode === 'form') {
+      return this.handleForm(request, need, round);
+    }
+    return this.handleUrl(request, round);
+  }
+
+  private async handleForm(
+    request: ElicitationRequest,
+    need: MrtrNeed,
+    round: number,
+  ): Promise<Record<string, unknown>> {
+    // Secret guard: quét TRƯỚC KHI hỏi user. `parseElicitationRequest`
+    // đã ném lỗi ở field nhạy cảm đầu tiên, nhưng quét lại ở đây để
+    // liệt kê hết field + ghi audit đầy đủ trước khi từ chối.
+    const schema = need.schema ?? request.requestedSchema ?? {};
+    const sensitive = findSensitiveElicitationFields(schema);
+    if (sensitive.length > 0) {
+      this.secretRefusalCount += 1;
+      this.record('secret-refused', round, 'form', sensitive.join(','));
+      this.onSecretRefused?.(sensitive, round);
+      throw new MrtrElicitationRefusedError(sensitive, round);
+    }
+    const result = await handleElicitationRequest(request, this.prompt, {
+      ...(this.signal ? { signal: this.signal } : {}),
+    });
+    if (result.action !== 'accept') {
+      this.record('form-declined', round, 'form', result.action);
+      throw new MrtrError(
+        `MRTR elicitation: người dùng ${result.action === 'decline' ? 'từ chối' : 'huỷ'} yêu cầu ở round ${round}`,
+        'needs_elicitation',
+        round,
+      );
+    }
+    const fieldNames = (request.fields ?? []).map((f) => f.name).join(',');
+    this.record('form-accepted', round, 'form', fieldNames || undefined);
+    return { ...(result.content ?? {}) };
+  }
+
+  private async handleUrl(
+    request: ElicitationRequest,
+    round: number,
+  ): Promise<Record<string, unknown>> {
+    const url = request.url as string;
+    // Hỏi user trước khi mở URL ngoài (prompt chung — user thấy rõ
+    // server nào, URL nào; decline/cancel thì không mở gì cả).
+    const result = await handleElicitationRequest(request, this.prompt, {
+      ...(this.signal ? { signal: this.signal } : {}),
+    });
+    if (result.action !== 'accept') {
+      this.record('form-declined', round, 'url', result.action);
+      throw new MrtrError(
+        `MRTR elicitation: người dùng ${result.action === 'decline' ? 'từ chối' : 'huỷ'} mở URL ở round ${round}`,
+        'needs_elicitation',
+        round,
+      );
+    }
+    if (!this.openUrl) {
+      throw new MrtrError(
+        `MRTR elicitation: URL-mode cần mở "${url}" nhưng client không có openUrl (không mở được trình duyệt ngoài)`,
+        'needs_elicitation',
+        round,
+      );
+    }
+    await this.openUrl(url);
+    this.record('url-opened', round, 'url', request.elicitationId ?? url);
+    if (request.elicitationId && this.urlTracker) {
+      try {
+        await this.urlTracker.waitForCompletion(request.elicitationId, {
+          timeoutMs: this.urlCompletionTimeoutMs,
+          ...(this.signal ? { signal: this.signal } : {}),
+        });
+      } catch (err) {
+        this.record('url-timeout', round, 'url', request.elicitationId);
+        throw new MrtrError(
+          `MRTR elicitation: hết thời gian chờ hoàn tất URL-mode (${this.urlCompletionTimeoutMs}ms) ở round ${round}: ${(err as Error).message}`,
+          'needs_elicitation',
+          round,
+        );
+      }
+      this.record('url-completed', round, 'url', request.elicitationId);
+      return { completed: true, elicitationId: request.elicitationId };
+    }
+    // Không có elicitationId/tracker: server không báo complete qua
+    // notification — coi mở URL xong là xong (tương thích server cũ).
+    return { completed: true, url };
+  }
+}
+
+/**
+ * Tạo callback `onNeedsElicitation` từ sources (để nối thẳng vào
+ * `MrtrHandlerSources` / `buildDefaultMrtrHandlers`). Trả về hàm
+ * đã bind + giữ `handler` để coordinator đọc audit / đếm từ chối.
+ */
+export function createMrtrElicitationHandler(
+  sources: MrtrElicitationSources,
+): {
+  onNeedsElicitation: (need: MrtrNeed, round: number) => Promise<Record<string, unknown>>;
+  handler: MrtrElicitationHandler;
+} {
+  const handler = new MrtrElicitationHandler(sources);
+  return {
+    onNeedsElicitation: (need, round) => handler.handle(need, round),
+    handler,
+  };
+}

@@ -162,6 +162,30 @@ export {
 } from './testRun';
 export type { HookTestRunResult, TestRunHookCommandOptions } from './testRun';
 
+// --- v1.07 (T4): declarative hooks (hooks.json) + lifecycle helpers ---
+export {
+  applyHooksConfig,
+  createSessionStartContextHook,
+  createStopCleanupHook,
+  findHooksConfigFiles,
+  loadAndApplyHooksConfig,
+  loadHooksConfigFile,
+  parseHooksConfig,
+  DEFAULT_HOOKS_CONFIG_REL_PATH,
+  HOOKS_CONFIG_FILE,
+  HOOKS_CONFIG_VERSION,
+  LEGACY_HOOKS_CONFIG_REL_PATH,
+} from './declarative';
+export type {
+  ApplyHooksConfigOptions,
+  ApplyHooksConfigResult,
+  HookConfigEntry,
+  ParsedHookConfigEntry,
+  ParseHooksConfigResult,
+  SessionStartContextHookOptions,
+  StopCleanupHookOptions,
+} from './declarative';
+
 export type {
   CompactHookOutcome,
   HookErrorMode,

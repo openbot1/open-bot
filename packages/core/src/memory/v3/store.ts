@@ -359,6 +359,42 @@ export class V6RecordStore {
     return { ...full };
   }
 
+  /**
+   * Xóa nội dung của một bản ghi (GDPR erasure, memory v8).
+   *
+   * ĐÂY LÀ NGOẠI LỆ DUY NHẤT của nguyên tắc add-only: luật xóa dữ
+   * liệu (GDPR Article 17) yêu cầu nội dung thật sự biến mất, không
+   * chỉ bị ẩn bằng event retire. Hàm này:
+   *  - thay text/entities/tags/sourceText bằng tombstone "[đã xóa
+   *    theo yêu cầu]" (id, scope, kind, key, confidence, timestamps
+   *    được GIỮ để audit còn biết "đã từng có một bản ghi ở đây");
+   *  - append event retire (lý do xóa) để bản ghi không còn active;
+   *  - ghi bền ngay.
+   * Chỉ dùng qua ErasureService v8 (có audit log riêng + bước verify).
+   * Trả về bản ghi đã scrub (view) hoặc undefined khi không có id.
+   */
+  scrubRecord(id: string, actor: string, reason: string): V6RecordView | undefined {
+    this.load();
+    const record = this.records.find((r) => r.id === id);
+    if (!record) return undefined;
+    record.text = '[đã xóa theo yêu cầu]';
+    record.entities = [];
+    record.tags = ['erased'];
+    record.source = {
+      type: record.source.type,
+      ref: record.source.ref,
+      ...(record.source.botId ? { botId: record.source.botId } : {}),
+    };
+    this.appendEventInternal({
+      type: 'retire',
+      targetId: id,
+      reason: reason === '' ? 'Xóa theo yêu cầu (GDPR erasure v8).' : reason,
+      actor,
+    });
+    this.save();
+    return this.toView(record);
+  }
+
   /** Tìm bản ghi active theo key + scope (key/value lookup). */
   findByKey(
     key: string,

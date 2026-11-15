@@ -50,12 +50,14 @@ import { PROVIDERS } from '../providers/index';
 import { ANTHROPIC_KNOWN_MODELS } from '../providers/anthropic';
 import { COHERE_KNOWN_MODELS } from '../providers/cohere';
 import { DEEPSEEK_KNOWN_MODELS } from '../providers/deepseek';
+import { FIREWORKS_KNOWN_MODELS } from '../providers/fireworks';
 import { GEMINI_KNOWN_MODELS, GEMINI_PREVIEW_MODELS } from '../providers/gemini';
 import { GROQ_KNOWN_MODELS } from '../providers/groq';
 import { MISTRAL_KNOWN_MODELS } from '../providers/mistral';
 import { MOONSHOT_KNOWN_MODELS } from '../providers/moonshot';
 import { OLLAMA_KNOWN_MODELS } from '../providers/ollama';
 import { OPENAI_KNOWN_MODELS } from '../providers/openai';
+import { OPENROUTER_KNOWN_MODELS } from '../providers/openrouter';
 import { QWEN_KNOWN_MODELS } from '../providers/qwen';
 import { TOGETHER_KNOWN_MODELS } from '../providers/together';
 import { XAI_KNOWN_MODELS } from '../providers/xai';
@@ -120,6 +122,10 @@ const BUILTIN_FALLBACKS: Record<string, string> = {
   groq: 'llama-3.1-8b-instant',
   together: 'meta-llama/Llama-3.1-8B-Instruct-Turbo',
   cohere: 'command-r-08-2024',
+  // v1.08 (Đội T4): OpenRouter (router — fallback là chính nó, model
+  // rẻ hơn do router tự chọn) + Fireworks (8B rẻ hơn 70B mặc định).
+  openrouter: 'openrouter/auto',
+  fireworks: 'accounts/fireworks/models/llama-v3p1-8b-instruct',
   ollama: 'qwen2.5',
   'openai-compatible': '',
   // M1: CLI provider chỉ có một model — fallback là chính nó.
@@ -155,6 +161,9 @@ const KNOWN_MODELS_BY_PROVIDER: Record<string, readonly string[]> = {
   groq: GROQ_KNOWN_MODELS,
   together: TOGETHER_KNOWN_MODELS,
   cohere: COHERE_KNOWN_MODELS,
+  // v1.08 (Đội T4): OpenRouter + Fireworks AI (promoted from presets).
+  openrouter: OPENROUTER_KNOWN_MODELS,
+  fireworks: FIREWORKS_KNOWN_MODELS,
   ollama: [...OLLAMA_KNOWN_MODELS, 'qwen2.5:0.5b'],
   'openai-compatible': COMPATIBLE_PRESETS.map((p) => p.defaultModel),
   // M1: model duy nhất của CLI provider — model thật do CLI đã đăng nhập quyết định.

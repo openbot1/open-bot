@@ -1,0 +1,93 @@
+/**
+ * Harness v4 — public surface (v1.08, Đội T3).
+ *
+ * EventLog v4 (session, JSONL, hash chain, replay/time-travel/resume),
+ * CodeAct v4 loop (chạy → phân loại lỗi → fixer sửa → chạy lại),
+ * dependency sweep (thứ tự an toàn + xung đột + chia việc).
+ */
+export {
+  CodeActV4Loop,
+  HARNESS_V4_ERROR_PATTERNS,
+  classifyHarnessV4Error,
+  harnessV4FixHintFor,
+  runHarnessV4CodeActLoop,
+} from './codeActV4Loop';
+export type { HarnessV4LoopOptions } from './codeActV4Loop';
+export {
+  HARNESS_V4_CODEACT_PREVIEW_CHARS,
+  HARNESS_V4_DEFAULT_MAX_FILE_BYTES,
+  HARNESS_V4_GENESIS_PREV_HASH,
+  HARNESS_V4_MAX_PAYLOAD_CHARS,
+  HarnessV4EventLog,
+  HarnessV4EventLogError,
+  foldHarnessV4Events,
+  harnessV4CompareStates,
+  harnessV4DigestState,
+  harnessV4EventHashInput,
+  harnessV4HashEvent,
+  harnessV4Sha256Hex,
+  harnessV4StableStringify,
+  harnessV4TruncateText,
+  harnessV4VerifyEventHash,
+  safeHarnessV4SessionFileName,
+} from './eventLogV4';
+export type {
+  HarnessV4EventLogOptions,
+  HarnessV4EventQuery,
+  HarnessV4ReadResult,
+  HarnessV4ResumeResult,
+  HarnessV4SessionSnapshot,
+} from './eventLogV4';
+export {
+  HARNESS_V4_SWEEP_MAX_FILE_BYTES,
+  HARNESS_V4_SWEEP_MAX_FILES,
+  analyzeHarnessV4Dependencies,
+  detectHarnessV4Conflicts,
+  extractHarnessV4ImportSpecifiers,
+  findHarnessV4Cycles,
+  harnessV4DependencyClosure,
+  harnessV4ImpactOf,
+  normalizeHarnessV4SweepPath,
+  resolveHarnessV4Import,
+  safeHarnessV4Order,
+  suggestHarnessV4Partition,
+} from './dependencySweep';
+export { DEFAULT_HARNESS_V4_LOOP_LIMITS } from './types';
+export type {
+  AnyHarnessV4Event,
+  H4CheckpointPayload,
+  H4CodeActLoopPayload,
+  H4CodeActRunPayload,
+  H4ErrorPayload,
+  H4ModelReplyPayload,
+  H4SessionEndedPayload,
+  H4SessionStartedPayload,
+  H4ToolPayload,
+  H4UserMessagePayload,
+  HarnessV4Assignment,
+  HarnessV4Conflict,
+  HarnessV4ConflictReport,
+  HarnessV4DependencyEdge,
+  HarnessV4DependencyGraph,
+  HarnessV4ErrorKind,
+  HarnessV4Event,
+  HarnessV4EventKind,
+  HarnessV4EventPayloadMap,
+  HarnessV4Fixer,
+  HarnessV4Impact,
+  HarnessV4LoopLimits,
+  HarnessV4LoopOutcome,
+  HarnessV4LoopResult,
+  HarnessV4LoopRound,
+  HarnessV4Partition,
+  HarnessV4SafeOrder,
+  HarnessV4SessionMeta,
+  HarnessV4SessionState,
+  HarnessV4StateDiff,
+  HarnessV4SweepFile,
+  HarnessV4TimeTravelResult,
+  HarnessV4ToolCallRecord,
+  HarnessV4TranscriptEntry,
+  HarnessV4Verification,
+  NewHarnessV4Event,
+} from './types';

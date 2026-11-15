@@ -47,6 +47,7 @@ import type {
 } from './taskProgress';
 import { isTaskTerminal, parseTaskStatus } from './tasks';
 import type { McpTaskSpecVersion } from './tasks';
+import { ClientDeprecationTracker } from './clientDeprecation';
 
 /** Handler cho `sampling/createMessage` do server gửi (khi có). */
 export type McpSamplingHandler = (params: unknown) => unknown | Promise<unknown>;
@@ -136,6 +137,17 @@ export function registerDefaultMcpClientHandlers(
   }
   const serverName = options.serverName?.trim() || 'MCP server';
   const urlTracker = new ElicitationUrlTracker();
+  // v1.06: tracker deprecation phía client (Roots/Sampling/Logging).
+  // Client thật (Stdio/StreamableHttp) luôn có tracker; client giả
+  // trong test có thể không có — khi đó bỏ qua, không throw.
+  const deprecationTracker = (
+    client as { deprecationTracker?: ClientDeprecationTracker }
+  ).deprecationTracker;
+  // Ghi nhận capability deprecated client quảng cáo ngay từ lúc
+  // connect (roots vì có workspace, sampling vì có handler) — chỉ
+  // ghi nhận, không từ chối kết nối.
+  const capabilities = buildMcpClientCapabilities(options);
+  deprecationTracker?.noteAdvertisedCapabilities(capabilities);
 
   if (options.elicitationPrompt) {
     // v0.85 (P2-8): nối tracker vào handler — URL-mode accept thì
@@ -156,19 +168,36 @@ export function registerDefaultMcpClientHandlers(
 
   if (options.workspaceDir) {
     const workspaceDir = options.workspaceDir;
-    dispatcher.register('roots/list', () => ({
+    // v1.06: `roots/list` đã deprecated (SEP-2577) — bọc handler để
+    // lần server gọi đầu tiên cảnh báo, các lần sau chỉ đếm.
+    const rootsHandler = (): { roots: Array<{ uri: string; name: string }> } => ({
       roots: [
         {
           uri: pathToFileURL(workspaceDir).href,
           name: workspaceDir.split(/[\\/]/).filter(Boolean).pop() ?? workspaceDir,
         },
       ],
-    }));
+    });
+    dispatcher.register(
+      'roots/list',
+      deprecationTracker
+        ? deprecationTracker.wrapHandler('roots/list', rootsHandler)
+        : rootsHandler,
+    );
   }
 
   if (options.samplingHandler) {
     const samplingHandler = options.samplingHandler;
-    dispatcher.register('sampling/createMessage', (params) => samplingHandler(params));
+    // v1.06: `sampling/createMessage` đã deprecated (SEP-2577) — bọc
+    // tương tự roots (xem `mrtr.ts` cho đường thay thế).
+    dispatcher.register(
+      'sampling/createMessage',
+      deprecationTracker
+        ? deprecationTracker.wrapHandler('sampling/createMessage', (params: unknown) =>
+            samplingHandler(params),
+          )
+        : (params: unknown) => samplingHandler(params),
+    );
   }
 
   // v1.05 (MCP 2.0 Tasks): server-directed task — server gửi
