@@ -166,9 +166,17 @@ export function ensureMcpServer(
           : 'exists-different',
     };
   }
+  // v1.10 (audit bảo mật): validate config TRƯỚC khi ghi — config
+  // tới từ runtime (plugin bundle, part definition) không qua
+  // `loadMcpConfig` nên có thể mang shape hỏng (args không phải
+  // mảng, url không phải http(s), ...). Ghi thẳng sẽ poison mcp.json:
+  // mọi lần `loadMcpConfig` sau đó đều throw, toàn bộ MCP config tê
+  // liệt. Validate ở đây chặn ngay từ đầu; config đã validate cũng
+  // được chuẩn hoá (bỏ field lạ) trước khi ghi.
+  const validated = validateServer(name, config);
   const filePath = path.join(workspaceDir, MCP_CONFIG_REL_PATH);
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const next: McpConfig = { servers: { ...current.servers, [name]: config } };
+  const next: McpConfig = { servers: { ...current.servers, [name]: validated } };
   const tmp = filePath + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(next, null, 2) + '\n', 'utf8');
   fs.renameSync(tmp, filePath);

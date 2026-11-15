@@ -36,6 +36,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { validateInputAgainstSchema } from './inputRequired';
 
 export type ServerTaskStatus =
   | 'working'
@@ -262,6 +263,12 @@ export class McpTaskStore {
    * Deliver input to an `input_required` task (`tasks/update`).
    * The parked runner resumes with the answer; the task returns to
    * `working`. Throws when the task is not waiting for input.
+   *
+   * v1.10 (audit bảo mật): khi task đã khai `inputRequest.schema`
+   * lúc `requestInput`, đáp án PHẢI khớp schema mới được nhận —
+   * client gửi sai kiểu / thiếu trường bắt buộc thì task giữ nguyên
+   * `input_required` (client sửa lại rồi gửi tiếp) thay vì runner
+   * nhận input hỏng rồi vỡ ở bước sau.
    */
   update(taskId: string, input: Record<string, unknown>): ServerTaskHandleData {
     const task = this.getOrThrow(taskId);
@@ -270,6 +277,16 @@ export class McpTaskStore {
         `Task ${taskId} is ${task.status}; tasks/update needs input_required.`,
         taskId,
       );
+    }
+    if (task.inputRequest?.schema) {
+      const check = validateInputAgainstSchema(input, task.inputRequest.schema);
+      if (!check.valid) {
+        throw new TaskStoreError(
+          `Task ${taskId}: input không khớp schema: ` +
+            check.issues.map((i) => `${i.path || '(gốc)'} ${i.message}`).join('; '),
+          taskId,
+        );
+      }
     }
     const waiter = this.inputWaiters.get(taskId);
     this.inputWaiters.delete(taskId);

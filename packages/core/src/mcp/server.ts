@@ -52,6 +52,7 @@ import {
 import { checkTasksMethodAllowed, resolveTasksSpecVersion } from './tasksSpec';
 import type { McpTaskSpecVersion } from './tasks';
 import { extractMrtrToolResult } from './mrtrClient';
+import { extractInputRequiredResult } from './inputRequired';
 import { McpAuditLog, summarizeMcpResult } from './auditLog';
 import {
   McpNotificationHub,
@@ -1052,6 +1053,12 @@ export class McpServer {
           // trip chết). Xem `mrtrClient.ts: extractMrtrToolResult`.
           const mrtr = extractMrtrToolResult(raw);
           if (mrtr) return this.ok(id, mrtr);
+          // v1.10 (MCP 2026-07-28): handler trả `resultType:
+          // "input_required"` cũng phải trả thẳng, không bọc vào
+          // content block — cùng lý do như MRTR cũ (xem
+          // `inputRequired.ts: extractInputRequiredResult`).
+          const inputRequired = extractInputRequiredResult(raw);
+          if (inputRequired) return this.ok(id, inputRequired);
           const text = typeof raw === 'string' ? raw : raw.text;
           const structured = typeof raw === 'string' ? undefined : raw.structuredContent;
           const isError = typeof raw === 'string' ? false : raw.isError === true;

@@ -215,6 +215,20 @@ export interface WaitForCompletionOptions {
   /** Gọi mỗi khi trạng thái task đổi sau một lần poll. */
   onStatusChange?: (status: TaskStatus, task: TaskHandleData) => void;
   signal?: AbortSignal;
+  /**
+   * v1.10: nguồn đáp án khi task rơi vào `input_required` (chỉ có
+   * nghĩa ở extension 2026-07-28 — `tasks/update`). Khi có provider,
+   * `waitForCompletion` tự gọi `sendInput(answer)` rồi poll tiếp thay
+   * vì ném lỗi; không có provider thì giữ hành vi cũ (ném `TaskError`
+   * hướng dẫn gọi `sendInput()` tay). Provider ném lỗi → lỗi đó
+   * propagate (vd user từ chối trả lời).
+   */
+  onInputRequired?: (task: TaskHandleData) => Promise<unknown>;
+  /**
+   * v1.10: số vòng input tối đa `onInputRequired` được gọi trong một
+   * lần `waitForCompletion` (mặc định 8) — chặn task xin input vô hạn.
+   */
+  maxInputRounds?: number;
 }
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
@@ -444,8 +458,9 @@ export class TaskHandle {
    *  - `failed` -> ném `TaskError` (kèm status)
    *  - `cancelled` -> ném `TaskError` (kèm status)
    *  - `input_required` -> 2025-11-25: ném `TaskError` (spec chưa có
-   *    cách gửi input); 2026-07-28: ném `TaskError` hướng dẫn gọi
-   *    `sendInput()` (`tasks/update`) rồi poll tiếp
+   *    cách gửi input); 2026-07-28: có `onInputRequired` thì tự gửi
+   *    input (`tasks/update`) rồi poll tiếp (tối đa `maxInputRounds`
+   *    vòng), không có thì ném `TaskError` hướng dẫn gọi `sendInput()`
    *  - hết `timeoutMs` hoặc signal abort -> ném lỗi tương ứng
    *
    * Poll dùng backoff: khoảng chờ bắt đầu từ `pollIntervalMs` (server
@@ -460,6 +475,7 @@ export class TaskHandle {
     const deadline =
       options.timeoutMs !== undefined ? Date.now() + options.timeoutMs : undefined;
     let attempt = 0;
+    let inputRounds = 0;
     for (;;) {
       signal?.throwIfAborted();
       if (deadline !== undefined && Date.now() >= deadline) {
@@ -487,6 +503,20 @@ export class TaskHandle {
       }
       if (data.status === 'input_required') {
         if (this.specVersion === '2026-07-28') {
+          if (options.onInputRequired) {
+            const maxInputRounds = options.maxInputRounds ?? 8;
+            if (inputRounds >= maxInputRounds) {
+              throw new TaskError(
+                `Task "${this.taskId}": server xin input quá ${maxInputRounds} vòng — dừng để tránh lặp vô hạn`,
+                this.taskId,
+                'input_required',
+              );
+            }
+            inputRounds += 1;
+            const answer = await options.onInputRequired(data);
+            await this.sendInput(answer, signal);
+            continue;
+          }
           throw new TaskError(
             `Task "${this.taskId}": server đang chờ input thêm (input_required) — ` +
               `gọi sendInput() (tasks/update) rồi poll tiếp`,
@@ -546,5 +576,29 @@ export async function runTaskToCompletion(
 ): Promise<unknown> {
   const handle = await createTask(transport, method, params, options);
   const { result } = await handle.waitForCompletion(options);
+  return result;
+}
+
+/**
+ * v1.10: như `runTaskToCompletion` nhưng tự trả lời mọi round
+ * `input_required` bằng `inputProvider` (extension 2026-07-28 —
+ * `tasks/update`). `inputProvider` nhận handle data của round đang
+ * chờ input và trả đáp án; đáp án được gửi qua `tasks/update` rồi
+ * poll tiếp. Hết `maxInputRounds` (mặc định 8) thì dừng với
+ * `TaskError`. Ở backend 2025-11-25, task `input_required` vẫn ném
+ * lỗi như trước (spec đó không có cách gửi input).
+ */
+export async function runTaskWithInput(
+  transport: McpTaskTransport,
+  method: string,
+  params: Record<string, unknown> = {},
+  inputProvider: (task: TaskHandleData) => Promise<unknown>,
+  options: CreateTaskOptions & WaitForCompletionOptions = {},
+): Promise<unknown> {
+  const handle = await createTask(transport, method, params, options);
+  const { result } = await handle.waitForCompletion({
+    ...options,
+    onInputRequired: inputProvider,
+  });
   return result;
 }

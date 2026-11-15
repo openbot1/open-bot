@@ -28,7 +28,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { ensureMcpServer, loadMcpConfig, MCP_CONFIG_REL_PATH } from './config';
+import { ensureMcpServer, loadMcpConfig, validateMcpServerConfig, MCP_CONFIG_REL_PATH } from './config';
 import type { McpConfig, McpServerConfig } from './types';
 
 /** Sidecar recording which MCP servers each plugin installed. */
@@ -126,7 +126,13 @@ export function mergePluginMcpServers(
   const result: MergePluginMcpServersResult = { added: [], alreadyPresent: [], existsDifferent: [] };
   const addedConfigs: Record<string, McpServerConfig> = {};
   for (const name of Object.keys(servers).sort()) {
-    const config = servers[name]!;
+    const raw = servers[name]!;
+    // v1.10 (audit bảo mật): validate config bundle khai TRƯỚC khi
+    // chạm mcp.json — bundle hỏng (args không phải mảng, url không
+    // phải http(s), thiếu cả command lẫn url, ...) fail fast với lỗi
+    // rõ tên plugin + server, không ghi một nửa rồi mới vỡ; sidecar
+    // cũng ghi config đã chuẩn hoá (đồng nhất với file trên đĩa).
+    const config = validateMcpServerConfig(name, raw);
     const outcome = ensureMcpServer(workspaceDir, name, config);
     if (outcome.added) {
       result.added.push(name);
