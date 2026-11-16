@@ -121,3 +121,7 @@ export type {
   ContextWindowSource,
   ResolvedContextWindow,
 } from './contextWindow';
+
+// v1.15 (Đội T3): local model router — registry Ollama/llama.cpp,
+// LRU theo RAM, policy cost/latency/quality, budget + gateway.
+export * from './local/index';

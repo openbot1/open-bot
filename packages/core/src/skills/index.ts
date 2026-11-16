@@ -102,6 +102,10 @@ export {
 } from './evolved';
 export type { EvolvedSkill, EvolvedSkillStatus, SkillFeedback, TaskLogEntry } from './evolved';
 
+// --- v1.13 (T1): Agent Skills loader v13 — strict validation, session
+// index, internal registry, cross-CLI interop, local marketplace, audits ---
+export * from './v13/index';
+
 // --- v0.14: skill marketplace (install from URL/git) ---
 export {
   installSkillFromUrl,

@@ -51,3 +51,15 @@ export type {
   UserModelOverrides,
   UserProviderOverrides,
 } from './types';
+// v1.15 (Đội T3): local model catalogue Qwen3/Llama/Gemma + license validation.
+export {
+  ALLOWED_LICENSE_NAMES,
+  DEFAULT_LOCAL_MODEL_ID,
+  DEFAULT_ROUTER_MODEL_ID,
+  LOCAL_MODEL_CATALOG,
+  findLocalModel,
+  localModelsForUseCase,
+  localModelsFittingRam,
+  validateModelLicense,
+} from './localCatalog';
+export type { LicenseValidation, LocalModelEntry, LocalModelLicense } from './localCatalog';
