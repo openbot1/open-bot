@@ -31,6 +31,17 @@ import type {
 // Chỉ user mới được thêm agent tin tưởng (UI); tool không tự trust.
 import { createA2aTools } from './a2aTools';
 import type { A2aToolOptions, TrustedA2aAgent, TrustedA2aAgentStore } from './a2aTools';
+// v1.15 (T2): protocol triad tools — đăng ký qua registerProtocolV115Tools() dưới đây.
+import { createProtocolV115Tools } from './protocolV115Tools';
+import type { ProtocolV115ToolOptions } from './protocolV115Tools';
+// v1.16 (T2): protocols v2 tools — đăng ký qua registerProtocolV2Tools() dưới đây.
+import { createProtocolV2Tools } from './protocolV2Tools';
+import type { ProtocolV2ToolOptions } from './protocolV2Tools';
+
+export { PROTOCOL_V115_TOOLS, PROTOCOL_V115_TOOL_NAMES, createProtocolV115Tools, isProtocolV115ToolName } from './protocolV115Tools';
+export type { ProtocolV115ToolOptions } from './protocolV115Tools';
+export { PROTOCOL_V2_TOOLS, PROTOCOL_V2_TOOL_NAMES, createProtocolV2Tools, isProtocolV2ToolName } from './protocolV2Tools';
+export type { ProtocolV2ToolName, ProtocolV2ToolOptions } from './protocolV2Tools';
 
 export { A2A_TOOLS, A2A_TOOL_NAMES, createA2aTools, createFileTrustedAgentStore, createMemoryTrustedAgentStore, trustedAgentFromCard } from './a2aTools';
 export type { A2aToolOptions, TrustedA2aAgent, TrustedA2aAgentStore } from './a2aTools';
@@ -161,6 +172,32 @@ export class ToolRegistry {
    */
   registerA2aTools(options: A2aToolOptions = {}): void {
     this.registerMany(createA2aTools(options));
+  }
+
+  /**
+   * v1.15 (T2): protocol triad tools — AG-UI emit/catalog,
+   * interrupt raise/resolve, A2UI render/answer, A2A card/
+   * negotiate, MCP discover. The host binds run emitters,
+   * the interrupt manager, the surface registry, the HMAC key
+   * and the MCP transport via ProtocolV115ToolOptions; without
+   * them the tools fall back to fresh local instances (or
+   * refuse, for card signing and MCP discover).
+   */
+  registerProtocolV115Tools(options: ProtocolV115ToolOptions = {}): void {
+    this.registerMany(createProtocolV115Tools(options));
+  }
+
+  /**
+   * v1.16 (T2): protocols v2 tools — MCP discover/negotiate,
+   * durable Tasks create/poll/cancel, Skills list/get/approve,
+   * A2A card sign/verify, A2UI render. The host binds the task
+   * manager, skills server, activation gate, A2UI catalog and
+   * signing keys via ProtocolV2ToolOptions; without them the
+   * tools fall back to fresh local instances (or refuse, for
+   * card signing).
+   */
+  registerProtocolV2Tools(options: ProtocolV2ToolOptions = {}): void {
+    this.registerMany(createProtocolV2Tools(options));
   }
 
   /** Look up a tool by name, or undefined when not registered. */
