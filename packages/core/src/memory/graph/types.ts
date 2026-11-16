@@ -54,6 +54,16 @@ export interface MemoryScope {
    * a query at run level also sees agent, user and app memories.
    */
   appId?: string;
+  /**
+   * Session scope (v1.12, temporal KG v2): the conversation session
+   * the memory belongs to ('' / absent = not bound to a session).
+   * A session groups several runs of one user+bot (vd one long
+   * chat session resumed across restarts). Session is an orthogonal
+   * filter dimension, not a hierarchy level: `matchesScope` applies
+   * the same "empty matches everything" rule as the other fields,
+   * so legacy facts (no sessionId) stay visible everywhere.
+   */
+  sessionId?: string;
 }
 
 /** Nguồn gốc của một fact — bắt buộc, không có fact "mồ côi". */
@@ -124,6 +134,22 @@ export interface GraphFact {
   supersedes?: string;
   /** Fact này bị fact nào thay thế (khi bị UPDATE). */
   supersededBy?: string;
+  /**
+   * Thời điểm fact bị INVALIDATE vì mâu thuẫn (v1.12, temporal KG
+   * v2): khác `validUntil` ở chỗ `validUntil` còn mang nhiều nghĩa
+   * (hết hạn, bị thay thế, bị xoá) — `invalidAt` ghi riêng "fact
+   * này bị tuyên bố sai lúc nào, vì mâu thuẫn với fact nào".
+   * Khi invalidate, `validUntil` cũng được đóng = `invalidAt`
+   * (để query "đúng tại T" vẫn đúng), nhưng `invalidAt` cho phép
+   * liệt kê riêng fact bị invalidate mà không lẫn với fact hết hạn
+   * hay bị thay thế. Fact bị invalidate KHÔNG bị xoá: lịch sử
+   * trước invalidAt vẫn truy vấn được.
+   */
+  invalidAt?: string;
+  /** Ai đã invalidate fact này (user id / `agent:<botId>` / `system`). */
+  invalidatedBy?: string;
+  /** Lý do invalidate (mâu thuẫn với fact nào / bằng chứng nào). */
+  invalidationReason?: string;
   /** Độ tin cậy 0..1. */
   confidence: number;
   status: FactStatus;
@@ -145,6 +171,8 @@ export interface GraphEpisode {
   runId: string;
   botId: string;
   userId: string;
+  /** Session chứa episode này (v1.12, temporal KG v2; '' = không gắn session). */
+  sessionId?: string;
   /** 'user' | 'assistant' | 'system'. */
   role: string;
   /** Nội dung turn (cắt ngắn tối đa 8000 ký tự khi ingest). */

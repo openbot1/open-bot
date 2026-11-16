@@ -55,6 +55,12 @@ export interface MemoryBlock {
   charLimit: number;
   /** true = không sửa/xoá được nội dung (xem `setReadOnly`). */
   readOnly: boolean;
+  /**
+   * true = block hệ thống (v12): chỉ actor `user` mới sửa/xoá/bỏ
+   * bảo vệ được; agent (`agent:<botId>`) bị chặn ngay tại store.
+   * Vắng/false = block thường.
+   */
+  systemOwned?: boolean;
   /** Bot đã tạo block ('' = user tạo / import, không gắn bot nào). */
   createdByBotId: string;
   /** User sở hữu block (vắng = legacy, thuộc user hiện tại). */
@@ -96,6 +102,8 @@ export interface CreateBlockInput {
   content?: string;
   charLimit?: number;
   readOnly?: boolean;
+  /** true = tạo luôn thành block hệ thống (v12, chỉ user tạo). */
+  systemOwned?: boolean;
   createdByBotId?: string;
   userId?: string;
 }
@@ -274,6 +282,7 @@ export class MemoryBlockStore {
       content,
       charLimit,
       readOnly: input.readOnly === true,
+      ...(input.systemOwned === true ? { systemOwned: true as const } : {}),
       createdByBotId: input.createdByBotId ?? '',
       ...((input.userId ?? '').trim() !== '' ? { userId: (input.userId as string).trim() } : {}),
       version: 1,
@@ -426,7 +435,12 @@ export class MemoryBlockStore {
     return found;
   }
 
-  private assertWritable(block: MemoryBlock): void {
+  private assertWritable(block: MemoryBlock, actor = 'user'): void {
+    if (block.systemOwned === true && actor !== 'user') {
+      throw new Error(
+        `Memory block "${block.label}" là block hệ thống — chỉ user mới sửa được (agent bị chặn).`,
+      );
+    }
     if (block.readOnly) {
       throw new Error(
         `Memory block "${block.label}" đang read-only — tắt read-only trước khi sửa (setReadOnly).`,
@@ -449,7 +463,7 @@ export class MemoryBlockStore {
     }
     const file = this.readFile();
     const block = this.resolveBlock(file, idOrLabel);
-    this.assertWritable(block);
+    this.assertWritable(block, actor);
     const newLimit =
       patch.charLimit !== undefined ? clampCharLimit(patch.charLimit, block.charLimit) : block.charLimit;
     const newContent = patch.content !== undefined ? patch.content : block.content;
@@ -490,7 +504,7 @@ export class MemoryBlockStore {
   replace(idOrLabel: string, content: string, actor = 'user'): MemoryBlock {
     const file = this.readFile();
     const block = this.resolveBlock(file, idOrLabel);
-    this.assertWritable(block);
+    this.assertWritable(block, actor);
     if (content.length > block.charLimit) {
       throw new Error(
         `Nội dung block "${block.label}" dài ${content.length} ký tự, vượt giới hạn ${block.charLimit} ký tự của block.`,
@@ -516,7 +530,7 @@ export class MemoryBlockStore {
     if (!text || !text.trim()) throw new Error('Không có nội dung để nối vào block.');
     const file = this.readFile();
     const block = this.resolveBlock(file, idOrLabel);
-    this.assertWritable(block);
+    this.assertWritable(block, actor);
     const addition = text.trim();
     const next = block.content === '' ? addition : `${block.content}\n${addition}`;
     if (next.length > block.charLimit) {
@@ -538,7 +552,7 @@ export class MemoryBlockStore {
   delete(idOrLabel: string, actor = 'user'): boolean {
     const file = this.readFile();
     const block = this.resolveBlock(file, idOrLabel);
-    this.assertWritable(block);
+    this.assertWritable(block, actor);
     const idx = file.blocks.findIndex((b) => b.id === block.id);
     if (idx === -1) return false;
     file.blocks.splice(idx, 1);
@@ -559,6 +573,11 @@ export class MemoryBlockStore {
   setReadOnly(idOrLabel: string, readOnly: boolean, actor = 'user'): MemoryBlock {
     const file = this.readFile();
     const block = this.resolveBlock(file, idOrLabel);
+    if (block.systemOwned === true && readOnly === false && actor !== 'user') {
+      throw new Error(
+        `Memory block "${block.label}" là block hệ thống — chỉ user mới tắt read-only (agent bị chặn).`,
+      );
+    }
     if (block.readOnly !== readOnly) {
       block.readOnly = readOnly;
       block.version += 1;
@@ -567,6 +586,33 @@ export class MemoryBlockStore {
       this.audit('set-read-only', block.id, actor, `readOnly=${readOnly}`, block.label);
       // v1.02 (memory v3 — blocks v2): snapshot the new version.
       recordBlockVersion(this.workspaceDir, block, 'set-read-only', actor);
+    }
+    return { ...block };
+  }
+
+  /**
+   * Bật/tắt cờ block hệ thống (v12). Chỉ actor `user` mới được gọi —
+   * agent (`agent:<botId>`, `system:*`) bị chặn cả hai chiều (không
+   * tự phong block thường thành block hệ thống, cũng không gỡ bảo vệ
+   * khỏi block hệ thống). Đổi cờ thì version +1, ghi audit
+   * `set-system-owned` + snapshot lịch sử như mọi lần sửa khác.
+   */
+  setSystemOwned(idOrLabel: string, systemOwned: boolean, actor = 'user'): MemoryBlock {
+    if (actor !== 'user') {
+      throw new Error(
+        'Chỉ user mới được bật/tắt cờ block hệ thống (agent bị chặn).',
+      );
+    }
+    const file = this.readFile();
+    const block = this.resolveBlock(file, idOrLabel);
+    if ((block.systemOwned === true) !== systemOwned) {
+      if (systemOwned) block.systemOwned = true;
+      else delete block.systemOwned;
+      block.version += 1;
+      block.updatedAt = new Date().toISOString();
+      this.writeFile(file);
+      this.audit('set-system-owned', block.id, actor, `systemOwned=${systemOwned}`, block.label);
+      recordBlockVersion(this.workspaceDir, block, 'set-system-owned', actor);
     }
     return { ...block };
   }
@@ -595,7 +641,7 @@ export class MemoryBlockStore {
   restoreVersion(idOrLabel: string, version: number, actor = 'user'): MemoryBlock {
     const file = this.readFile();
     const block = this.resolveBlock(file, idOrLabel);
-    this.assertWritable(block);
+    this.assertWritable(block, actor);
     const snapshot = readBlockHistory(this.workspaceDir, block.id, 200).find(
       (s) => s.version === version,
     );

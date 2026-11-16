@@ -478,7 +478,7 @@ export class AppBridgeHost {
         return {
           accepted: false,
           reason: 'tool-not-allowed',
-          detail: toolName ? `Tool "${toolName}" không được phép gọi từ app này.` : 'tool-call thiếu tên tool.',
+          detail: toolName ? `Tool "${toolName}" is not allowed to be called from this app.` : 'tool-call is missing a tool name.',
         };
       }
       this.pushLog('in', sessionId, type, 'accepted');
@@ -498,7 +498,7 @@ export class AppBridgeHost {
       const allowed = this.onLinkOpen ? this.onLinkOpen(sessionId, url) : false;
       this.pushLog('in', sessionId, type, allowed ? 'accepted' : 'action-not-allowed');
       if (!allowed) {
-        return { accepted: false, reason: 'action-not-allowed', detail: `Link "${url}" bị host chặn.` };
+        return { accepted: false, reason: 'action-not-allowed', detail: `Link "${url}" was blocked by the host.` };
       }
       return {
         accepted: true,

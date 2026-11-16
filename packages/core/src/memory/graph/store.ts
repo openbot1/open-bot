@@ -31,6 +31,7 @@ import type {
   FactProvenance,
   GraphBackend,
   GraphEntity,
+  GraphEpisode,
   GraphFact,
   GraphFile,
   GraphShare,
@@ -159,6 +160,8 @@ export interface ScopeFilter {
   runId?: string;
   /** v1.02 (memory v3): filter by app scope. */
   appId?: string;
+  /** v1.12 (temporal KG v2): filter by session scope. */
+  sessionId?: string;
   /** true = bỏ qua lọc scope (chỉ dùng cho share/admin). */
   includeOtherScopes?: boolean;
 }
@@ -177,6 +180,16 @@ export function matchesScope(scope: MemoryScope, filter: ScopeFilter): boolean {
   // v1.02 (memory v3): app scope follows the same "empty matches
   // everything" rule as the other scope fields.
   if (filter.appId !== undefined && filter.appId !== '' && (scope.appId ?? '') !== '' && scope.appId !== filter.appId) {
+    return false;
+  }
+  // v1.12 (temporal KG v2): session scope follows the same rule —
+  // a fact/episode with no sessionId is visible to every session.
+  if (
+    filter.sessionId !== undefined &&
+    filter.sessionId !== '' &&
+    (scope.sessionId ?? '') !== '' &&
+    scope.sessionId !== filter.sessionId
+  ) {
     return false;
   }
   return true;
@@ -344,6 +357,8 @@ export class TemporalGraphStore {
     userId: string;
     role: string;
     text: string;
+    /** v1.12: session chứa episode này ('' = không gắn session). */
+    sessionId?: string;
   }): { id: string; duplicate: boolean } {
     this.assertWritable();
     const text = (input.text ?? '').slice(0, MAX_EPISODE_TEXT_CHARS);
@@ -365,6 +380,7 @@ export class TemporalGraphStore {
       runId: input.runId ?? '',
       botId: input.botId ?? '',
       userId: input.userId ?? '',
+      ...(input.sessionId ? { sessionId: input.sessionId } : {}),
       role: input.role ?? 'user',
       text,
       factIds: [] as string[],
@@ -472,7 +488,16 @@ export class TemporalGraphStore {
     const oldFact = this.getFact(oldFactId);
     if (!oldFact) throw new GraphStoreError('Không tìm thấy fact cần thay thế.');
     if (oldFact.status !== 'active') throw new GraphStoreError('Chỉ thay thế được fact đang active.');
-    const now = nowIso();
+    // v1.15 merge fix (root cause, memory-v3-tools-v102): the supersede
+    // instant used to be always wall-clock now, so a test (or replay)
+    // that supersedes "on Nov 14" silently used today instead — the
+    // temporal windows in the test then stopped matching the day after
+    // Nov 15 and the contradiction count flipped 1 -> 0. Honour an
+    // explicit input.validFrom when the caller supplies one (temporal
+    // KG v14 already worked around this with setFactValidity after
+    // the call); default stays wall-clock now, so existing callers
+    // (consolidateGraph, onePass, v14) behave exactly as before.
+    const now = input.validFrom ?? nowIso();
     const created = this.addFact({ ...input, validFrom: now });
     oldFact.status = 'superseded';
     oldFact.validUntil = now;
@@ -496,6 +521,48 @@ export class TemporalGraphStore {
     fact.updatedAt = now;
     this.persist();
     return fact;
+  }
+
+  /**
+   * Xoá CỨNG một fact khỏi file (v1.15, memory v14 — GDPR erasure):
+   * fact biến mất hoàn toàn, kể cả embedding đi kèm (embedding nằm
+   * trong chính fact nên bị xoá cùng). Chỉ dùng cho erasure theo
+   * yêu cầu xoá dữ liệu; mọi xoá thông thường vẫn dùng `deleteFact`
+   * (xoá mềm, giữ lịch sử). Trả false khi không tìm thấy fact.
+   */
+  removeFactHard(factId: string): boolean {
+    this.assertWritable();
+    const before = this.file.facts.length;
+    this.file.facts = this.file.facts.filter((f) => f.id !== factId);
+    if (this.file.facts.length === before) return false;
+    this.persist();
+    return true;
+  }
+
+  /**
+   * Xoá CỨNG một episode khỏi file (v1.15, memory v14 — GDPR
+   * erasure). Trả false khi không tìm thấy episode.
+   */
+  removeEpisodeHard(episodeId: string): boolean {
+    this.assertWritable();
+    const before = this.file.episodes.length;
+    this.file.episodes = this.file.episodes.filter((e) => e.id !== episodeId);
+    if (this.file.episodes.length === before) return false;
+    this.persist();
+    return true;
+  }
+
+  /**
+   * Xoá CỨNG một mục quarantine khỏi file (v1.15, memory v14 —
+   * GDPR erasure). Trả false khi không tìm thấy mục.
+   */
+  removeQuarantineHard(quarantineId: string): boolean {
+    this.assertWritable();
+    const before = this.file.quarantine.length;
+    this.file.quarantine = this.file.quarantine.filter((q) => q.id !== quarantineId);
+    if (this.file.quarantine.length === before) return false;
+    this.persist();
+    return true;
   }
 
   /**
@@ -524,6 +591,87 @@ export class TemporalGraphStore {
     }
     fact.validFrom = nextFrom;
     fact.validUntil = nextUntil;
+    fact.updatedAt = nowIso();
+    this.persist();
+    return fact;
+  }
+
+  /**
+   * Đánh dấu một fact bị INVALIDATE vì mâu thuẫn (v1.12, temporal
+   * KG v2): đóng `validUntil` = invalidAt (để query "đúng tại T"
+   * vẫn đúng trước invalidAt), đồng thời ghi riêng `invalidAt` /
+   * `invalidatedBy` / `invalidationReason` lên fact để liệt kê
+   * riêng fact bị invalidate mà không lẫn với fact hết hạn hay bị
+   * thay thế. Status KHÔNG đổi (fact vẫn `active` theo nghĩa "chưa
+   * bị supersede/xoá" — cửa sổ hiệu lực đã đóng nên query hiện tại
+   * không còn thấy nó đúng nữa). Fact KHÔNG bị xoá.
+   *
+   * `invalidAt` phải nằm trong cửa sổ hiệu lực hiện tại của fact
+   * (validFrom ≤ invalidAt; nếu fact đã có validUntil thì invalidAt
+   * phải < validUntil) — invalidate một fact đã hết hiệu lực là vô
+   * nghĩa và bị chặn. Gọi 2 lần trên cùng fact: lần 2 giữ nguyên
+   * `invalidAt` đầu tiên (lịch sử invalidate đầu tiên mới là mốc
+   * fact bắt đầu sai) nhưng cập nhật lý do/actor nếu truyền mới.
+   */
+  markFactInvalidated(
+    factId: string,
+    opts: { invalidAt: string | Date; actor: string; reason: string },
+  ): GraphFact {
+    this.assertWritable();
+    const fact = this.getFact(factId);
+    if (!fact) throw new GraphStoreError('Không tìm thấy fact.');
+    const invalidMs = opts.invalidAt instanceof Date ? opts.invalidAt.getTime() : Date.parse(opts.invalidAt);
+    if (Number.isNaN(invalidMs)) throw new GraphStoreError('invalidAt không phải thời gian hợp lệ.');
+    const cleanReason = (opts.reason ?? '').trim().slice(0, 1000);
+    if (cleanReason === '') throw new GraphStoreError('Lý do invalidate không được rỗng (cần audit được).');
+    const invalidIso = new Date(invalidMs).toISOString();
+    if (fact.invalidAt !== undefined) {
+      // Đã invalidate rồi: giữ mốc đầu tiên, chỉ cập nhật lý do/actor.
+      fact.invalidationReason = cleanReason;
+      fact.invalidatedBy = (opts.actor ?? '').trim() || 'system';
+      fact.updatedAt = nowIso();
+      this.persist();
+      return fact;
+    }
+    if (invalidMs < Date.parse(fact.validFrom)) {
+      throw new GraphStoreError('invalidAt phải >= validFrom của fact (không thể invalidate trước khi fact bắt đầu đúng).');
+    }
+    if (fact.validUntil !== null && invalidMs >= Date.parse(fact.validUntil)) {
+      throw new GraphStoreError('Fact đã hết hiệu lực trước invalidAt — không cần invalidate nữa.');
+    }
+    fact.validUntil = invalidIso;
+    fact.invalidAt = invalidIso;
+    fact.invalidatedBy = (opts.actor ?? '').trim() || 'system';
+    fact.invalidationReason = cleanReason;
+    fact.updatedAt = nowIso();
+    this.persist();
+    return fact;
+  }
+
+  /**
+   * Liệt kê fact đã bị invalidate (có `invalidAt`) trong một scope
+   * (v1.12, temporal KG v2). Mới nhất trước — theo `invalidAt`.
+   */
+  listInvalidatedFacts(filter: ScopeFilter & { limit?: number } = {}): GraphFact[] {
+    return this.file.facts
+      .filter((f) => f.invalidAt !== undefined && matchesScope(f.scope, filter))
+      .sort((a, b) => (b.invalidAt ?? '').localeCompare(a.invalidAt ?? ''))
+      .slice(0, filter.limit ?? 500);
+  }
+
+  /**
+   * Gắn / đổi session scope của một fact (v1.12, temporal KG v2):
+   * dùng khi một fact được rút ra trong session A nhưng thực ra
+   * thuộc session B, hoặc khi backfill sessionId cho fact cũ.
+   * `sessionId` rỗng = gỡ session (fact thành không gắn session).
+   */
+  setFactSession(factId: string, sessionId: string): GraphFact {
+    this.assertWritable();
+    const fact = this.getFact(factId);
+    if (!fact) throw new GraphStoreError('Không tìm thấy fact.');
+    const clean = (sessionId ?? '').trim().slice(0, 200);
+    if (clean === '') delete fact.scope.sessionId;
+    else fact.scope.sessionId = clean;
     fact.updatedAt = nowIso();
     this.persist();
     return fact;
@@ -743,6 +891,170 @@ export class TemporalGraphStore {
 
   getShare(targetBotId: string): GraphShare | undefined {
     return this.file.shares[targetBotId];
+  }
+
+  /**
+   * Import một entity giữ nguyên id gốc (v1.12, temporal KG v2 —
+   * dùng cho import snapshot bi-temporal). Trả false khi entity đã
+   * có (trùng id) — không ghi đè. Entity import phải có id + tên.
+   */
+  importEntityRaw(entity: GraphEntity): boolean {
+    this.assertWritable();
+    if (typeof entity.id !== 'string' || entity.id === '') {
+      throw new GraphStoreError('Entity import thiếu id.');
+    }
+    if (typeof entity.name !== 'string' || entity.name.trim() === '') {
+      throw new GraphStoreError('Entity import thiếu tên.');
+    }
+    if (this.getEntity(entity.id)) return false;
+    if (this.findEntityByName(entity.name)) {
+      // Tên đã có entity khác giữ — vẫn thêm entity import (id khác
+      // nhau) để không mất liên kết fact → entity theo id.
+    }
+    this.file.entities.push({
+      id: entity.id,
+      name: entity.name.slice(0, 200),
+      kind: entity.kind,
+      aliases: [...(entity.aliases ?? [])],
+      firstSeenAt: entity.firstSeenAt,
+      lastSeenAt: entity.lastSeenAt,
+      factCount: 0,
+    });
+    this.persist();
+    return true;
+  }
+
+  /**
+   * Import một episode giữ nguyên id gốc (v1.12, temporal KG v2).
+   * Trả false khi episode đã có (trùng id, hoặc trùng turnId+botId)
+   * — không ghi đè, không tạo trùng.
+   */
+  importEpisodeRaw(episode: GraphEpisode): boolean {
+    this.assertWritable();
+    if (typeof episode.id !== 'string' || episode.id === '') {
+      throw new GraphStoreError('Episode import thiếu id.');
+    }
+    if (this.getEpisode(episode.id)) return false;
+    if ((episode.turnId ?? '') !== '') {
+      const dup = this.file.episodes.find((e) => e.turnId === episode.turnId && e.botId === episode.botId);
+      if (dup) return false;
+    }
+    if (typeof episode.text !== 'string' || episode.text.trim() === '') {
+      throw new GraphStoreError('Episode import thiếu text.');
+    }
+    this.file.episodes.push({
+      id: episode.id,
+      turnId: episode.turnId ?? '',
+      runId: episode.runId ?? '',
+      botId: episode.botId ?? '',
+      userId: episode.userId ?? '',
+      ...(episode.sessionId ? { sessionId: episode.sessionId } : {}),
+      role: episode.role ?? 'user',
+      text: episode.text.slice(0, MAX_EPISODE_TEXT_CHARS),
+      factIds: [...(episode.factIds ?? [])],
+      processed: episode.processed === true,
+      createdAt: episode.createdAt,
+    });
+    this.persist();
+    return true;
+  }
+
+  /**
+   * Import một fact giữ nguyên id gốc + toàn bộ trường bi-temporal
+   * (v1.12, temporal KG v2 — dùng cho import snapshot). Entity chủ
+   * ngữ phải có sẵn trong kho (import entity trước); tân ngữ entity
+   * cũng vậy khi có objectId. Fact import phải có provenance đầy
+   * đủ và cửa sổ hiệu lực hợp lệ — nếu không throw. Trả false khi
+   * fact đã có (trùng id) — không ghi đè.
+   */
+  importFactRaw(fact: GraphFact): GraphFact | false {
+    this.assertWritable();
+    if (typeof fact.id !== 'string' || fact.id === '') {
+      throw new GraphStoreError('Fact import thiếu id.');
+    }
+    if (this.getFact(fact.id)) return false;
+    if (!this.getEntity(fact.subjectId)) {
+      throw new GraphStoreError('Fact import trỏ entity chủ ngữ chưa có trong kho — import entity trước.');
+    }
+    if (fact.objectId && !this.getEntity(fact.objectId)) {
+      throw new GraphStoreError('Fact import trỏ entity tân ngữ chưa có trong kho — import entity trước.');
+    }
+    if (typeof fact.predicate !== 'string' || fact.predicate === '') {
+      throw new GraphStoreError('Fact import thiếu predicate.');
+    }
+    if (!fact.provenance || typeof fact.provenance.episodeId !== 'string' || fact.provenance.episodeId === '') {
+      throw new GraphStoreError('Fact import thiếu provenance.episodeId (fact mồ côi không được import).');
+    }
+    if (Number.isNaN(Date.parse(fact.validFrom))) {
+      throw new GraphStoreError('Fact import có validFrom không hợp lệ.');
+    }
+    if (
+      fact.validUntil !== null &&
+      fact.validUntil !== undefined &&
+      Date.parse(fact.validUntil) < Date.parse(fact.validFrom)
+    ) {
+      throw new GraphStoreError('Fact import có validUntil < validFrom.');
+    }
+    const imported: GraphFact = {
+      id: fact.id,
+      subjectId: fact.subjectId,
+      predicate: fact.predicate,
+      ...(fact.objectId ? { objectId: fact.objectId } : {}),
+      ...(fact.objectText !== undefined ? { objectText: fact.objectText.slice(0, 1000) } : {}),
+      validFrom: fact.validFrom,
+      validUntil: fact.validUntil ?? null,
+      ...(fact.supersedes ? { supersedes: fact.supersedes } : {}),
+      ...(fact.supersededBy ? { supersededBy: fact.supersededBy } : {}),
+      ...(fact.invalidAt !== undefined ? { invalidAt: fact.invalidAt } : {}),
+      ...(fact.invalidatedBy !== undefined ? { invalidatedBy: fact.invalidatedBy } : {}),
+      ...(fact.invalidationReason !== undefined ? { invalidationReason: fact.invalidationReason } : {}),
+      confidence: clampConfidence(fact.confidence),
+      status: fact.status,
+      scope: { ...fact.scope },
+      provenance: {
+        ...fact.provenance,
+        sourceText: (fact.provenance.sourceText ?? '').slice(0, MAX_SOURCE_TEXT_CHARS),
+      },
+      ...(fact.embedding ? { embedding: [...fact.embedding] } : {}),
+      createdAt: fact.createdAt,
+      updatedAt: fact.updatedAt,
+    };
+    this.file.facts.push(imported);
+    this.persist();
+    return imported;
+  }
+
+  /**
+   * Gỡ một liên kết supersession đứt gãy (v1.12, temporal KG v2 —
+   * dùng cho repair audit): xoá `supersedes` hoặc `supersededBy`
+   * khi fact đích không còn tồn tại. Chỉ gỡ liên kết, không đổi
+   * nội dung hay lịch sử hiệu lực của fact.
+   */
+  clearFactLink(factId: string, link: 'supersedes' | 'supersededBy'): GraphFact {
+    this.assertWritable();
+    const fact = this.getFact(factId);
+    if (!fact) throw new GraphStoreError('Không tìm thấy fact.');
+    if (link === 'supersedes') delete fact.supersedes;
+    else delete fact.supersededBy;
+    fact.updatedAt = nowIso();
+    this.persist();
+    return fact;
+  }
+
+  /**
+   * Gỡ factId khỏi episode.factIds (v1.12, temporal KG v2 — dùng
+   * cho repair audit): khi fact đó không còn tồn tại. Episode giữ
+   * nguyên text. Trả null khi không tìm thấy episode.
+   */
+  pruneEpisodeFacts(episodeId: string, factIdsToRemove: string[]): GraphEpisode | null {
+    this.assertWritable();
+    const episode = this.getEpisode(episodeId);
+    if (!episode) return null;
+    const remove = new Set(factIdsToRemove);
+    const before = episode.factIds.length;
+    episode.factIds = episode.factIds.filter((id) => !remove.has(id));
+    if (episode.factIds.length !== before) this.persist();
+    return episode;
   }
 
   /** Export toàn bộ file (để backup / đồng bộ qua port memory2). */

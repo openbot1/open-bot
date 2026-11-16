@@ -117,9 +117,17 @@ export function invalidateFact(
   }
   const cleanReason = (reason ?? '').trim().slice(0, 1000);
   if (cleanReason === '') throw new Error('Lý do invalidate không được rỗng (cần audit được).');
-  // Chụp cửa sổ cũ TRƯỚC khi setFactValidity mutate cùng object.
+  // Chụp cửa sổ cũ TRƯỚC khi markFactInvalidated mutate cùng object.
   const previousValidUntil = fact.validUntil;
-  const updated = store.setFactValidity(factId, { validUntil: new Date(invalidMs).toISOString() });
+  // v1.12: ghi riêng invalidAt/invalidatedBy/invalidationReason lên
+  // fact (qua store.markFactInvalidated) — validUntil cũng được
+  // đóng = invalidAt trong cùng một lần ghi, để query "đúng tại T"
+  // và audit "bị invalidate khi nào" đều đúng.
+  const updated = store.markFactInvalidated(factId, {
+    invalidAt: new Date(invalidMs).toISOString(),
+    actor: (actor ?? '').trim() || 'system',
+    reason: cleanReason,
+  });
   const record: InvalidationRecord = {
     id: randomUUID(),
     factId: fact.id,
