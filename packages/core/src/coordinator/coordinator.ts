@@ -1047,6 +1047,16 @@ export function defaultToolFactory(
       sleepAgent?: SleepConsolidationAgent;
       getUserId?: () => string | undefined;
     }): Tool[];
+    /** v1.12 (Đội T3): temporal KG v2 tools (temporal_kg_asof /
+     * snapshot / invalidate / contradictions / resolve / timeline /
+     * export) trên cùng temporal graph store. Optional until the
+     * tools package ships the factory — guarded at the call site,
+     * like createMemoryGraphTools. */
+    createMemoryTemporalV112Tools?(opts?: {
+      graphStore?: TemporalGraphStore;
+      workspaceDir?: string;
+      getUserId?: () => string | undefined;
+    }): Tool[];
     /** v1.01 (Đội T5): evolving notes tools (notes_create/update/search/
      * list/get/link/suggest_links/graph/revisit/conflicts/benchmark_run/
      * import). Optional until the tools package ships the factory —
@@ -1249,6 +1259,13 @@ export function defaultToolFactory(
       defaultBackendIds?: string[];
       promptTimeoutMs?: number;
     }): Tool[];
+    /**
+     * v1.12 (Team T4): ACP Control Center tools (discover / list /
+     * register / start / stop / set_budget / usage). Optional until
+     * the tools package ships the factory — guarded at the call
+     * site, like createAcpHostingTools.
+     */
+    createAcpControlTools?(opts?: { stateDir?: string }): Tool[];
     /**
      * v0.53 (P1-7): tool-call history store (file-backed, same
      * workspace) for `tool_call_replay`. Optional until the tools
@@ -1525,6 +1542,17 @@ export function defaultToolFactory(
         }),
       );
     }
+    // v1.12 (Đội T3): temporal KG v2 tools (temporal_kg_*) trên cùng
+    // temporal graph store. Guarded như các factory khác.
+    if (typeof toolsMod.createMemoryTemporalV112Tools === 'function') {
+      registry.registerMany(
+        toolsMod.createMemoryTemporalV112Tools({
+          graphStore: TemporalGraphStore.fromWorkspace(workspaceDir),
+          workspaceDir,
+          getUserId: () => host?.getLocalUserId?.() ?? undefined,
+        }),
+      );
+    }
     // v1.01 (Đội T5): evolving notes tools (notes_*) trên cùng workspace
     // (`.open-bot/memory-notes.json`). Benchmark tool chạy trên store
     // in-memory riêng, không đụng kho note thật. Guarded như factory khác.
@@ -1745,6 +1773,12 @@ export function defaultToolFactory(
     // backend process, so that one tool needs approval.
     if (typeof toolsMod.createAcpHostingTools === 'function') {
       registry.registerMany(toolsMod.createAcpHostingTools({}));
+    }
+    // v1.12 (Team T4): ACP Control Center tools — discover / list /
+    // register / usage are read-only; start spawns the CLI process
+    // (needs approval); stop / set_budget only touch local state.
+    if (typeof toolsMod.createAcpControlTools === 'function') {
+      registry.registerMany(toolsMod.createAcpControlTools({}));
     }
     // v0.53 (P1-7): replay needs the history store (same workspace
     // file the loop recorder writes) + the live registry to dispatch
