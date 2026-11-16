@@ -352,3 +352,159 @@ export type {
   ComposioV111PollPolicy,
   ComposioV111PollPolicyState,
 } from './pollPolicyV111';
+export {
+  COMPOSIO_V112_MOCK_TOOLKITS,
+  MockComposioV112Executor,
+  createMockComposioV112AppDefinitions,
+  executeMockComposioV112Tool,
+  findMockComposioV112Toolkit,
+  isMockComposioV112Slug,
+  mockComposioV112AppId,
+  mockComposioV112DeterministicId,
+  mockComposioV112Slugs,
+  mockComposioV112ToolNeedsApproval,
+  summarizeMockComposioV112Catalogue,
+} from './toolkitsV112';
+export type { ComposioV112MockToolkitDef, MockComposioV112Result } from './toolkitsV112';
+// --- v1.14 (Đội T4): mock toolkits v114 — Webflow, Pipedrive,
+// Chargebee, Xero, Eventbrite, SurveyMonkey (mock-only, chua live). ---
+export {
+  COMPOSIO_V114_MOCK_TOOLKITS,
+  MockComposioV114Executor,
+  createMockComposioV114AppDefinitions,
+  executeMockComposioV114Tool,
+  findMockComposioV114Toolkit,
+  isMockComposioV114Slug,
+  mockComposioV114AppId,
+  mockComposioV114DeterministicId,
+  mockComposioV114Slugs,
+  mockComposioV114ToolNeedsApproval,
+  resolveMockComposioV114Slug,
+  summarizeMockComposioV114Catalogue,
+} from './toolkitsV114';
+export type { ComposioV114AuthKind, ComposioV114MockToolkitDef, MockComposioV114Result } from './toolkitsV114';
+// --- v1.14 (Đội T4): poll scheduler v2 — lich theo connection,
+// backoff khi loi, dedupe event, checkpoint resume sau restart. ---
+export {
+  COMPOSIO_V114_CHECKPOINT_VERSION,
+  COMPOSIO_V114_DEFAULT_BACKOFF_MULTIPLIER,
+  COMPOSIO_V114_DEFAULT_DEDUPE_WINDOW_MS,
+  COMPOSIO_V114_DEFAULT_INTERVAL_BY_TOOLKIT,
+  COMPOSIO_V114_DEFAULT_INTERVAL_MS,
+  COMPOSIO_V114_DEFAULT_JITTER_FRACTION,
+  COMPOSIO_V114_DEFAULT_MAX_BACKOFF_MS,
+  COMPOSIO_V114_DEFAULT_MAX_SEEN_IDS,
+  ComposioV114PollEngine,
+  applyComposioV114Jitter,
+  checkpointComposioV114Schedule,
+  composioV114BackoffDelayMs,
+  composioV114MsUntilNextPoll,
+  createComposioV114Schedule,
+  defaultComposioV114IntervalMs,
+  filterComposioV114NewItems,
+  isComposioV114Duplicate,
+  isComposioV114ScheduleDue,
+  missedComposioV114Polls,
+  nextComposioV114PollAfterError,
+  nextComposioV114PollAfterSuccess,
+  parseComposioV114Checkpoint,
+  pruneComposioV114SeenIds,
+  recordComposioV114SeenIds,
+  resumeComposioV114Schedule,
+  serializeComposioV114Checkpoint,
+  validateComposioV114Checkpoint,
+  validateComposioV114Schedule,
+} from './pollSchedulerV2';
+export type {
+  ComposioV114Checkpoint,
+  ComposioV114CreateScheduleInput,
+  ComposioV114FetchFn,
+  ComposioV114PollEngineOptions,
+  ComposioV114PollItem,
+  ComposioV114PollSchedule,
+  ComposioV114SeenEntry,
+  ComposioV114TickResult,
+} from './pollSchedulerV2';
+// --- v1.14 (Đội T4): trigger templates v2 — 35 template co schema +
+// mo ta + vi du payload (29 curated + 6 candidate cho toolkit v114). ---
+export {
+  COMPOSIO_V114_TRIGGER_TEMPLATES,
+  COMPOSIO_V114_TRIGGER_TEMPLATE_COUNT,
+  composioV114TemplateToMappingInput,
+  composioV114TemplatesForCategory,
+  composioV114TemplatesForToolkit,
+  findComposioV114TriggerTemplate,
+  renderComposioV114ExamplePayload,
+  searchComposioV114TriggerTemplates,
+  validateComposioV114TriggerTemplates,
+} from './triggerTemplatesV114';
+export type {
+  ComposioV114TemplateSource,
+  ComposioV114TriggerCategory,
+  ComposioV114TriggerField,
+  ComposioV114TriggerFieldType,
+  ComposioV114TriggerTemplate,
+} from './triggerTemplatesV114';
+// --- v1.14 (Đội T4): connection health dashboard — trang thai, lan
+// sync cuoi, ti le loi, latency, canh bao khi connection yeu/het han. ---
+export {
+  COMPOSIO_V114_MAX_LATENCY_SAMPLES,
+  COMPOSIO_V114_MIN_POLLS_FOR_RATE,
+  ComposioV114HealthStore,
+  DEFAULT_COMPOSIO_V114_HEALTH_THRESHOLDS,
+  averageComposioV114Latency,
+  emptyComposioV114ConnectionHealth,
+  evaluateComposioV114Health,
+  percentileComposioV114Latency,
+  recordComposioV114SyncError,
+  recordComposioV114SyncSuccess,
+  setComposioV114ConnectionExpiry,
+  summarizeComposioV114HealthDashboard,
+  validateComposioV114ConnectionHealth,
+  validateComposioV114HealthThresholds,
+} from './connectionHealth';
+export type {
+  ComposioV114ConnectionHealth,
+  ComposioV114HealthAlert,
+  ComposioV114HealthAlertKind,
+  ComposioV114HealthDashboard,
+  ComposioV114HealthStatus,
+  ComposioV114HealthThresholds,
+} from './connectionHealth';
+// --- v1.14 (Đội T4): MCP Apps/Tasks bridge — expose tool mock v114
+// qua MCP App (ui://composio/...) + Task (chi client goi mock). ---
+export {
+  COMPOSIO_V114_MCP_APP_COUNT,
+  COMPOSIO_V114_MCP_APP_CATEGORIES,
+  COMPOSIO_V114_MCP_APP_SERVER_ID,
+  COMPOSIO_V114_MCP_APP_URI_PREFIX,
+  ComposioV114McpTaskStore,
+  cancelComposioV114McpTask,
+  composioV114McpAppId,
+  composioV114McpAppUri,
+  createComposioV114McpApp,
+  createComposioV114McpTask,
+  executeMockComposioV114ToolViaApp,
+  findComposioV114McpApp,
+  isComposioV114McpAppUri,
+  listComposioV114McpApps,
+  parseComposioV114McpAppUri,
+  renderComposioV114McpAppHtml,
+  runComposioV114McpTask,
+  summarizeComposioV114McpTask,
+  validateComposioV114McpAppHtml,
+} from './mcpComposioBridge';
+export type { ComposioV114McpAppDef, ComposioV114McpTask } from './mcpComposioBridge';
+// --- v1.14 (Đội T4): checkpoint store — luu checkpoint poll v2 xuong
+// dia (file JSON atomic) hoac trong bo nho, de resume sau restart. ---
+export {
+  COMPOSIO_V114_CHECKPOINTS_FILE,
+  JsonFileComposioV114CheckpointStore,
+  MemoryComposioV114CheckpointStore,
+  getComposioV114CheckpointsPath,
+  loadComposioV114CheckpointForSchedule,
+} from './pollCheckpointStoreV114';
+export type {
+  ComposioV114CheckpointStore,
+  JsonFileComposioV114CheckpointStoreOptions,
+} from './pollCheckpointStoreV114';
