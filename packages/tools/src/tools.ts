@@ -84,6 +84,18 @@ import { MEMORY_V10_TOOLS, createMemoryV10Tools } from './memoryV10Tools';
 // insert/patch, unified block_history, shared supervisor, sleep agent)
 // — 9 tools, placeholder trong ALL_TOOLS ---
 import { MEMORY_V11_TOOLS, createMemoryV11Tools } from './memoryV11Tools';
+// --- v1.12 (Doi T1): memory v12 tools (exact-string edit, token
+// budget, compile <memory_blocks> co cache, system blocks, audit,
+// sleep janitor) — 7 tools, placeholder trong ALL_TOOLS ---
+import { MEMORY_V12_TOOLS, createMemoryV12Tools } from './memoryV12Tools';
+// --- v1.15 (Doi T1): memory v14 tools (extract, fused search,
+// state-at, quarantine, GDPR erase, eval, extract preview) — 8 tools,
+// placeholder trong ALL_TOOLS ---
+import { MEMORY_V14_TOOLS, createMemoryV14Tools } from './memoryV14Tools';
+// --- v1.16 (Doi T1): memory v15 tools (consolidate add-only, hybrid
+// search 4 tin hieu, state-at, time-travel, block edit/list, sleep
+// reorganize, eval) — 8 tools, placeholder trong ALL_TOOLS ---
+import { MEMORY_V15_TOOLS, createMemoryV15Tools } from './memoryV15Tools';
 // --- v1.09 (Đội T2): memory v9 kiểu Letta tools (core memory tự sửa
 // qua tool, recall, archival, entity bền vững, sleep pass/proposals)
 // — 23 tools, placeholder trong ALL_TOOLS ---
@@ -133,10 +145,64 @@ import { FLEET_V7_TOOLS, createFleetV7Tools } from './fleetV7Tools';
 // (9 tools) — placeholder trong ALL_TOOLS ---
 import { EVAL_V111_TOOLS, createEvalV111Tools } from './evalV111Tools';
 import type { EvalV111ToolOptions } from './evalV111Tools';
+// --- v1.12 (Đội T2): event-sourced conversation + CodeAct-lite +
+// skill workspace on-demand (11 tools) — placeholder trong ALL_TOOLS ---
+import { CONVERSATION_V112_TOOLS, createConversationV112Tools } from './conversationV112Tools';
+import type { ConversationV112ToolOptions } from './conversationV112Tools';
 // --- v1.11 (Đội T5): voice v10 — realtime v2 + VAD v10 + noise +
 // bot voice presets + AG-UI voice v3 (10 tools) ---
 import { VOICE_V10_TOOLS, createVoiceV10Tools } from './voiceV10Tools';
+// --- v1.12 (Đội T5): voice v11 — VAD v11 + barge-in v11 state machine +
+// turn-taking v11 + streaming TTS v11 (8 tools) ---
+import { VOICE_V11_TOOLS, createVoiceV11Tools } from './voiceV11Tools';
 import { FLEET_V8_TOOLS, createFleetV8Tools } from './fleetV8Tools';
+// --- v1.12 (Đội T6): fleet scheduling v2 + automations v2 +
+// Composio mock v112 + MCP Apps v112 (15 tools) ---
+import { FLEET_V9_TOOLS, createFleetV9Tools } from './fleetV9Tools';
+// --- v1.13 (Đội T1): Agent Skills loader v13 — SKILL.md validation +
+// session index + internal registry + interop + marketplace + audit (8 tools) ---
+import { SKILLS_V13_TOOLS, createSkillsV13Tools } from './skillsV13Tools';
+// --- v1.13 (Đội T2): MCP Apps host v13 — ui:// registry + ui/ dialect +
+// display modes + component kit (7 tools) ---
+import { MCP_APPS_V113_TOOLS, createMcpAppsV113Tools } from './mcpAppsV113Tools';
+// --- v1.14 (Đội T2): MCP Apps v2 + Tasks chuẩn 2026-07-28 — negotiation
+// 2 chiều + gallery/template + bundler/CSP + permissions mic/camera +
+// component kit v2 (8 tools) ---
+import { MCP_APPS_V2_TOOLS, createMcpAppsV2Tools } from './mcpAppsV2Tools';
+// --- v1.13 (Đội T3): repo map v5 — topology + summaries + incremental
+// index + code graph search + jump-to-definition (6 tools) ---
+import { REPOMAP_V5_TOOLS, createRepomapV5Tools } from './repoMapV5Tools';
+// --- v1.13 (Đội T4): coding agent v5 git-native — patch preview +
+// auto-commit + /add + SWE-bench eval + rollback (11 tools) ---
+import { CODING_V5_TOOLS, createCodingV5Tools } from './codingV5Tools';
+// --- v1.14 (Đội T3): coding agent v6 — event-sourced log + CodeAct-lite
+// v2 + security gate + condenser v2 + stuck + delegate + RouterLLM (7 tools) ---
+import { CODING_V6_TOOLS, createCodingV6Tools } from './codingV6Tools';
+import type { CodingV6ToolOptions } from './codingV6Tools';
+import { CODING_V7_TOOLS, createCodingV7Tools } from './codingV7Tools';
+import type { CodingV7ToolOptions } from './codingV7Tools';
+// --- v1.13 (Đội T5): voice v12 realtime — barge-in + TTS streaming +
+// turn-taking + overlap (8 tools) ---
+import { VOICE_V12_TOOLS, createVoiceV12Tools } from './voiceV12Tools';
+// --- v1.14 (Đội T5): voice v13 realtime — barge-in engine + clause TTS +
+// Smart Turn + latency budget + wake word + providers (8 tools) ---
+import { VOICE_V13_TOOLS, createVoiceV13Tools } from './voiceV13Tools';
+// --- v1.15 (Đội T5): voice v14 realtime — latency budget v2 +
+// providers v2 + Smart Turn v2 + wake word v2 + barge-in v2 (9 tools) ---
+import { VOICE_V14_TOOLS, createVoiceV14Tools } from './voiceV14Tools';
+// --- v1.13 (Đội T6): fleet v10 — event triggers + schedules +
+// multi-user + ACP dashboard (11 tools) ---
+import { FLEET_V10_TOOLS, createFleetV10Tools } from './fleetV10Tools';
+// --- v1.14 (Đội T4): Composio v114 — mock toolkits + poll scheduler v2 +
+// connection health + trigger templates + MCP App bridge (6 tools) ---
+import { COMPOSIO_V114_TOOLS, createComposioV114Tools } from './composioV114Tools';
+// --- v1.14 (Đội T6): fleet v11 — health + staged rollout + panels (9 tools) ---
+import { FLEET_V11_TOOLS, createFleetV11Tools } from './fleetV11Tools';
+// --- v1.15 (Đội T3): local model router — catalogue + load/unload +
+// route decide + budget/spend + virtual key (10 tools) ---
+import { ROUTER_LOCAL_V115_TOOLS, createRouterLocalV115Tools } from './routerLocalV115Tools';
+// --- v1.15 (Đội T6): fleet v12 — model pinning + % rollout + health v12 + panels (9 tools) ---
+import { FLEET_V12_TOOLS, createFleetV12Tools } from './fleetV12Tools';
 
 // Shared helper: MAX_TOOL_RESULT_CHARS nay song o ./truncate (cung gia tri
 // 20.000) — re-export de code import tu module nay khong phai sua.
@@ -922,6 +988,18 @@ export const ALL_TOOLS: Tool[] = [
   // shared write supervisor-only (1) + sleep record fast (1) +
   // sleep pass (1) = 9 ---
   ...MEMORY_V11_TOOLS,
+  // --- v1.12 (Doi T1): memory v12 — exact-string edit (1) + search (1) +
+  // token usage (1) + compile <memory_blocks> (1) + system block (1) +
+  // audit trail (1) + sleep janitor (1) + export (1) + import (1) = 9 ---
+  ...MEMORY_V12_TOOLS,
+  // --- v1.15 (Doi T1): memory v14 — extract (1) + fused search (1) +
+  // state-at (1) + quarantine list (1) + quarantine review (1) +
+  // erase (1) + eval (1) + extract preview (1) = 8 ---
+  ...MEMORY_V14_TOOLS,
+  // --- v1.16 (Doi T1): memory v15 — consolidate (1) + hybrid search (1) +
+  // state-at (1) + time-travel (1) + block edit (1) + block list (1) +
+  // sleep reorganize (1) + eval (1) = 8 ---
+  ...MEMORY_V15_TOOLS,
   // --- v1.07 (Đội T2): harness v3 — delegate (1) + budget meter (1) + LLM profile (1) = 3 ---
   ...HARNESS_V107_TOOLS,
   // --- v1.08 (Đội T3): harness v4 — EventLog (6) + CodeAct run/loop (2) + dependency sweep (4) = 12 ---
@@ -971,15 +1049,63 @@ export const ALL_TOOLS: Tool[] = [
   // run suite (1) + export rollout (1) + profiles list/set/for-task (3) +
   // report (1) = 9 ---
   ...EVAL_V111_TOOLS,
+  // --- v1.12 (Đội T2): event-sourced conversation — start/append/
+  // replay/branch/snapshot/compact/export/timetravel (8) + CodeAct-lite
+  // run text (1) + skill workspace list/load (2) = 11 ---
+  ...CONVERSATION_V112_TOOLS,
   // --- v1.11 (Đội T5): voice v10 — session create/list/stats/stop/
   // delete (5) + simulate turn (1) + VAD v10 (1) + noise (1) +
   // bot voice preset (1) + realtime v2 (1) = 10 ---
   ...VOICE_V10_TOOLS,
+  // --- v1.12 (Đội T5): voice v11 — session create/list/stats/stop/
+  // delete (5) + feed text (1) + interrupt (1) + VAD v11 (1) = 8 ---
+  ...VOICE_V11_TOOLS,
   // --- v1.11 (Đội T6): fleet v8 — node probe/health/rebalance (3) +
   // dashboard (1) + incident list/record (2) + Composio mock v111 (2) +
   // connection list/disconnect/reconnect (3) + poll policy (1) +
   // SambaNova models (1) = 13 --
   ...FLEET_V8_TOOLS,
+  // --- v1.12 (Đội T6): fleet scheduling v2 — schedule create/list/
+  // enable (3) + queue tick/list (2) + day plan (1) + automations v2 —
+  // create/list/dry-run/run-log (4) + Composio mock v112 list/execute
+  // (2) + MCP Apps v112 catalogue/install/uninstall (3) = 15 ---
+  ...FLEET_V9_TOOLS,
+  // --- v1.13 (Đội T1): Agent Skills loader v13 (8) ---
+  ...SKILLS_V13_TOOLS,
+  // --- v1.13 (Đội T2): MCP Apps host v13 (7) ---
+  ...MCP_APPS_V113_TOOLS,
+  // --- v1.14 (Đội T2): MCP Apps v2 + Tasks chuẩn 2026-07-28 (8) ---
+  ...MCP_APPS_V2_TOOLS,
+  // --- v1.13 (Đội T3): repo map v5 (6) ---
+  ...REPOMAP_V5_TOOLS,
+  // --- v1.13 (Đội T4): coding agent v5 git-native (11) ---
+  ...CODING_V5_TOOLS,
+  // --- v1.14 (Đội T3): coding agent v6 — start/run_text/approve/
+  // replay/security/condense/delegate (7) ---
+  ...CODING_V6_TOOLS,
+  // --- v1.15 (Đội T4): coding agent v7 — start/step/pause/resume/
+  // replay/security/condense/skills/eval (9) ---
+  ...CODING_V7_TOOLS,
+  // --- v1.13 (Đội T5): voice v12 realtime (8) ---
+  ...VOICE_V12_TOOLS,
+  // --- v1.14 (Đội T5): voice v13 realtime (8) ---
+  ...VOICE_V13_TOOLS,
+  // --- v1.15 (Đội T5): voice v14 realtime (9) ---
+  ...VOICE_V14_TOOLS,
+  // --- v1.13 (Đội T6): fleet v10 (11) ---
+  ...FLEET_V10_TOOLS,
+  // --- v1.14 (Đội T4): Composio v114 — mock toolkits list/execute (2) +
+  // poll schedule v2 (1) + connection health (1) + trigger templates (1) +
+  // MCP App open (1) = 6 ---
+  ...COMPOSIO_V114_TOOLS,
+  // --- v1.14 (Đội T6): fleet v11 (9) ---
+  ...FLEET_V11_TOOLS,
+  // --- v1.15 (Đội T3): local model router — catalogue list/validate (2) +
+  // model load/unload/status (3) + route decide (1) + budget set/report (2) +
+  // spend record (1) + gateway key (1) = 10 ---
+  ...ROUTER_LOCAL_V115_TOOLS,
+  // --- v1.15 (Đội T6): fleet v12 (9) ---
+  ...FLEET_V12_TOOLS,
 ];
 
 export function createDefaultTools(opts?: {
@@ -1074,6 +1200,26 @@ export function createDefaultTools(opts?: {
   getMemoryV11WorkspaceDir?: () => string | null | undefined;
   getMemoryV11BotId?: () => string | null | undefined;
   /**
+   * v1.12 (Doi T1): memory v12 wiring. When given, the 7 memory v12
+   * placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern as v11) — never registered twice.
+   * `getMemoryV12WorkspaceDir` resolves the bot workspace dir
+   * (memory blocks live there). `getMemoryV12BotId` resolves the
+   * calling bot id (actor `agent:<botId>` for edit/audit checks).
+   */
+  getMemoryV12WorkspaceDir?: () => string | null | undefined;
+  getMemoryV12BotId?: () => string | null | undefined;
+  /**
+   * v1.15 (Doi T1): memory v14 wiring. When given, the 8 memory v14
+   * placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern as v12) — never registered twice.
+   * `getMemoryV14WorkspaceDir` resolves the bot workspace dir
+   * (temporal graph lives there). `getMemoryV14BotId` resolves the
+   * calling bot id (actor `agent:<botId>` for extract/erase checks).
+   */
+  getMemoryV14WorkspaceDir?: () => string | null | undefined;
+  getMemoryV14BotId?: () => string | null | undefined;
+  /**
    * v1.08 (Đội T2): coding v2 wiring. When given, the 10 coding v2
    * placeholders in ALL_TOOLS are replaced by bound tools (same
    * replace-in-place pattern as memory v8) — never registered twice.
@@ -1161,6 +1307,36 @@ export function createDefaultTools(opts?: {
   /** v1.11 (Đội T2): executor thật + test timeout cho eval v111 tools. */
   getEvalV111ToolOptions?: () => EvalV111ToolOptions | undefined;
   /**
+   * v1.12 (Đội T2): event-sourced conversation wiring. When given,
+   * the 11 conversation v112 placeholders in ALL_TOOLS are replaced
+   * by bound tools (same replace-in-place pattern) — never registered
+   * twice. `getConversationV112BaseDir` resolves the app userData dir
+   * (logs `<userData>/conversations-v112/`).
+   */
+  getConversationV112BaseDir?: () => string | null | undefined;
+  /** v1.12 (Đội T2): CodeAct executor + workspace fallback cho conversation v112 tools. */
+  getConversationV112ToolOptions?: () => ConversationV112ToolOptions | undefined;
+  /**
+   * v1.14 (Đội T3): coding agent v6 wiring. When given, the 7 coding
+   * v6 placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern) — never registered twice.
+   * `getCodingV6BaseDir` resolves the app userData dir (logs
+   * `<userData>/coding-v6/`).
+   */
+  getCodingV6BaseDir?: () => string | null | undefined;
+  /** v1.14 (Đội T3): CodeAct executor + sub-agent runner + workspace fallback cho coding v6 tools. */
+  getCodingV6ToolOptions?: () => CodingV6ToolOptions | undefined;
+  /**
+   * v1.15 (Đội T4): coding agent v7 wiring. When given, the 9 coding
+   * v7 placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern) — never registered twice.
+   * `getCodingV7BaseDir` resolves the app userData dir (logs
+   * `<userData>/coding-v7/`).
+   */
+  getCodingV7BaseDir?: () => string | null | undefined;
+  /** v1.15 (Đội T4): model generator + workspace fallback + skills dir cho coding v7 tools. */
+  getCodingV7ToolOptions?: () => CodingV7ToolOptions | undefined;
+  /**
    * v1.11 (Đội T5): voice v10 wiring. When given, the 10 voice v10
    * placeholders in ALL_TOOLS are replaced by bound tools (same
    * replace-in-place pattern) — never registered twice.
@@ -1172,6 +1348,15 @@ export function createDefaultTools(opts?: {
   getVoiceV10Manager?: () => import('./voiceV10Tools').VoiceV10ManagerLike | null;
   hasVoiceV10LiveKey?: () => boolean;
   /**
+   * v1.12 (Đội T5): voice v11 wiring. When given, the 8 voice v11
+   * placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern) — never registered twice.
+   * `getVoiceV11Manager` returns the host's VoiceV11Manager (or
+   * null when voice is not wired — the placeholders then refuse
+   * with a plain message).
+   */
+  getVoiceV11Manager?: () => import('./voiceV11Tools').VoiceV11ManagerLike | null;
+  /**
    * v1.11 (Đội T6): fleet v8 wiring. When given, the 13 fleet v8
    * placeholders in ALL_TOOLS are replaced by bound tools (same
    * replace-in-place pattern) — never registered twice.
@@ -1181,6 +1366,35 @@ export function createDefaultTools(opts?: {
    * poll policy, SambaNova models) work even unbound.
    */
   getFleetV8BaseDir?: () => string | null | undefined;
+  /**
+   * v1.12 (Đội T6): fleet v9 wiring. When given, the 15 fleet v9
+   * placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern) — never registered twice.
+   * `getFleetV9BaseDir` resolves the app userData dir (fleet root
+   * is `<userData>/fleet`, automations state `<userData>/automations`,
+   * MCP Apps state `<userData>/mcp-apps-v112.json`).
+   * The 4 pure tools (day plan, automation dry-run, mock list/execute,
+   * app catalogue) work even unbound.
+   */
+  getFleetV9BaseDir?: () => string | null | undefined;
+  /**
+   * v1.14 (Đội T6): fleet v11 wiring. When given, the 9 fleet v11
+   * placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern) — never registered twice.
+   * `getFleetV11BaseDir` resolves the app userData dir (fleet root
+   * is `<userData>/fleet`). The 4 pure tools (health snapshot, 3
+   * panel view-models) work even unbound.
+   */
+  getFleetV11BaseDir?: () => string | null | undefined;
+  /**
+   * v1.15 (Đội T6): fleet v12 wiring. When given, the 9 fleet v12
+   * placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern) — never registered twice.
+   * `getFleetV12BaseDir` resolves the app userData dir (fleet root
+   * is `<userData>/fleet`). The 3 pure tools (health dashboard,
+   * 2 panel view-models) work even unbound.
+   */
+  getFleetV12BaseDir?: () => string | null | undefined;
   /**
    * v1.08 (Đội T4): providers v2 wiring. When given, the 17 v1.08
    * placeholders in ALL_TOOLS are replaced by bound tools (same
@@ -1193,7 +1407,7 @@ export function createDefaultTools(opts?: {
    */
   getProvidersV108Opts?: () => ProvidersV108ToolOptions | null | undefined;
 }): Tool[] {
-  if (!opts?.getDaemon && !opts?.getEgressPolicy && !opts?.getInternetDataFile && !opts?.getBraveSearchApiKey && !opts?.onWatchChanged && !opts?.getFleetV103BaseDir && !opts?.getOpenmausbotV105BaseDir && !opts?.getEvalFleetV105BaseDir && !opts?.getPlatformV4BaseDir && !opts?.getMemoryV8WorkspaceDir && !opts?.getMemoryV9WorkspaceDir && !opts?.getMemoryV10WorkspaceDir && !opts?.getMemoryV11WorkspaceDir && !opts?.getMemoryV11BotId && !opts?.getSkillsPluginsV107Opts && !opts?.getFleetV4TeamsBaseDir && !opts?.getCodingV2WorkspaceDir && !opts?.getCodingV3WorkspaceDir && !opts?.getCodingV4WorkspaceDir && !opts?.getProvidersV108Opts && !opts?.getFleetV5BaseDir && !opts?.getAgentTeamsV109BaseDir && !opts?.getFleetV6BaseDir && !opts?.getFleetV7BaseDir && !opts?.getEvalV111BaseDir && !opts?.getVoiceV10Manager && !opts?.hasVoiceV10LiveKey && !opts?.getFleetV8BaseDir) return [...ALL_TOOLS];
+  if (!opts?.getDaemon && !opts?.getEgressPolicy && !opts?.getInternetDataFile && !opts?.getBraveSearchApiKey && !opts?.onWatchChanged && !opts?.getFleetV103BaseDir && !opts?.getOpenmausbotV105BaseDir && !opts?.getEvalFleetV105BaseDir && !opts?.getPlatformV4BaseDir && !opts?.getMemoryV8WorkspaceDir && !opts?.getMemoryV9WorkspaceDir && !opts?.getMemoryV10WorkspaceDir && !opts?.getMemoryV11WorkspaceDir && !opts?.getMemoryV11BotId && !opts?.getMemoryV12WorkspaceDir && !opts?.getMemoryV12BotId && !opts?.getMemoryV14WorkspaceDir && !opts?.getMemoryV14BotId && !opts?.getSkillsPluginsV107Opts && !opts?.getFleetV4TeamsBaseDir && !opts?.getCodingV2WorkspaceDir && !opts?.getCodingV3WorkspaceDir && !opts?.getCodingV4WorkspaceDir && !opts?.getProvidersV108Opts && !opts?.getFleetV5BaseDir && !opts?.getAgentTeamsV109BaseDir && !opts?.getFleetV6BaseDir && !opts?.getFleetV7BaseDir && !opts?.getEvalV111BaseDir && !opts?.getConversationV112BaseDir && !opts?.getVoiceV10Manager && !opts?.hasVoiceV10LiveKey && !opts?.getVoiceV11Manager && !opts?.getFleetV8BaseDir && !opts?.getFleetV9BaseDir && !opts?.getCodingV6BaseDir && !opts?.getFleetV11BaseDir && !opts?.getCodingV7BaseDir && !opts?.getFleetV12BaseDir) return [...ALL_TOOLS];
   let tools = [...ALL_TOOLS];
   const idx = tools.indexOf(shellExecTool);
   if (idx !== -1) {
@@ -1368,6 +1582,42 @@ export function createDefaultTools(opts?: {
     if (workspaceDir) {
       const botId = opts.getMemoryV11BotId?.() ?? undefined;
       const bound = createMemoryV11Tools({ workspaceDir, ...(botId ? { botId } : {}) });
+      const boundNames = new Set(bound.map((t) => t.definition.name));
+      const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+      if (firstIdx !== -1) {
+        const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+        kept.splice(firstIdx, 0, ...bound);
+        tools = kept;
+      }
+    }
+  }
+  // v1.12 (Doi T1): bind the memory v12 tools when the host wires
+  // them (bot workspace dir). Same replace-in-place pattern as v11 —
+  // same 9 names, never a duplicate. getMemoryV12BotId (optional)
+  // sets the calling bot id for edit/audit actor checks.
+  if (opts?.getMemoryV12WorkspaceDir) {
+    const workspaceDir = opts.getMemoryV12WorkspaceDir();
+    if (workspaceDir) {
+      const botId = opts.getMemoryV12BotId?.() ?? undefined;
+      const bound = createMemoryV12Tools({ workspaceDir, ...(botId ? { botId } : {}) });
+      const boundNames = new Set(bound.map((t) => t.definition.name));
+      const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+      if (firstIdx !== -1) {
+        const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+        kept.splice(firstIdx, 0, ...bound);
+        tools = kept;
+      }
+    }
+  }
+  // v1.15 (Doi T1): bind the memory v14 tools when the host wires
+  // them (bot workspace dir). Same replace-in-place pattern as v12 —
+  // same 8 names, never a duplicate. getMemoryV14BotId (optional)
+  // sets the calling bot id for extract/erase actor checks.
+  if (opts?.getMemoryV14WorkspaceDir) {
+    const workspaceDir = opts.getMemoryV14WorkspaceDir();
+    if (workspaceDir) {
+      const botId = opts.getMemoryV14BotId?.() ?? undefined;
+      const bound = createMemoryV14Tools({ workspaceDir, ...(botId ? { botId } : {}) });
       const boundNames = new Set(bound.map((t) => t.definition.name));
       const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
       if (firstIdx !== -1) {
@@ -1562,6 +1812,54 @@ export function createDefaultTools(opts?: {
       tools = kept;
     }
   }
+  // v1.12 (Đội T2): bind the conversation v112 tools when the host
+  // wires them (userData dir). Same replace-in-place pattern — same
+  // 11 names, never a duplicate.
+  if (opts?.getConversationV112BaseDir) {
+    const bound = createConversationV112Tools(
+      opts.getConversationV112BaseDir,
+      opts.getConversationV112ToolOptions?.() ?? {},
+    );
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
+  // v1.14 (Đội T3): bind the coding v6 tools when the host wires
+  // them (userData dir). Same replace-in-place pattern — same
+  // 7 names, never a duplicate.
+  if (opts?.getCodingV6BaseDir) {
+    const bound = createCodingV6Tools(
+      opts.getCodingV6BaseDir,
+      opts.getCodingV6ToolOptions?.() ?? {},
+    );
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
+  // v1.15 (Đội T4): bind the coding v7 tools when the host wires
+  // them (userData dir). Same replace-in-place pattern — same
+  // 9 names, never a duplicate.
+  if (opts?.getCodingV7BaseDir) {
+    const bound = createCodingV7Tools(
+      opts.getCodingV7BaseDir,
+      opts.getCodingV7ToolOptions?.() ?? {},
+    );
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
   // v1.11 (Đội T5): bind the voice v10 tools when the host wires
   // them (same replace-in-place pattern — same 10 names, never a duplicate).
   if (opts?.getVoiceV10Manager || opts?.hasVoiceV10LiveKey) {
@@ -1577,11 +1875,64 @@ export function createDefaultTools(opts?: {
       tools = kept;
     }
   }
+  // v1.12 (Đội T5): bind the voice v11 tools when the host wires
+  // them (same replace-in-place pattern — same 8 names, never a duplicate).
+  if (opts?.getVoiceV11Manager) {
+    const bound = createVoiceV11Tools({
+      getManager: opts.getVoiceV11Manager,
+    });
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
   // v1.11 (Đội T6): bind the fleet v8 tools when the host wires
   // them (userData dir). Same replace-in-place pattern — same 13
   // names, never a duplicate.
   if (opts?.getFleetV8BaseDir) {
     const bound = createFleetV8Tools(opts.getFleetV8BaseDir);
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
+  // v1.12 (Đội T6): bind the fleet v9 tools when the host wires
+  // them (userData dir). Same replace-in-place pattern — same 15
+  // names, never a duplicate.
+  if (opts?.getFleetV9BaseDir) {
+    const bound = createFleetV9Tools(opts.getFleetV9BaseDir);
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
+  // v1.14 (Đội T6): bind the fleet v11 tools when the host wires
+  // them (userData dir). Same replace-in-place pattern — same 9
+  // names, never a duplicate.
+  if (opts?.getFleetV11BaseDir) {
+    const bound = createFleetV11Tools(opts.getFleetV11BaseDir);
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
+  // v1.15 (Đội T6): bind the fleet v12 tools when the host wires
+  // them (userData dir). Same replace-in-place pattern — same 9
+  // names, never a duplicate.
+  if (opts?.getFleetV12BaseDir) {
+    const bound = createFleetV12Tools(opts.getFleetV12BaseDir);
     const boundNames = new Set(bound.map((t) => t.definition.name));
     const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
     if (firstIdx !== -1) {

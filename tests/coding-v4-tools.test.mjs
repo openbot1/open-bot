@@ -66,13 +66,13 @@ test('tool surface: 14 coding-v4 tools, names match, none needs approval', () =>
   }
 });
 
-test('registry wiring: ALL_TOOLS holds the 14 tools (359), binding keeps 359', () => {
+test('registry wiring: ALL_TOOLS holds the 14 tools (491), binding keeps 491', () => {
   for (const name of CODING_V4_TOOL_NAMES) {
     assert.ok(ALL_TOOLS.some((x) => x.definition.name === name), name);
   }
   // v1.11 (Doi T4): 289 + 14 coding v4 = 303. The coordinator re-pins
   // this number when merging the other v1.11 teams.
-  assert.equal(ALL_TOOLS.length, 359);
+  assert.equal(ALL_TOOLS.length, 544); // v1.14 merge re-pin.
   assert.equal(new Set(ALL_TOOLS.map((x) => x.definition.name)).size, ALL_TOOLS.length);
   const bound = createDefaultTools({ getCodingV4WorkspaceDir: () => '/tmp/no-such-dir' });
   assert.equal(bound.length, ALL_TOOLS.length);

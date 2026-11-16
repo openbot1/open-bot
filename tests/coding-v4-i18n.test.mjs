@@ -72,11 +72,11 @@ test('coding v4 keys exist in all 6 locales with matching placeholders', () => {
   }
 });
 
-test('locale totals move 4353 -> 4384 in all 6 locales', () => {
+test('locale totals move 4983 -> 5278 in all 6 locales', () => {
   // v1.11 (Doi T4): 4353 + 31 coding v4 keys = 4384. The coordinator
   // re-pins this number when merging the other v1.11 teams.
   const counts = LOCALE_NAMES.map((code) => Object.keys(loadLocale(code)).length);
-  assert.deepEqual(counts, [4565, 4565, 4565, 4565, 4565, 4565]);
+  assert.deepEqual(counts, [5704, 5704, 5704, 5704, 5704, 5704]); // v1.14 merge re-pin.
 });
 
 test('renderer: CodingV4SubagentTree has no hard-coded Vietnamese and uses existing keys', () => {
