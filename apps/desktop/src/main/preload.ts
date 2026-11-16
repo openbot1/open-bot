@@ -5,7 +5,7 @@
  * KHÔNG expose ipcRenderer trực tiếp, KHÔNG expose API key hay Node API.
  */
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AppliedPluginTemplate, A2aPersistStatus, AppSnapshot, AgUiEvent, AgUiRunState, AppStatusView, AuditEvent, AuditVerifyResult, AutoApproveRule, AutoApproveRuleInput, BotConfig, BotQuota, CanvasDocument, CanvasSummary, Channel, ChannelKind, ChannelMessage, ChannelResponderRules, ComposioPollStatus, ComposioStateView, ComposioToolkitConnection, ComputerBackend, ComputerPlan, ComputerSchedulerState, ComputerStatusView, CreateFleetWorkspaceInput, CreatePluginTemplateInput, CrashReport, CrashReportSummary, DeepLinkRoute, FleetBotOverview, FleetCapacityCheck, FleetConsoleRole, FleetConsoleUser, FleetDecision, FleetRole, FleetStatusView, FleetUsageSummary, FleetV6Overview, FleetV8DashboardSnapshot, FleetWorkspace, GroupBotInterruptedEntry, GroupBotStatusEntry, GroupChat, GroupMessage, GuestAgentHealth, HarnessEvent, HarnessStatusResult, HarnessThreadLogResult, ListBotSkillsResult, ListBotToolsResult, LocalProfile, LongTermMemoryEntry, MachineProfile, MarketplaceV2Entry, McpAppDefinition, MemoryBlock, OnePasswordBrokerStatus, OpenAppInput, PermissionReview, PluginCatalogEntry, PluginTemplate, QuotaAlert, SetBotSkillEnabledResult, SetBotToolEnabledResult, TaskSnapshot, TeamBundle, ThreadItem, ThreadSearchHit, VerbatimRecord, VisionAttachment, RouterConfig, RouterStats, RouterTarget, RoutingDecision, RouterCliStatus, GetRouterConfigResult, GetRouterDecisionsResult, GetRouterStatsResult, GetRouterTargetsResult, RunLogMeta, RunEventQuery, RunLogVerification, AuditIntegrityReport, PauseResumeResult, ForkRunResult, ReplayedRunState, AnyRunEvent, FleetOverview, PlacementPlan, QueuedPlacement, MarketplaceCollection, MarketplaceEntryVersion, MarketplaceInstallRecord, PluginUpdateInfo, PluginDependencyCheck, QueuedPluginInstall, PluginRollbackRecord, EvalSuite, EvalCase, EvalCheck, EvalSuiteReport, EvalCaseResult, EvalComparison, FleetPolicyV4, FleetTaskV4, MemoryEvalReport, RegressionAlert, RunMemoryEvalSuiteResult, EventStreamSummary, EventStreamBucket, AgentTeamV109, TeamV109Summary, TeamV2Dashboard } from '@open-bot/core';
+import type { AppliedPluginTemplate, A2aPersistStatus, AppSnapshot, AgUiEvent, AgUiRunState, AppStatusView, AuditEvent, AuditVerifyResult, AutoApproveRule, AutoApproveRuleInput, BotConfig, BotQuota, CanvasDocument, CanvasSummary, Channel, ChannelKind, ChannelMessage, ChannelResponderRules, ComposioPollStatus, ComposioStateView, ComposioToolkitConnection, ComputerBackend, ComputerPlan, ComputerSchedulerState, ComputerStatusView, CreateFleetWorkspaceInput, CreatePluginTemplateInput, CrashReport, CrashReportSummary, DeepLinkRoute, FleetBotOverview, FleetCapacityCheck, FleetConsoleRole, FleetConsoleUser, FleetDecision, FleetRole, FleetStatusView, FleetUsageSummary, FleetV6Overview, FleetV8DashboardSnapshot, FleetWorkspace, AcpControlAgentSnapshot, AcpControlDiscoveredSnapshot, AcpControlReportSnapshot, AcpControlSnapshot, AcpControlTurnSnapshot, GroupBotInterruptedEntry, GroupBotStatusEntry, GroupChat, GroupMessage, GuestAgentHealth, HarnessEvent, HarnessStatusResult, HarnessThreadLogResult, ListBotSkillsResult, ListBotToolsResult, LocalProfile, LongTermMemoryEntry, MachineProfile, MarketplaceV2Entry, McpAppDefinition, MemoryBlock, OnePasswordBrokerStatus, OpenAppInput, PermissionReview, PluginCatalogEntry, PluginTemplate, QuotaAlert, SetBotSkillEnabledResult, SetBotToolEnabledResult, TaskSnapshot, TeamBundle, ThreadItem, ThreadSearchHit, VerbatimRecord, VisionAttachment, RouterConfig, RouterStats, RouterTarget, RoutingDecision, RouterCliStatus, GetRouterConfigResult, GetRouterDecisionsResult, GetRouterStatsResult, GetRouterTargetsResult, RunLogMeta, RunEventQuery, RunLogVerification, AuditIntegrityReport, PauseResumeResult, ForkRunResult, ReplayedRunState, AnyRunEvent, FleetOverview, PlacementPlan, QueuedPlacement, MarketplaceCollection, MarketplaceEntryVersion, MarketplaceInstallRecord, PluginUpdateInfo, PluginDependencyCheck, QueuedPluginInstall, PluginRollbackRecord, EvalSuite, EvalCase, EvalCheck, EvalSuiteReport, EvalCaseResult, EvalComparison, FleetPolicyV4, FleetTaskV4, MemoryEvalReport, RegressionAlert, RunMemoryEvalSuiteResult, EventStreamSummary, EventStreamBucket, AgentTeamV109, TeamV109Summary, TeamV2Dashboard } from '@open-bot/core';
 // Trace shapes from core (not ../renderer/types: tsconfig.main.json
 // pins rootDir to src/main, so preload cannot import renderer files).
 // The renderer-side mirrors live in ../renderer/types.ts.
@@ -1889,6 +1889,16 @@ export interface OpenBotApi {
   'fleet:v6-overview'(): Promise<FleetV6Overview>;
   // v1.11 (Đội T6): fleet v8 dashboard.
   'fleet:v8-dashboard'(): Promise<FleetV8DashboardSnapshot>;
+  // v1.12 (Team T4): ACP Control Center — managed external CLI agents.
+  'acp-control:list'(): Promise<AcpControlSnapshot>;
+  'acp-control:discover'(payload?: { probeAcp?: boolean }): Promise<AcpControlDiscoveredSnapshot[]>;
+  'acp-control:register'(backendId: string): Promise<AcpControlAgentSnapshot>;
+  'acp-control:start'(agentId: string): Promise<AcpControlAgentSnapshot>;
+  'acp-control:stop'(agentId: string): Promise<{ stopped: boolean }>;
+  'acp-control:set-enabled'(payload: { agentId: string; enabled: boolean }): Promise<AcpControlAgentSnapshot>;
+  'acp-control:set-budget'(payload: { agentId: string; budget: { maxTokensPerDay?: number; maxCostUsdPerDay?: number; maxCallsPerDay?: number; maxWallMsPerDay?: number } }): Promise<AcpControlAgentSnapshot>;
+  'acp-control:usage'(agentId: string): Promise<AcpControlTurnSnapshot[]>;
+  'acp-control:report'(agentId: string, days?: number): Promise<AcpControlReportSnapshot>;
   // Đội D: camelCase aliases (same channels).
   listFleet: () => Promise<FleetStatusView[]>;
   getFleetStatus: (id: string) => Promise<FleetStatusView>;
@@ -1923,6 +1933,16 @@ export interface OpenBotApi {
   getFleetV6Overview: () => Promise<FleetV6Overview>;
   // v1.11 (Đội T6): fleet v8 dashboard (camelCase alias).
   getFleetV8Dashboard: () => Promise<FleetV8DashboardSnapshot>;
+  // v1.12 (Team T4): ACP Control Center (camelCase aliases).
+  getAcpControlSnapshot: () => Promise<AcpControlSnapshot>;
+  discoverAcpControlAgents: (payload?: { probeAcp?: boolean }) => Promise<AcpControlDiscoveredSnapshot[]>;
+  registerAcpControlAgent: (backendId: string) => Promise<AcpControlAgentSnapshot>;
+  startAcpControlAgent: (agentId: string) => Promise<AcpControlAgentSnapshot>;
+  stopAcpControlAgent: (agentId: string) => Promise<{ stopped: boolean }>;
+  setAcpControlEnabled: (payload: { agentId: string; enabled: boolean }) => Promise<AcpControlAgentSnapshot>;
+  setAcpControlBudget: (payload: { agentId: string; budget: { maxTokensPerDay?: number; maxCostUsdPerDay?: number; maxCallsPerDay?: number; maxWallMsPerDay?: number } }) => Promise<AcpControlAgentSnapshot>;
+  getAcpControlUsage: (agentId: string) => Promise<AcpControlTurnSnapshot[]>;
+  getAcpControlReport: (agentId: string, days?: number) => Promise<AcpControlReportSnapshot>;
   listBotQuotas: () => Promise<BotQuota[]>;
   // v1.03 (Team T6): fleet overview v3 + scheduler v3.
   'fleet:overview'(): Promise<FleetOverview>;
@@ -2719,6 +2739,25 @@ const openBot: OpenBotApi = {
   // v1.09 (Đội T6): fleet v6 overview.
   'fleet:v6-overview': () => ipcRenderer.invoke('fleet:v6-overview'),
   'fleet:v8-dashboard': () => ipcRenderer.invoke('fleet:v8-dashboard'),
+  // v1.12 (Team T4): ACP Control Center — managed external CLI agents.
+  'acp-control:list': () => ipcRenderer.invoke('acp-control:list'),
+  'acp-control:discover': (payload) => ipcRenderer.invoke('acp-control:discover', payload),
+  'acp-control:register': (backendId) => ipcRenderer.invoke('acp-control:register', backendId),
+  'acp-control:start': (agentId) => ipcRenderer.invoke('acp-control:start', agentId),
+  'acp-control:stop': (agentId) => ipcRenderer.invoke('acp-control:stop', agentId),
+  'acp-control:set-enabled': (payload) => ipcRenderer.invoke('acp-control:set-enabled', payload),
+  'acp-control:set-budget': (payload) => ipcRenderer.invoke('acp-control:set-budget', payload),
+  'acp-control:usage': (agentId) => ipcRenderer.invoke('acp-control:usage', agentId),
+  'acp-control:report': (agentId, days) => ipcRenderer.invoke('acp-control:report', agentId, days),
+  getAcpControlReport: (agentId, days) => ipcRenderer.invoke('acp-control:report', agentId, days),
+  getAcpControlSnapshot: () => ipcRenderer.invoke('acp-control:list'),
+  discoverAcpControlAgents: (payload) => ipcRenderer.invoke('acp-control:discover', payload),
+  registerAcpControlAgent: (backendId) => ipcRenderer.invoke('acp-control:register', backendId),
+  startAcpControlAgent: (agentId) => ipcRenderer.invoke('acp-control:start', agentId),
+  stopAcpControlAgent: (agentId) => ipcRenderer.invoke('acp-control:stop', agentId),
+  setAcpControlEnabled: (payload) => ipcRenderer.invoke('acp-control:set-enabled', payload),
+  setAcpControlBudget: (payload) => ipcRenderer.invoke('acp-control:set-budget', payload),
+  getAcpControlUsage: (agentId) => ipcRenderer.invoke('acp-control:usage', agentId),
   listFleet: () => ipcRenderer.invoke('fleet:list'),
   getFleetStatus: (id) => ipcRenderer.invoke('fleet:status', id),
   createFleetWorkspace: (payload) => ipcRenderer.invoke('fleet:create', payload),

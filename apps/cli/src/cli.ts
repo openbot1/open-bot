@@ -163,6 +163,7 @@ import {
 } from '@open-bot/core';
 import { createHarnessV2Tools } from '@open-bot/tools';
 import { cmdContext } from './contextCommand';
+import { cmdCodingV7 } from './codingV7Command';
 import type {
   AgentEvent,
   BotConfig,
@@ -291,6 +292,16 @@ DÙNG:
                 model local. Secret được lược bỏ trước khi ghi.
   open-bot eval harbor profiles [--json]
                 (v1.11) Liệt kê Agent Profiles (builtin + custom).
+  open-bot coding-v7 security <bash|python|edit|read> <text> [--json]
+                (v1.15) Quét code/command bằng security analyzer v7
+                (allow/warn/block). Exit 2 khi block.
+  open-bot coding-v7 skills list|match <text>|init [--json]
+                (v1.15) Liệt kê/khớp/ghi skill mẫu của coding agent v7.
+  open-bot coding-v7 eval [--task <id>] [--json]
+                (v1.15) Chạy eval coding mẫu (3 task, repo mẫu /tmp,
+                scripted model). Exit 2 khi có task fail.
+  open-bot coding-v7 replay <sessionId> [--at N] [--from N] [--json]
+                (v1.15) Verify hash chain + state/event của log v7.
   open-bot eval harbor profile <kind> [--json]
                 (v1.11) Chọn profile cho một loại task (coding,
                 research, writing, review, general, data) + resolve
@@ -2910,6 +2921,9 @@ async function main(argv: string[]): Promise<number> {
   }
   if (cmd === 'eval') {
     return cmdEval(sub, positional.slice(2), flags);
+  }
+  if (cmd === 'coding-v7') {
+    return cmdCodingV7(sub, positional.slice(2), flags, resolveDataDir(flags));
   }
   process.stdout.write(HELP);
   return fail(`Không rõ lệnh "${cmd}".`, 1);

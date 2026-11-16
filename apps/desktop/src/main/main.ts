@@ -417,6 +417,17 @@ import {
   readLettaSleepLog,
   runLettaSleepPass,
 } from '@open-bot/core';
+// v1.12 (Team T4): ACP Control Center — managed external CLI agents
+// (IPC `acp-control:*`; state under <userData>/acp-control).
+import {
+  AcpControlCenter,
+  buildAcpControlAgentView,
+  buildAcpControlReport,
+  buildAcpControlSnapshot,
+  toAcpControlDiscoveredView,
+  toAcpControlTurnView,
+} from '@open-bot/core';
+import type { AcpControlAgentSnapshot } from '@open-bot/core';
 // v1.08 (Đội T5): voice v7 sessions cho IPC `voice-v7:*` (mock,
 // local-first — panel quản lý session + transcript streaming).
 import { VoiceV7Manager, isVadV7PresetName } from '@open-bot/core';
@@ -11154,6 +11165,70 @@ function registerIpc(): void {
   // v1.11 (Đội T6): fleet v8 dashboard — node health + problem bots +
   // running campaigns + recent incidents (CHỈ ĐỌC, local-first).
   ipcMain.handle('fleet:v8-dashboard', () => buildFleetV8Dashboard(fleetRootDir()));
+
+  // v1.12 (Team T4): ACP Control Center — managed external CLI agents.
+  // State under <userData>/acp-control (registrations + usage JSON,
+  // never a secret). Start spawns the CLI binary with the CLI's own
+  // login; budgets are enforced by the center before every turn.
+  let acpControlCenter: AcpControlCenter | undefined;
+  function getAcpControlCenter(): AcpControlCenter {
+    if (!acpControlCenter) {
+      acpControlCenter = new AcpControlCenter({ stateDir: path.join(app.getPath('userData'), 'acp-control') });
+    }
+    return acpControlCenter;
+  }
+  function acpControlAgentView(agentId: string): AcpControlAgentSnapshot {
+    const view = getAcpControlCenter().views().find((v) => v.record.id === agentId);
+    if (!view) throw new Error(`unknown managed agent: ${agentId}`);
+    return buildAcpControlAgentView(view);
+  }
+  ipcMain.handle('acp-control:list', () => buildAcpControlSnapshot(getAcpControlCenter()));
+  ipcMain.handle('acp-control:discover', async (_event: unknown, payload: unknown) => {
+    const probeAcp = Boolean((payload as Record<string, unknown> | undefined)?.probeAcp);
+    const found = await getAcpControlCenter().discover({ probeAcp });
+    return found.map(toAcpControlDiscoveredView);
+  });
+  ipcMain.handle('acp-control:register', async (_event: unknown, backendId: unknown) => {
+    const center = getAcpControlCenter();
+    const found = await center.discover();
+    const match = found.find((f) => f.backendId === asStringParam(backendId));
+    if (!match) throw new Error(`unknown backend: ${String(backendId)}`);
+    if (!match.installed) throw new Error(`${match.name} is not installed on this machine.`);
+    const record = center.registerDiscovered(match);
+    return acpControlAgentView(record.id);
+  });
+  ipcMain.handle('acp-control:start', async (_event: unknown, agentId: unknown) => {
+    const record = await getAcpControlCenter().start(asStringParam(agentId));
+    return acpControlAgentView(record.id);
+  });
+  ipcMain.handle('acp-control:stop', (_event: unknown, agentId: unknown) => {
+    const stopped = getAcpControlCenter().stop(asStringParam(agentId));
+    return { stopped };
+  });
+  ipcMain.handle('acp-control:set-enabled', (_event: unknown, payload: unknown) => {
+    const rec = (payload ?? {}) as Record<string, unknown>;
+    const record = getAcpControlCenter().setEnabled(asStringParam(rec.agentId), rec.enabled === true);
+    return acpControlAgentView(record.id);
+  });
+  ipcMain.handle('acp-control:set-budget', (_event: unknown, payload: unknown) => {
+    const rec = (payload ?? {}) as Record<string, unknown>;
+    const budget = (rec.budget ?? {}) as Record<string, unknown>;
+    const patch: { maxTokensPerDay?: number; maxCostUsdPerDay?: number; maxCallsPerDay?: number; maxWallMsPerDay?: number } = {};
+    for (const key of ['maxTokensPerDay', 'maxCostUsdPerDay', 'maxCallsPerDay', 'maxWallMsPerDay'] as const) {
+      const value = budget[key];
+      if (typeof value === 'number') patch[key] = value;
+      else if (value === null) patch[key] = undefined;
+    }
+    const { record } = getAcpControlCenter().setBudget(asStringParam(rec.agentId), patch);
+    return acpControlAgentView(record.id);
+  });
+  ipcMain.handle('acp-control:usage', (_event: unknown, agentId: unknown) => {
+    return getAcpControlCenter().history(asStringParam(agentId), 20).map(toAcpControlTurnView);
+  });
+  ipcMain.handle('acp-control:report', (_event: unknown, agentId: unknown, days: unknown) => {
+    const n = typeof days === 'number' && Number.isFinite(days) ? Math.max(1, Math.min(30, Math.floor(days))) : 7;
+    return buildAcpControlReport(getAcpControlCenter(), asStringParam(agentId), n);
+  });
 
   // v1.03 (Team T6): fleet overview v3 + scheduler v3 — totals,
   // top consumers, capacity forecast, placement planning, and the

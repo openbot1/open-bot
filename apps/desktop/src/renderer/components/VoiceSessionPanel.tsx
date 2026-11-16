@@ -22,6 +22,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '../i18n/useT';
+import VoicePanelV11 from './VoicePanelV11';
 import {
   filterTranscriptV7Lines,
   formatVoiceV7Duration,
@@ -103,6 +104,9 @@ export default function VoiceSessionPanel({ onBack }: Props) {
   const [simulateText, setSimulateText] = useState('');
   const [simulateReply, setSimulateReply] = useState('');
   const [transcriptFilter, setTranscriptFilter] = useState<'all' | 'user' | 'agent'>('all');
+  // v1.14 (Team T6): toggle the voice panel v11 (latency, barge-in,
+  // wake word, provider picker). Hidden by default (progressive disclosure).
+  const [showV11Panel, setShowV11Panel] = useState(false);
   const [lastPartial, setLastPartial] = useState('');
   const selectedIdRef = useRef('');
   selectedIdRef.current = selectedId;
@@ -358,6 +362,10 @@ export default function VoiceSessionPanel({ onBack }: Props) {
       <h2>{t('voice.v7.title')}</h2>
       <p className="hint">{t('voice.v7.intro')}</p>
       <p className="hint">{t('voice.v7.mockOnly')}</p>
+      <button className="btn secondary" onClick={() => setShowV11Panel((v) => !v)}>
+        {t('voicePanelV11.title')}
+      </button>
+      {showV11Panel && <VoicePanelV11 />}
       {loading && <p className="hint">{t('voice.v7.loading')}</p>}
       {error && <p className="error">{error}</p>}
       {notice && <p className="hint" data-testid="voice-v7-notice">{notice}</p>}

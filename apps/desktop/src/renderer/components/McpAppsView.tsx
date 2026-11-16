@@ -3,6 +3,7 @@ import type { McpAppFullViewLike, McpAppViewLike } from '../types';
 import { useT } from '../i18n/useT';
 import { MCP_APP_SANDBOX, SAMPLE_APP_HTML, buildRendererAppSrcdoc, formatAppBytes } from './mcpApps';
 import McpAppSecurityReview, { buildReviewFromApp } from './McpAppSecurityReview';
+import McpAppsPanelV11 from './McpAppsPanelV11';
 
 interface Props {
   onBack: () => void;
@@ -30,6 +31,9 @@ export default function McpAppsView({ onBack }: Props) {
   // review (only meaningful for apps that need confirmation — tool-result has no
   // review yet). Sample/manual apps run immediately, no confirmation needed.
   const [approvedId, setApprovedId] = useState<string | null>(null);
+  // v1.14 (Team T6): toggle the MCP Apps panel v11 (gallery, template,
+  // permissions, CSP). Hidden by default (progressive disclosure).
+  const [showV11Panel, setShowV11Panel] = useState(false);
 
   const refresh = useCallback(async () => {
     if (typeof window.openBot.listMcpApps !== 'function') {
@@ -137,8 +141,12 @@ export default function McpAppsView({ onBack }: Props) {
         <button className="btn secondary" onClick={() => void openSample()} disabled={busy}>
           {t('mcpApps.openSample')}
         </button>
+        <button className="btn secondary" onClick={() => setShowV11Panel((v) => !v)}>
+          {t('mcpAppsPanelV11.title')}
+        </button>
         <span style={{ color: 'var(--text-dim)' }}>{t('mcpApps.appsCount', { count: String(apps.length) })}</span>
       </div>
+      {showV11Panel && <McpAppsPanelV11 />}
       {error !== '' && <p className="error">{error}</p>}
       {loading ? (
         <p className="empty">{t('mcpApps.loading')}</p>

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { FleetCapacityCheckView, FleetStatusView, FleetWorkspaceView } from '../types';
 import FleetV8View from './FleetV8View';
+import FleetV11HealthView from './FleetV11HealthView';
+import FleetV11RolloutView from './FleetV11RolloutView';
 import { useT } from '../i18n/useT';
 
 /**
@@ -71,6 +73,10 @@ export default function FleetView({ onBack }: Props) {
   // v1.11 (Team T6): toggle the fleet v8 dashboard (node health + problem
   // bots + campaigns + incidents). Hidden by default so the old FleetView is unchanged.
   const [showV8, setShowV8] = useState(false);
+  // v1.14 (Team T6): toggles for the fleet v11 health + rollout panels.
+  // Hidden by default (progressive disclosure) so the old FleetView is unchanged.
+  const [showV11Health, setShowV11Health] = useState(false);
+  const [showV11Rollout, setShowV11Rollout] = useState(false);
 
   const loadFleet = useCallback(async () => {
     setLoading(true);
@@ -240,6 +246,14 @@ export default function FleetView({ onBack }: Props) {
         {showV8 ? t('fleetV8.hideDashboard') : t('fleetV8.showDashboard')}
       </button>
       {showV8 && <FleetV8View />}
+      <button type="button" onClick={() => setShowV11Health((v) => !v)}>
+        {showV11Health ? t('fleetV11.hideHealth') : t('fleetV11.showHealth')}
+      </button>
+      {showV11Health && <FleetV11HealthView />}
+      <button type="button" onClick={() => setShowV11Rollout((v) => !v)}>
+        {showV11Rollout ? t('fleetV11.hideRollout') : t('fleetV11.showRollout')}
+      </button>
+      {showV11Rollout && <FleetV11RolloutView />}
 
       {error && (
         <p role="alert">

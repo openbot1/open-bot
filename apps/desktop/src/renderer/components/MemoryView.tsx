@@ -25,6 +25,7 @@ import MemoryLettaView from './MemoryLettaView';
 import MemoryTimelineView from './MemoryTimelineView';
 import MemoryV10View from './MemoryV10View';
 import MemoryV11View from './MemoryV11View';
+import MemoryPanelV11 from './MemoryPanelV11';
 
 interface Props {
   bots: BotConfigLike[];
@@ -72,7 +73,7 @@ export default function MemoryView({ bots, botId, onBack, onSelectBot }: Props) 
   // CoALA + versioned blocks + fused 3-signal retrieval).
   // v1.11 (Doi T1): memory v11 tab (shared supervisor blocks + unified
   // block_history + <memory_blocks> + sleep-time consolidation).
-  const [tab, setTab] = useState<'memories' | 'blocks' | 'blocks-editor' | 'v2' | 'graph' | 'verbatim' | 'notes' | 'v3' | 'v5' | 'timeline' | 'letta' | 'v10' | 'v11'>('memories');
+  const [tab, setTab] = useState<'memories' | 'blocks' | 'blocks-editor' | 'v2' | 'graph' | 'verbatim' | 'notes' | 'v3' | 'v5' | 'timeline' | 'letta' | 'v10' | 'v11' | 'v11-panel'>('memories');
 
   const activeBot = bots.find((b) => b.id === botId) ?? bots[0] ?? null;
 
@@ -289,8 +290,18 @@ export default function MemoryView({ bots, botId, onBack, onSelectBot }: Props) 
         >
           {t('memory.tabV11')}
         </button>
+        <button
+          className="btn secondary"
+          data-testid="memory-tab-v11-panel"
+          onClick={() => setTab('v11-panel')}
+          disabled={tab === 'v11-panel'}
+        >
+          {t('memory.tabV11Panel')}
+        </button>
       </div>
-      {tab === 'v11' ? (
+      {tab === 'v11-panel' ? (
+        <MemoryPanelV11 />
+      ) : tab === 'v11' ? (
         <MemoryV11View bots={bots} botId={botId} onSelectBot={onSelectBot} />
       ) : tab === 'v10' ? (
         <MemoryV10View bots={bots} botId={botId} onSelectBot={onSelectBot} />
