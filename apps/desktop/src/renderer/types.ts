@@ -3220,3 +3220,107 @@ export interface BenchmarkReportView {
   failures: Array<{ taskId: string; kind: string; question: string; expectedAnswer: string; retrievedTopK: string[] }>;
   methodNote: string;
 }
+
+// v1.12 (Team T4): ACP Control Center — mirror of core
+// packages/core/src/acp/control/types.ts (plain JSON over IPC).
+export interface AcpControlBudgetView {
+  maxTokensPerDay?: number;
+  maxCostUsdPerDay?: number;
+  maxCallsPerDay?: number;
+  maxWallMsPerDay?: number;
+  warnAtFraction?: number;
+}
+
+export interface AcpControlUsageView {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  costUsd: number | null;
+  calls: number;
+  unpricedCalls: number;
+  wallMs: number;
+  toolCalls: number;
+}
+
+export interface AcpControlDimensionView {
+  dimension: 'tokens' | 'cost' | 'calls' | 'wallMs';
+  used: number;
+  limit?: number;
+  fractionUsed: number | null;
+  warned: boolean;
+  exceeded: boolean;
+}
+
+export interface AcpControlAgentView {
+  id: string;
+  backendId: string;
+  name: string;
+  command: string;
+  args: string[];
+  resolvedPath?: string;
+  agentName?: string;
+  agentVersion?: string;
+  speaksAcp: boolean;
+  loginLabel?: string;
+  loginMethod?: string;
+  loggedIn: boolean;
+  enabled: boolean;
+  status: string;
+  budget: AcpControlBudgetView;
+  createdAt: string;
+  startedAt?: string;
+  stoppedAt?: string;
+  lastError?: string;
+  restarts: number;
+  today: AcpControlUsageView;
+  total: AcpControlUsageView;
+  dimensions: AcpControlDimensionView[];
+  blocked: boolean;
+  warned: boolean;
+  reasons: string[];
+}
+
+export interface AcpControlTurnView {
+  id: string;
+  agentId: string;
+  sessionId: string;
+  at: string;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number | null;
+  durationMs: number;
+  stopReason: string;
+  status: string;
+  toolCalls: number;
+}
+
+export interface AcpControlDiscoveredView {
+  backendId: string;
+  name: string;
+  command: string;
+  args: string[];
+  resolvedPath?: string;
+  installed: boolean;
+  speaksAcp: boolean;
+  agentName?: string;
+  agentVersion?: string;
+  loginLabel?: string;
+  loginMethod?: string;
+  loggedIn: boolean;
+  verifiedInRepo: boolean;
+  error?: string;
+  alreadyRegistered: boolean;
+}
+
+export interface AcpControlSnapshot {
+  agents: AcpControlAgentView[];
+  today: AcpControlUsageView;
+  total: AcpControlUsageView;
+}
+
+export interface AcpControlReportView {
+  agentId: string;
+  days: Array<{ day: string; summary: AcpControlUsageView; blocked: boolean }>;
+  total: AcpControlUsageView;
+  alerts: Array<{ id: string; kind: string; reasons: string[]; day: string; at: string }>;
+}
