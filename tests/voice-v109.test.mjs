@@ -811,13 +811,13 @@ test('v109 tools: full lifecycle on a real manager (mock sessions)', async () =>
   assert.match(badVad, /Unknown voice v8 session|Unknown VAD v8 preset/);
 });
 
-test('v109 registry: all 10 voice_v8 tools in defaultToolFactory, total 649', () => {
+test('v109 registry: all 10 voice_v8 tools in defaultToolFactory, total 858', () => {
   const ws = tmpDir('open-bot-voice-v109-registry-');
   const mem = new BotMemory(ws);
   try {
     const tools = defaultToolFactory(mem, ws, 'bot-1');
     const names = tools.map((t) => t.definition.name);
-    assert.equal(names.length, 710, `expected 710 tools, got ${names.length}`); // v1.09 merge (T5): 500 + 10 voice_v8_* = 510
+    assert.equal(names.length, 1274, `expected 1200 tools, got ${names.length}`); // v1.14 T2: 820 + 8 mcpAppsV2 = 828; v1.13 merge: 769 + 51 = 820; v1.09 merge (T5): 500 + 10 voice_v8_* = 510 // v1.36 re-pin: factory 1274 (ALL_TOOLS 899 + 375).
     assert.equal(new Set(names).size, names.length, 'duplicate tool names in the agent registry');
     for (const name of VOICE_V8_TOOL_NAMES) {
       assert.ok(names.includes(name), `${name} must be registered`);
@@ -949,7 +949,7 @@ test('v109 renderer: voice session v8 row parse + status labels + waveform + PTT
 // 7. i18n
 // ---------------------------------------------------------------------------
 
-test('v109 i18n: 25 voice.v8.* keys in all 6 locales, 4388 keys each', () => {
+test('v109 i18n: 25 voice.v8.* keys in all 6 locales, 5278 keys each', () => {
   const localesDir = path.join(ROOT, 'apps/desktop/src/renderer/i18n/locales');
   const expected = [
     'voice.v8.bargeIn.echoOnly',
@@ -987,5 +987,5 @@ test('v109 i18n: 25 voice.v8.* keys in all 6 locales, 4388 keys each', () => {
       assert.ok(data[key].length > 0, `${locale} ${key} must not be empty`);
     }
   }
-  assert.deepEqual(counts, [4565, 4565, 4565, 4565, 4565, 4565]); // v1.10 merge: 4089 + 264 keys = 4353; v1.11: 4353 + 212 v1.11 = 4565
+  assert.deepEqual(counts, [7540, 7540, 7540, 7540, 7540, 7540]); // v1.13: 4818 + 165 = 4983. 1.10 merge: 4089 + 264 keys = 4353; v1.11: 4353 + 212 v1.11 = 4565 // v1.36 re-pin: 7540.
 });

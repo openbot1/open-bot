@@ -865,13 +865,13 @@ test('v108 tools: full lifecycle on a real manager (mock sessions)', async () =>
   assert.equal(deletedAgain.deleted, false);
 });
 
-test('v108 registry: all 9 voice_v7 tools in defaultToolFactory, total 649', () => {
+test('v108 registry: all 9 voice_v7 tools in defaultToolFactory, total 858', () => {
   const ws = tmpDir('open-bot-voice-v108-registry-');
   const mem = new BotMemory(ws);
   try {
     const tools = defaultToolFactory(mem, ws, 'bot-1');
     const names = tools.map((t) => t.definition.name);
-    assert.equal(names.length, 710, `expected 710 tools, got ${names.length}`); // v1.09 merge: 500 + 11 teams + 23 letta + 10 fleet_v6 + 10 voice_v8 + 2 a2a_v11 = 556; / v1.08 merge (T5): 428 + 9 voice_v7_* = 437
+    assert.equal(names.length, 1274, `expected 1200 tools, got ${names.length}`); // v1.14 T2: 820 + 8 mcpAppsV2 = 828; v1.13 merge: 769 + 51 = 820; v1.09 merge: 500 + 11 teams + 23 letta + 10 fleet_v6 + 10 voice_v8 + 2 a2a_v11 = 584; / v1.08 merge (T5): 428 + 9 voice_v7_* = 437 // v1.36 re-pin: factory 1274 (ALL_TOOLS 899 + 375).
     assert.equal(new Set(names).size, names.length, 'duplicate tool names in the agent registry');
     for (const name of VOICE_V7_TOOL_NAMES) {
       assert.ok(names.includes(name), `${name} must be registered`);

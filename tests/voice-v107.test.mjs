@@ -779,13 +779,13 @@ test('v107 tools: full lifecycle on a real manager (mock sessions)', async () =>
   assert.match(await runToolRaw(byName, 'voice_v6_state', {}), /^Error: Missing required argument/);
 });
 
-test('v107 registry: all 7 voice_v6 tools in defaultToolFactory, total 649', () => {
+test('v107 registry: all 7 voice_v6 tools in defaultToolFactory, total 858', () => {
   const ws = tmpDir('open-bot-voice-v107-registry-');
   const mem = new BotMemory(ws);
   try {
     const tools = defaultToolFactory(mem, ws, 'bot-1');
     const names = tools.map((t) => t.definition.name);
-    assert.equal(names.length, 710, `expected 710 tools, got ${names.length}`); // v1.09 merge: 500 + 11 teams + 23 letta + 10 fleet_v6 + 10 voice_v8 + 2 a2a_v11 = 556; v1.10 merge: 556 + 9 memory_v10 + 10 mcp_v110 + 18 teams_v2 + 12 coding_v3 + 21 voice_v9/agui_v2/dashboard + 14 fleet_v7/cerebras = 640; v1.11 merge: 640 + 70 = 710; / v1.07 merge: 389 + 12 + 3 + 4 + 8 + 7 + 5 = 428
+    assert.equal(names.length, 1274, `expected 1200 tools, got ${names.length}`); // v1.14 T2: 820 + 8 mcpAppsV2 = 828; v1.13 merge: 769 + 51 = 820; v1.09 merge: 500 + 11 teams + 23 letta + 10 fleet_v6 + 10 voice_v8 + 2 a2a_v11 = 584; v1.10 merge: 584 + 9 memory_v10 + 10 mcp_v110 + 18 teams_v2 + 12 coding_v3 + 21 voice_v9/agui_v2/dashboard + 14 fleet_v7/cerebras = 640; v1.11 merge: 640 + 70 = 710; / v1.07 merge: 389 + 12 + 3 + 4 + 8 + 7 + 5 = 428 // v1.36 re-pin: factory 1274 (ALL_TOOLS 899 + 375).
     assert.equal(new Set(names).size, names.length, 'duplicate tool names in the agent registry');
     for (const name of VOICE_V6_TOOL_NAMES) {
       assert.ok(names.includes(name), `${name} must be registered`);

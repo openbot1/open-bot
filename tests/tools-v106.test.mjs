@@ -28,7 +28,7 @@ async function exec(tool, args) {
   return tool.execute(args, CTX);
 }
 
-test('tools: ALL_TOOLS có đủ 14 tool mới + 5 fleet v4 teams + 10 coding v2 (ALL_TOOLS 359)', () => {
+test('tools: ALL_TOOLS có đủ 14 tool mới + 5 fleet v4 teams + 10 coding v2 (ALL_TOOLS 491)', () => {
   const names = new Set(ALL_TOOLS.map((t) => t.definition.name));
   for (const name of [
     'doctor_run', 'doctor_check',
@@ -38,8 +38,8 @@ test('tools: ALL_TOOLS có đủ 14 tool mới + 5 fleet v4 teams + 10 coding v2
   ]) {
     assert.ok(names.has(name), `thiếu tool ${name}`);
   }
-  assert.equal(ALL_TOOLS.length, 359); // v1.10 merge: 236 + 53 = 289; v1.11 merge: 289 + 70 = 359
-  assert.equal(new Set(ALL_TOOLS.map((t) => t.definition.name)).size, 359, 'không trùng tên tool'); // v1.11 merge: 289 + 70 = 359
+  assert.equal(ALL_TOOLS.length, 899); // v1.14 merge: 453 + 38 = 500; v1.13: 402 + 51 = 453; v1.10 merge: 236 + 53 = 289; v1.11 merge: 289 + 70 = 359 // v1.36 re-pin: 825 + 74 = 899.
+  assert.equal(new Set(ALL_TOOLS.map((t) => t.definition.name)).size, 899, 'không trùng tên tool'); // v1.36 re-pin: 825 + 74 = 899.
 });
 
 test('tools: doctor_run trả JSON report, doctor_check chạy 1 check', async () => {

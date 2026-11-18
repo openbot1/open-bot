@@ -214,6 +214,7 @@ test('smoke UI-13: nav menu, theme, palette, delete modal, cron builder', { skip
   // v1.09 (merge): thêm 'agent-teams' (Đội T1) → 32 → 33.
   // v1.10 (merge): thêm 'agent-teams-v2' (Đội T3) → 33 → 34.
   // v1.11 (merge): thêm 'agent-teams-v3' (Đội T3) + 'eval-v111' (Đội T2) → 35 → 37.
+  // v1.12 (merge): thêm 'acp-control' (Đội T4) → 37 → 38.
   assert.equal(
     await evalJsStrict(`document.querySelectorAll('.sidebar > button.btn.secondary').length`),
     0,
@@ -224,8 +225,8 @@ test('smoke UI-13: nav menu, theme, palette, delete modal, cron builder', { skip
   const navKeys = await evalJsStrict(`[...document.querySelectorAll('[data-testid="sidebar-nav-dropdown"] [data-nav-key]')].map((b) => b.getAttribute('data-nav-key')).sort().join(',')`);
   assert.equal(
     navKeys,
-    'a2a,agent-teams,agent-teams-v2,agent-teams-v3,agui,automations,bot-marketplace,canvas,channels,computers,connected-apps,dashboard,doctor-team,eval-fleet,eval-harness,eval-v111,event-stream,eventlog,fleet,fleet-console,group,harness2,internet-data,marketplace,mcp,mcp-apps,mcp-tasks,mcp-tasks-monitor,memory,plans,plugin-marketplace,runlog,settings,skills,team,tools,voice-sessions',
-    `dropdown must list all 37 destinations, got ${navKeys}`, // v1.08 (Đội T5): + voice-sessions view; v1.06 (Đội T5): + doctor-team + mcp-tasks-monitor views
+    'a2a,acp-control,agent-teams,agent-teams-v2,agent-teams-v3,agui,automations,bot-marketplace,canvas,channels,computers,connected-apps,dashboard,doctor-team,eval-fleet,eval-harness,eval-v111,event-stream,eventlog,fleet,fleet-console,group,harness2,internet-data,marketplace,mcp,mcp-apps,mcp-tasks,mcp-tasks-monitor,memory,plans,plugin-marketplace,runlog,settings,skills,team,tools,voice-sessions',
+    `dropdown must list all 38 destinations, got ${navKeys}`, // v1.08 (Đội T5): + voice-sessions view; v1.06 (Đội T5): + doctor-team + mcp-tasks-monitor views
   );
   assert.equal(
     await evalJsStrict(`(() => { const b = document.querySelector('[data-nav-key="settings"]'); if (!b) return false; b.click(); return true; })()`),

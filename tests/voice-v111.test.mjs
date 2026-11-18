@@ -39,13 +39,13 @@
  *      tools, unique names, placeholder refuses, full lifecycle
  *      through the tools on a real manager (mock sessions),
  *      preset set/get/catalog, realtime status + force-batch +
- *      recover, registry wiring (ALL_TOOLS 359, binding keeps 359).
+ *      recover, registry wiring (ALL_TOOLS 368, binding keeps 368).
  *   9. Renderer-local view models (voiceSessionV10View.ts): row
  *      parsing, VAD/noise/latency views, transcript rows with a
  *      stable interim, waveform bars (peak >= level), bounded
  *      level history, fallback banner, preset rows + active mark.
  *  10. i18n: 23 `voice.realtime.v10.*` keys in all 6 locales,
- *      non-empty, total 4565 per locale.
+ *      non-empty, total 5029 per locale.
  *
  * No network, no sound card, no live provider, no key. TTS has no
  * Windows engine and no sound card on this VM — every audio path
@@ -873,18 +873,18 @@ test('voice v10 tools: full lifecycle on a real manager', async () => {
   assert.ok(missing.startsWith('Error: '));
 });
 
-test('voice v10 tools: registry wiring (ALL_TOOLS 359, binding keeps 359)', () => {
-  assert.equal(ALL_TOOLS.length, 359); // v1.11 T5 only: 289 + 70 v1.11 = 359
-  assert.equal(new Set(ALL_TOOLS.map((t) => t.definition.name)).size, 359);
+test('voice v10 tools: registry wiring (ALL_TOOLS 899, binding keeps 899)', () => {
+  assert.equal(ALL_TOOLS.length, 899); // v1.14 merge: 453 + 38 = 500; v1.13: 402 + 51 = 453; v1.11 T5 only: 289 + 70 v1.11 = 359 // v1.36 re-pin: 825 + 74 = 899.
+  assert.equal(new Set(ALL_TOOLS.map((t) => t.definition.name)).size, 899); // v1.36 re-pin: 825 + 74 = 899.
   for (const name of VOICE_V10_TOOL_NAMES) {
     assert.equal(ALL_TOOLS.filter((t) => t.definition.name === name).length, 1, `${name} duplicated`);
   }
   const manager = new VoiceV10Manager();
   const bound = createDefaultTools({ getVoiceV10Manager: () => manager });
-  assert.equal(bound.length, 359);
-  assert.equal(new Set(bound.map((t) => t.definition.name)).size, 359);
+  assert.equal(bound.length, 899); // v1.36 re-pin: 825 + 74 = 899.
+  assert.equal(new Set(bound.map((t) => t.definition.name)).size, 899); // v1.36 re-pin: 825 + 74 = 899.
   const plain = createDefaultTools();
-  assert.equal(plain.length, 359);
+  assert.equal(plain.length, 899); // v1.36 re-pin: 825 + 74 = 899.
 });
 
 // ---------------------------------------------------------------------------
@@ -987,7 +987,7 @@ test('voice v10 view: transcript rows, waveform bars, fallback, presets', () => 
 // 10. i18n
 // ---------------------------------------------------------------------------
 
-test('i18n: 23 voice.realtime.v10.* keys in all 6 locales, total 4565', () => {
+test('i18n: 23 voice.realtime.v10.* keys in all 6 locales, total 5278', () => {
   const localesDir = path.join(ROOT, 'apps/desktop/src/renderer/i18n/locales');
   const names = ['en', 'vi', 'es', 'fr', 'ja', 'zh'];
   const expected = [
@@ -1012,5 +1012,5 @@ test('i18n: 23 voice.realtime.v10.* keys in all 6 locales, total 4565', () => {
     }
     counts.push(Object.keys(locale).length);
   }
-  assert.deepEqual(counts, [4565, 4565, 4565, 4565, 4565, 4565]); // v1.11 T5 only: 4353 + 212 v1.11 = 4565
+  assert.deepEqual(counts, [7540, 7540, 7540, 7540, 7540, 7540]); // v1.11 T5 only: 4353 + 212 v1.11 = 4565 v1.13: 4818 + 165 = 4983. // v1.36 re-pin: 7540.
 });
