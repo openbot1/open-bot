@@ -34,6 +34,9 @@ không cloud VM / tài khoản / thanh toán.
 | `cliProbeV2.ts` | Probe sâu 6 CLI (Codex/Claude Code/OpenCode/Gemini CLI/Aider/Cursor CLI) |
 | `fallback.ts` | Fallback chain cloud → CLI → local, circuit breaker, health, budget (nối v1.15) |
 | `routerV2.ts` | Orchestrator: discovery + load on-demand + route + sweep |
+| `architectEditor.ts` | **v1.17** Architect–Editor: planner lập plan, editor thực thi, escalate khi fail |
+| `repoMapV4.ts` | **v1.17** Repo map v4: signature (TS/Py dùng parser v8, Go/Rust/Java riêng) + PageRank + budget map |
+| `localDetectV2.ts` | **v1.17** Ollama /api/tags + /api/ps, LM Studio /v1/models, hợp nhất CLI probe, toggle nguồn, entries cho model picker |
 | `index.ts` | Public exports |
 
 Tools: `packages/tools/src/routerV2Tools.ts` (8 tools, module riêng,
@@ -61,6 +64,21 @@ Tools: `packages/tools/src/routerV2Tools.ts` (8 tools, module riêng,
 - **Fallback**: cloud → CLI → local; circuit breaker mỗi nguồn
   (mở sau 3 lỗi liên tiếp, thử lại sau 60s); budget gate chặn cloud khi
   vượt budget; spend ghi vào `LocalBudgetTracker` v1.15.
+- **Architect–Editor (v1.17)**: planner mạnh nhất đạt ngưỡng quality
+  theo độ khó; editor rẻ nhất đạt ngưỡng (ưu tiên local); task dễ có
+  thể single-model. Editor fail → retry → escalate lên planner →
+  đổi editor mạnh hơn → fail có báo cáo. Executor do caller inject
+  (test dùng fake); không gọi model thật trong module này.
+- **Repo map v4 (v1.17)**: chỉ lấy signature + import, không thân
+  hàm; PageRank có trọng số (calls 4 > imports 3 > references 1.5 >
+  defines 1) + personalization theo query; render theo budget token
+  (chars/4), báo included/omitted/partial. Call resolve theo tên
+  ngắn nên method trùng tên có thể nối nhầm (báo trong stats).
+- **Local detect v2 (v1.17)**: chỉ gọi HTTP loopback + lệnh của
+  chính CLI; **không bao giờ** đọc nội dung credential/token, không
+  copy/gửi credential. Ollama tôn trọng `OLLAMA_HOST`, LM Studio
+  tôn trọng `LM_STUDIO_URL`. Toggle từng nguồn (`SourceToggleStore`,
+  serialize được); model picker entries ghi rõ nguồn + tài khoản.
 
 ## Cấu hình
 

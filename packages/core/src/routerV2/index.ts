@@ -10,6 +10,14 @@
  * - CLI probe v2: probe sau 6 CLI agent (version range + format + login + model list).
  * - Fallback: cloud -> CLI -> local, circuit breaker + health + budget (noi v1.15).
  * - Router: orchestrator load on-demand + route + sweep.
+ * - Architect–Editor v1.17: planner manh lap ke hoach, editor local re
+ *   thuc thi tung step, escalate len planner / editor manh hon khi fail.
+ * - Repo map v4 v1.17: signature extraction (TS/Python tai dung parser
+ *   v8, Go/Rust/Java parser rieng) + PageRank co trong so + render
+ *   theo budget token.
+ * - Local detect v2 v1.17: Ollama /api/tags + /api/ps, LM Studio
+ *   /v1/models, hop nhat voi probe CLI v1.16, toggle tung nguon,
+ *   entries cho model picker (nguon + tai khoan).
  */
 export * from './types';
 export * from './discovery';
@@ -22,3 +30,6 @@ export * from './pickerV2';
 export * from './cliProbeV2';
 export * from './fallback';
 export * from './routerV2';
+export * from './architectEditor';
+export * from './repoMapV4';
+export * from './localDetectV2';
