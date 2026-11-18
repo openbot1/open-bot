@@ -110,7 +110,7 @@ test('i18n: all 34 memoryV11.* keys + memory.tabV11 exist, non-empty, in all 6 l
   assert.equal(sets[0].length, 34);
   // Total key count pin: 4353 + 34 memoryV11.* + 1 memory.tabV11 = 4388.
   for (const locale of LOCALES) {
-    assert.equal(Object.keys(locales[locale]).length, 4565, `${locale} key count`);
+    assert.equal(Object.keys(locales[locale]).length, 7540, `${locale} key count`); // v1.36 re-pin: 7540.
   }
 });
 

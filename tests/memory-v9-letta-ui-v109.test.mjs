@@ -144,7 +144,7 @@ test('i18n: 44 key Letta mới có đủ 6 locale, không rỗng, tập key kh�
   for (const locale of LOCALES) {
     locales[locale] = readLocale(locale);
     // Tổng key/locale: 3891 (v1.08) + 44 (v1.09 Đội T2) = 3935.
-    assert.equal(Object.keys(locales[locale]).length, 4565, `${locale} phải có 4565 key`);
+    assert.equal(Object.keys(locales[locale]).length, 7540, `${locale} phải có 7540 key`); // v1.36 re-pin: 7540.
     for (const key of EXPECTED_KEYS) {
       assert.ok(key in locales[locale], `${locale} thiếu key ${key}`);
       assert.equal(typeof locales[locale][key], 'string', `${locale}.${key} phải là string`);

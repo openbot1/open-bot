@@ -121,9 +121,14 @@ test('memory_v3_temporal_query + contradictions + entity_timeline', async () => 
   // Superseded "now" (Nov 14): old fact valid Nov 3 -> Nov 14, new
   // fact valid from Nov 14. Window A = Nov 3-9, window B = Nov 12-16,
   // so the pair still contradicts across the two windows.
+  // v1.15 merge fix: pass the supersede instant explicitly — before,
+  // supersedeFact always stamped wall-clock now, so this test only
+  // passed while "today" fell inside window B (Nov 12-16); from
+  // Nov 16 on, the new fact fell outside B and the count flipped 1->0.
   graphStore.supersedeFact(old.id, {
     subjectName: 'user', predicate: 'lives_in', objectText: 'TP. Hồ Chí Minh', confidence: 0.95,
     scope, provenance: at('t2', 'Tôi đã chuyển vào TP. Hồ Chí Minh.'),
+    validFrom: '2026-11-14T10:00:00.000Z',
   });
 
   const lastWeek = await run(byName.get('memory_v3_temporal_query'), { at: '2026-11-05T00:00:00.000Z' });

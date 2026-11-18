@@ -131,7 +131,7 @@ test('realtime-ui: requireWsUrl accepts ws/wss realtime URLs', () => {
   assert.throws(() => requireWsUrl('', 'realtimeUrl'), /không rỗng|chuỗi/);
 });
 
-test('realtime-ui: all 6 locales carry the 118 voice.realtime.* keys (parity 6/6)', () => {
+test('realtime-ui: all 6 locales carry the 380 voice.realtime.* keys (parity 6/6)', () => {
   const keySets = [];
   for (const loc of LOCALES) {
     const data = JSON.parse(read(`apps/desktop/src/renderer/i18n/locales/${loc}.json`));
@@ -146,7 +146,7 @@ test('realtime-ui: all 6 locales carry the 118 voice.realtime.* keys (parity 6/6
   for (let i = 1; i < keySets.length; i++) {
     assert.deepEqual([...keySets[i]].sort(), [...keySets[0]].sort());
   }
-  assert.equal(keySets[0].size, 118); // v1.07 merge: 87 + 8 voice.realtime.v6.* = 95; v1.11 merge: 95 + 23 voice.realtime.v10.* = 118
+  assert.equal(keySets[0].size, 514); // v1.36 re-pin: 514 (measured from runtime; was 476 at v1.14).
 });
 
 test('realtime-ui: RealtimeVoicePanel renders provider/turn-mode/start/stop/interrupt/talk controls', () => {

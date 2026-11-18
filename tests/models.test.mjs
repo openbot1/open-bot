@@ -366,7 +366,7 @@ test('save without a filePath throws', () => {
 // Presets
 // ---------------------------------------------------------------------------
 
-test('compatible presets: all 12 with exact baseUrl + defaultModel', () => {
+test('compatible presets: 12 original presets keep exact baseUrl + defaultModel (total now 90)', () => {
   const expected = {
     // v0.97: deepseek-chat retired 2026-07-24 -> deepseek-v4-flash.
     deepseek: ['https://api.deepseek.com/v1', 'deepseek-v4-flash'],
@@ -384,8 +384,8 @@ test('compatible presets: all 12 with exact baseUrl + defaultModel', () => {
     sambanova: ['https://api.sambanova.ai/v1', 'Meta-Llama-3.3-70B-Instruct'],
     'google-ai-studio': ['https://generativelanguage.googleapis.com/v1beta/openai', 'gemini-2.5-flash'],
   };
-  assert.equal(COMPATIBLE_PRESETS.length, 12);
-  assert.equal(listCompatiblePresets().length, 12);
+  assert.equal(COMPATIBLE_PRESETS.length, 90);
+  assert.equal(listCompatiblePresets().length, 90);
   for (const [id, [baseUrl, defaultModel]] of Object.entries(expected)) {
     const preset = resolvePreset(id);
     assert.ok(preset, `missing preset ${id}`);
@@ -404,10 +404,101 @@ test('compatible presets: all 12 with exact baseUrl + defaultModel', () => {
 test('PROVIDERS meta exposes the presets on openai-compatible', () => {
   const meta = PROVIDERS.find((p) => p.id === 'openai-compatible');
   assert.ok(meta);
-  assert.equal(meta.presets.length, 12);
+  assert.equal(meta.presets.length, 90);
   assert.deepEqual(
     meta.presets.map((p) => p.id),
-    ['deepseek', 'moonshot', 'qwen', 'mistral', 'together', 'groq', 'cohere', 'openrouter', 'cerebras', 'fireworks', 'sambanova', 'google-ai-studio'],
+    [
+      'deepseek',
+      'moonshot',
+      'qwen',
+      'mistral',
+      'together',
+      'groq',
+      'cohere',
+      'openrouter',
+      'cerebras',
+      'fireworks',
+      'sambanova',
+      'google-ai-studio',
+      'openai',
+      'xai',
+      'perplexity',
+      'aimlapi',
+      'requesty',
+      'portkey',
+      'helicone',
+      'vercel-ai-gateway',
+      'langdb',
+      'martian',
+      'notdiamond',
+      'unify',
+      'eden-ai',
+      'huggingface',
+      'ovh-ai',
+      'targon',
+      'corcel',
+      'inference-sh',
+      'prime-intellect',
+      'scaleway',
+      'pollinations',
+      'pawan',
+      'shuttleai',
+      'textsynth',
+      'naga-ai',
+      'modelscope',
+      'anyscale',
+      'replicate',
+      'baseten',
+      'lambda',
+      'friendli',
+      'nvidia',
+      'lepton',
+      'deepinfra',
+      'hyperbolic',
+      'novita',
+      'siliconflow',
+      'featherless',
+      'chutes',
+      'infermatic',
+      'kluster',
+      'parasail',
+      'avian',
+      'nebius',
+      'ai21',
+      'writer',
+      'reka',
+      'upstage',
+      'sarvam',
+      'maritaca',
+      'zhipu',
+      'z-ai',
+      'doubao',
+      'minimax',
+      'baichuan',
+      'yi',
+      'spark',
+      'qianfan',
+      'hunyuan',
+      'stepfun',
+      'sensenova',
+      'internlm',
+      'moonshot-cn',
+      'qwen-cn',
+      'ollama-local',
+      'lm-studio',
+      'vllm',
+      'llama-cpp',
+      'text-generation-webui',
+      'jan',
+      'sglang',
+      'tgi',
+      'litellm',
+      'open-webui',
+      'gpt4all',
+      'localai',
+      'ollama-cloud',
+      'koboldcpp',
+    ],
   );
   assert.equal(PROVIDERS.find((p) => p.id === 'openai').presets, undefined);
 });

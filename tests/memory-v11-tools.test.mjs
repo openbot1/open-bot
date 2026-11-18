@@ -2,7 +2,7 @@
  * Tests for v1.11 (Doi T1) — memory v11 tools:
  * packages/tools/src/memoryV11Tools.ts (+ registry in tools.ts).
  *
- * Covers: 9 tools registered in ALL_TOOLS exactly once (359 total:
+ * Covers: 9 tools registered in ALL_TOOLS exactly once (368 total:
  * 289 + 9), no duplicates, approval flags match read/write, bound
  * execution via createMemoryV11Tools({ workspaceDir, botId }) —
  * insert / apply-patch / history list-diff-rollback / render /
@@ -58,8 +58,8 @@ async function run(tools, name, args) {
   return tool.execute(args);
 }
 
-test('registry: 9 memory v11 tools in ALL_TOOLS exactly once (359 total)', () => {
-  assert.equal(ALL_TOOLS.length, 359); // v1.11 merge: 289 + 70 = 359
+test('registry: 9 memory v11 tools in ALL_TOOLS exactly once (491 total)', () => {
+  assert.equal(ALL_TOOLS.length, 899); // v1.14 merge: 453 + 38 = 500; v1.13: 402 + 51 = 453; v1.12 merge: 359 + 9 memory v12 = 368 // v1.36 re-pin: 825 + 74 = 899.
   assert.deepEqual([...MEMORY_V11_TOOL_NAMES], [
     'memory_insert',
     'memory_apply_patch',
@@ -244,7 +244,7 @@ test('memory_sleep_record + memory_sleep_pass: fast record, pass consolidates', 
   assert.ok(!blocks.get('learned-context').content.includes('open-bot'));
 });
 
-test('binding: createDefaultTools({ getMemoryV11WorkspaceDir }) binds 9 tools in place, ALL_TOOLS stays 298', async () => {
+test('binding: createDefaultTools({ getMemoryV11WorkspaceDir }) binds 9 tools in place, ALL_TOOLS stays 491', async () => {
   const dir = makeTempDir();
   const store = new MemoryBlockStore(dir);
   store.create({ label: 'task', description: '', content: 'a\nb', charLimit: 4096 }, 'user');
@@ -252,8 +252,8 @@ test('binding: createDefaultTools({ getMemoryV11WorkspaceDir }) binds 9 tools in
     getMemoryV11WorkspaceDir: () => dir,
     getMemoryV11BotId: () => 'bot-1',
   });
-  assert.equal(bound.length, 359);
-  assert.equal(new Set(bound.map((t) => t.definition.name)).size, 359);
+  assert.equal(bound.length, 899); // v1.36 re-pin: 825 + 74 = 899.
+  assert.equal(new Set(bound.map((t) => t.definition.name)).size, 899); // v1.36 re-pin: 825 + 74 = 899.
   const tools = toolMap(bound);
   const out = JSON.parse(await tools.get('memory_blocks_render').execute({ botId: 'bot-1' }));
   assert.equal(out.blocks.length, 0); // nothing attached yet — but bound, not placeholder

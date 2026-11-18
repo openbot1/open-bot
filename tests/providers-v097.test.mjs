@@ -242,9 +242,9 @@ test('v097 providers: createProvider respects a user-overridden baseUrl/model', 
 // Presets: moonshot + cohere added, deepseek default fixed
 // ---------------------------------------------------------------------------
 
-test('v097 presets: 12 presets, moonshot + cohere resolve to the dedicated endpoints', () => {
-  assert.equal(COMPATIBLE_PRESETS.length, 12);
-  assert.equal(listCompatiblePresets().length, 12);
+test('v097 presets: 90 presets, moonshot + cohere resolve to the dedicated endpoints', () => {
+  assert.equal(COMPATIBLE_PRESETS.length, 90);
+  assert.equal(listCompatiblePresets().length, 90);
   const ids = COMPATIBLE_PRESETS.map((p) => p.id);
   assert.equal(new Set(ids).size, ids.length);
   assert.deepEqual(resolvePreset('moonshot'), {

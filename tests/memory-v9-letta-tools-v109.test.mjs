@@ -72,7 +72,7 @@ test('registry: 23 tool Letta trong ALL_TOOLS đúng 1 lần, không trùng, app
   assert.equal(inAll.length, 23);
   const names = ALL_TOOLS.map((t) => t.definition.name);
   assert.equal(names.length, new Set(names).size, 'ALL_TOOLS có tên trùng');
-  assert.equal(ALL_TOOLS.length, 359); // v1.10 merge: 236 + 53 = 289; v1.11 merge: 289 + 70 = 359
+  assert.equal(ALL_TOOLS.length, 899); // v1.14 merge: 453 + 38 = 500; v1.13: 402 + 51 = 453; v1.10 merge: 236 + 53 = 289; v1.11 merge: 289 + 70 = 359 // v1.36 re-pin: 825 + 74 = 899.
   const byName = new Map(inAll.map((t) => [t.definition.name, t]));
   const reads = [
     'core_memory_list', 'core_memory_read', 'core_memory_render',
@@ -286,10 +286,10 @@ test('memory_letta_sleep_*: run dry-run + run thật + proposals + decide + log'
   assert.ok(againRaw.startsWith('Error:'), againRaw);
 });
 
-test('binding: createDefaultTools({ getMemoryV9WorkspaceDir }) bind 23 tool Letta tại chỗ, ALL_TOOLS vẫn 359', async () => {
+test('binding: createDefaultTools({ getMemoryV9WorkspaceDir }) bind 23 tool Letta tại chỗ, ALL_TOOLS vẫn 491', async () => {
   const dir = makeTempDir();
   const bound = createDefaultTools({ getMemoryV9WorkspaceDir: () => dir });
-  assert.equal(bound.length, 359);
+  assert.equal(bound.length, 899); // v1.36 re-pin: 825 + 74 = 899.
   const names = bound.map((t) => t.definition.name);
   assert.equal(names.length, new Set(names).size);
   for (const name of MEMORY_V9_LETTA_TOOL_NAMES) {
