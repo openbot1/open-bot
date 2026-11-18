@@ -2232,6 +2232,64 @@ export type {
   OpenedAppV13,
 } from './mcp/appsHostV13';
 export {
+  McpAppHostV14,
+  McpAppHostV14Error,
+  McpAppsUiRegistryV14,
+  McpAppsV14Error,
+  McpAppsPreviewPanelV14,
+  McpAppsPreviewV14Error,
+  UiBridgeHostV14,
+  UiBridgeV14Error,
+  buildStrictCspV14,
+  buildV14FrameConfig,
+  clampPreferredSizeForClient,
+  detectSandboxEscapeAttempts,
+  extractTextFallbackFromResult,
+  isAllowedV14Origin,
+  isValidAllowListHost,
+  negotiateAppsCapability,
+  parseV14ClientCapability,
+  resultHasTextFallback,
+  validateHtmlDocumentV14,
+  validateSandboxAllowList,
+  validateTextFallback,
+  validateV14BridgeMessage,
+  MCP_APPS_V14_VERSION,
+  MCP_APPS_V14_PROTOCOL_VERSION,
+  UI_V14_BRIDGE_METHODS,
+  UI_V14_HOST_NOTIFICATIONS,
+  UI_V14_IFRAME_SANDBOX,
+  UI_V14_RENDER_MODES,
+  UI_V14_SRCDOC_ORIGIN,
+  UI_V14_TEXT_FALLBACK_MIN_CHARS,
+  UI_V14_TEXT_FALLBACK_MAX_CHARS,
+} from './mcp/appsHostV14';
+export type {
+  McpAppHostV14Options,
+  OpenAppForClientOptions,
+  OpenAppForClientResult,
+  ToolUiRegistrationV14,
+  ToolUiSnapshotV14,
+  UiTextFallback,
+  UiV14ActionLogEntry,
+  UiV14BridgeMethod,
+  UiV14ConsentRequest,
+  UiV14ConsentStatus,
+  UiV14HostNotification,
+  V14AppPreview,
+  V14BridgeMessage,
+  V14ClientAppsCapability,
+  V14FrameConfig,
+  V14HtmlValidation,
+  V14MessageValidation,
+  V14NegotiationResult,
+  V14SandboxAllowList,
+  UiBridgeV14SessionOptions,
+  UiBridgeV14SessionSnapshot,
+  UiBridgeHostV14Options,
+  SandboxEscapeFinding,
+} from './mcp/appsHostV14';
+export {
   CapabilityNegotiator,
   fallbackForToolCall,
   isMethodNotFoundError,
@@ -2410,6 +2468,192 @@ export type {
   MigrationAlert,
   MigrationAlertSeverity,
 } from './mcp/mcpMigrationAlerts';
+// --- v1.36 (Đội T3): MCP Apps v16 + MCP 2026-07-28 — stateless client
+// v16, MRTR SEP-2322, URL elicitation, extension negotiation,
+// deprecation policy, Client ID Metadata, Apps v16, server/discover ---
+export {
+  AppsHostV16,
+  buildSandboxPolicyV16,
+  negotiateDisplayModeV16,
+  sha256HexV16,
+  AppsV16Error,
+  APPS_V16_MAX_CACHE_BYTES,
+  APPS_V16_MAX_TEMPLATE_BYTES,
+  APPS_V16_MAX_TEMPLATES,
+} from './mcp/appsV16';
+export type {
+  AppsHostV16Options,
+  AppsV16DisplayMode,
+  AppsV16Review,
+  AppsV16SandboxPolicy,
+  AppsV16Session,
+  AppsV16Template,
+  AppsV16TemplateStatus,
+} from './mcp/appsV16';
+export {
+  DeprecationPolicyEngineV16,
+  buildDeprecationPoliciesV16,
+  daysUntilDate,
+  getMigrationPathV16,
+  lifecycleStatusAt,
+  DeprecationPolicyV16Error,
+  DEPRECATION_V16_EARLIEST_REMOVAL,
+  DEPRECATION_V16_MIGRATIONS,
+  DEPRECATION_V16_NOTICE_DAYS,
+  DEPRECATION_V16_WARN_INTERVAL_MS,
+} from './mcp/deprecationPolicyV16';
+export type {
+  DeprecationEngineOptions,
+  DeprecationLifecycleStatus,
+  DeprecationPolicyV16,
+  DeprecationReportRowV16,
+  DeprecationUsageV16,
+  MigrationPathV16,
+  MigrationStepV16,
+} from './mcp/deprecationPolicyV16';
+export {
+  UrlElicitationManagerV16,
+  assertFormModeAllowed,
+  checkFormModeAllowed,
+  suggestUrlPurpose,
+  validateElicitationUrl,
+  ElicitationUrlV16Error,
+  URL_ELICITATION_MAX_URL_LENGTH,
+  URL_ELICITATION_TTL_MS,
+} from './mcp/elicitationUrlV16';
+export type {
+  FormFieldToCheck,
+  FormModeCheckResult,
+  FormModeViolation,
+  UrlElicitationManagerOptions,
+  UrlElicitationPurpose,
+  UrlElicitationSession,
+  UrlElicitationStatus,
+} from './mcp/elicitationUrlV16';
+export {
+  EXTENSION_APPS_ID,
+  EXTENSION_APPS_STABLE_VERSION,
+  EXTENSION_TASKS_ID,
+  EXTENSION_TASKS_VERSION,
+  KNOWN_EXTENSIONS_V16,
+  buildExtensionsField,
+  compareExtensionVersions,
+  describeNegotiation,
+  extensionsFromDiscover,
+  getKnownExtension,
+  isExtensionEnabled,
+  negotiateExtensions,
+  parseExtensionsField,
+  requireExtension,
+  versionAtLeast,
+  ExtensionV16Error,
+} from './mcp/extensionsV16';
+export type {
+  ExtensionDeclaration,
+  ExtensionNegotiationResult,
+  KnownExtension,
+  NegotiatedExtension as NegotiatedExtensionV16,
+} from './mcp/extensionsV16';
+export {
+  MrtrV16Session,
+  findSecretFieldInState,
+  parseMrtrV16Result,
+  runMrtrV16,
+  sha256Hex as sha256HexMrtrV16,
+  signMrtrV16RequestState,
+  validateMrtrV16Response,
+  verifyMrtrV16RequestState,
+  MrtrV16Error,
+  MRTR_V16_MAX_ROUNDS,
+  MRTR_V16_RESULT_TYPE,
+  MRTR_V16_SECRET_FIELD_PATTERN,
+  MRTR_V16_STATE_TTL_MS,
+} from './mcp/mrtrV16';
+export type {
+  MrtrV16InputCollector,
+  MrtrV16InputRequest,
+  MrtrV16InputResponse,
+  MrtrV16Options,
+  MrtrV16Outcome,
+  MrtrV16RequestState,
+  MrtrV16RoundRecord,
+  MrtrV16ServerResult,
+} from './mcp/mrtrV16';
+export {
+  ClientMetadataRegistryV16,
+  canonicalizeJson as canonicalizeJsonV16,
+  compareDcrWithMetadata,
+  fingerprintClientMetadata,
+  parseClientMetadataDocument,
+  validateRedirectUri,
+  ClientMetadataV16Error,
+  CLIENT_METADATA_AUTH_METHODS,
+  CLIENT_METADATA_TTL_MS,
+} from './mcp/oauthClientIdV16';
+export type {
+  ClientMetadataDocumentV16,
+  ClientMetadataFetcherV16,
+  ClientMetadataRegistryOptions,
+  CredentialReuseAlertV16,
+  RegisteredClientMetadataV16,
+} from './mcp/oauthClientIdV16';
+export {
+  DiscoverCacheV16,
+  buildServerDiscoverDocumentV16,
+  checkVersionCompatibility,
+  discoverFromTransportV16,
+  pickCommonProtocolVersion,
+  ServerDiscoverV16Error,
+  DISCOVER_V16_TTL_MS,
+} from './mcp/serverDiscoverV16';
+export type {
+  BuildDiscoverDocumentInput,
+  DiscoverCacheEntryV16,
+  DiscoverCacheOptions,
+  DiscoverEndpointHealth,
+  DiscoverEndpointV16,
+  ServerDiscoverDocumentV16,
+  VersionCompatibilityV16,
+} from './mcp/serverDiscoverV16';
+export {
+  buildReadinessReport,
+  checkLegacyConfig,
+  migrateStatelessConfig,
+  migrationChecklistFor,
+  V16_MIGRATION_SCORE_PENALTY,
+} from './mcp/mcpV16Migration';
+export type {
+  LegacyMcpConfig,
+  MigratedStatelessConfig,
+  V16MigrationIssue,
+  V16MigrationRole,
+  V16MigrationSeverity,
+  V16ReadinessOptions,
+  V16ReadinessReport,
+} from './mcp/mcpV16Migration';
+export {
+  StatelessClientV16,
+  V16EndpointPool,
+  assertNoSessionIdHeader,
+  buildV16RequestEnvelope,
+  isTransientV16Error,
+  parseV16DiscoverResult,
+  StatelessClientV16Error,
+  V16TransportError,
+  MCP_V16_DISCOVER_METHOD,
+  MCP_V16_PROTOCOL_VERSION,
+  V16_ENDPOINT_COOLDOWN_MS,
+  V16_ENDPOINT_MAX_FAILURES,
+  V16_MAX_RETRIES_DEFAULT,
+} from './mcp/statelessClientV16';
+export type {
+  StatelessClientV16Options,
+  V16CallResult,
+  V16EndpointState,
+  V16RequestEnvelope,
+  V16StatelessEndpoint,
+  V16StatelessTransport,
+} from './mcp/statelessClientV16';
 // --- v1.06 (Đội T2): MCP stateless — transport POST-only không session,
 // ma trận version legacy + fallback, MRTR elicitation (secret guard +
 // URL-mode), server-directed tasks, deprecation phía client ---
@@ -6428,6 +6672,267 @@ export {
   voiceSessionV15Summary,
   voiceSessionV15Markdown,
 } from './voiceV15/index';
+export {
+  // --- v1.17 (Đội T5): voice v16 ---
+  StreamingSttV16,
+  BoundedQueueV16,
+  SpeechToSpeechPipelineV16,
+  createStreamingSttV16,
+  createS2SPipelineV16,
+  defaultStreamingSttV16Options,
+  validateStreamingSttV16Options,
+  defaultS2SPipelineOptionsV16,
+  validateS2SPipelineOptionsV16,
+  s2sV16Summary,
+  s2sV16Markdown,
+  S2S_V16_SAMPLE_RATE_HZ,
+  S2S_V16_FRAME_MS,
+  S2S_V16_FRAME_SAMPLES,
+  S2S_V16_DEFAULT_MAX_QUEUED_FRAMES,
+  S2S_V16_DEFAULT_MAX_QUEUED_REPLY_CHUNKS,
+  S2S_V16_DEFAULT_MAX_QUEUED_AUDIO_CHUNKS,
+  BargeInEngineV16,
+  createBargeInEngineV16,
+  defaultBargeInV16Options,
+  validateBargeInV16Options,
+  bargeInV16Summary,
+  bargeInV16Markdown,
+  SmartTurnDetectorV16,
+  createSmartTurnDetectorV16,
+  decideSmartTurnV16,
+  speechRateWpsV16,
+  isListInProgressV16,
+  defaultSmartTurnV16Options,
+  validateSmartTurnV16Options,
+  smartTurnV16Summary,
+  smartTurnV16Markdown,
+  WakeWordDetectorV16,
+  createWakeWordDetectorV16,
+  defaultWakeWordV16Config,
+  validateWakeWordV16Config,
+  defaultWakeWordV16Options,
+  validateWakeWordV16Options,
+  extractWakeCommandV16,
+  wakeWordV16Summary,
+  wakeWordV16Markdown,
+  WAKE_WORD_V16_DEFAULT_WORDS,
+  TtsStreamV16,
+  createTtsStreamV16,
+  defaultTtsStreamV16Options,
+  validateTtsStreamV16Options,
+  ttsChunkDurationMsV16,
+  ttsV16Summary,
+  ttsV16Markdown,
+  TTS_V16_SAMPLE_RATE_HZ,
+  TTS_V16_DEFAULT_MAX_CHUNK_CHARS,
+  TTS_V16_DEFAULT_CROSSFADE_MS,
+  TTS_V16_DEFAULT_UNDERRUN_PAD_MS,
+  VoiceSessionV16,
+  VoiceSessionManagerV16,
+  createVoiceSessionV16,
+  createVoiceSessionManagerV16,
+  defaultVoiceSessionV16Options,
+  voiceSessionV16Summary,
+  voiceSessionV16Markdown,
+} from './voiceV16/index';
+export type {
+  SttWordScheduleV16,
+  SttV16EventKind,
+  SttV16Event,
+  SttV16Sink,
+  StreamingSttV16Options,
+  BackpressureStateV16,
+  BoundedQueueStatsV16,
+  S2SResumeTokenV16,
+  S2SPipelineModeV16,
+  S2SPipelineStateV16,
+  S2SPipelineEventKindV16,
+  S2SPipelineEventV16,
+  S2SPipelineSinkV16,
+  S2SPipelineOptionsV16,
+  S2SPipelineStatsV16,
+  BargeInV16Options,
+  BargeInV16CutKind,
+  BargeInV16TurnContext,
+  BargeInV16CutReceipt,
+  BargeInV16EventKind,
+  BargeInV16Event,
+  BargeInV16EventSink,
+  BargeInV16Stats,
+  BargeInV16Hooks,
+  SmartTurnV16State,
+  SmartTurnV16Decision,
+  SmartTurnV16HoldReason,
+  SmartTurnV16Options,
+  SmartTurnV16DecisionInput,
+  SmartTurnV16DecisionOutput,
+  SmartTurnV16EventKind,
+  SmartTurnV16Event,
+  SmartTurnV16Sink,
+  SmartTurnV16Stats,
+  WakeWordV16Config,
+  WakeWordV16Options,
+  WakeWordV16EventKind,
+  WakeWordV16Event,
+  WakeWordV16Sink,
+  WakeWordV16Stats,
+  TtsStreamV16Options,
+  TtsPlayItemV16,
+  TtsStreamV16State,
+  TtsStreamV16EventKind,
+  TtsStreamV16Event,
+  TtsStreamV16Sink,
+  TtsStreamV16Stats,
+  VoiceSessionV16Mode,
+  VoiceSessionV16State,
+  VoiceSessionV16EventKind,
+  VoiceSessionV16Event,
+  VoiceSessionV16Sink,
+  VoiceSessionV16Options,
+  VoiceSessionV16Turn,
+  VoiceSessionV16Stats,
+} from './voiceV16/index';
+// --- v1.18 (Đội T5): voice realtime v17 — VAD v5 (speech/silence/
+// noise) + barge-in v5 (resume policy) + TTS streaming v3
+// (sentence streaming, priority queue) + turn-taking v5 (state
+// machine + watchdog) + multi-voice profiles v2 + session v17 ---
+export {
+  VadV17,
+  createVadV17,
+  defaultVadV17Options,
+  validateVadV17Options,
+  vadV17FrameFeatures,
+  classifyVadFrameV17,
+  pcm16ToBytesV17,
+  vadV17Summary,
+  vadV17Markdown,
+  VAD_V17_FRAME_MS,
+  VAD_V17_FRAME_SAMPLES,
+  BargeInEngineV17,
+  createBargeInEngineV17,
+  defaultBargeInV17Options,
+  validateBargeInV17Options,
+  classifyInterruptionV17,
+  decideBargeInResumeV17,
+  bargeInV17Summary,
+  bargeInV17Markdown,
+  TtsStreamV17,
+  createTtsStreamV17,
+  defaultTtsStreamV17Options,
+  validateTtsStreamV17Options,
+  splitSentencesV17,
+  percentileV17,
+  ttsV17Summary,
+  ttsV17Markdown,
+  TTS_V17_SAMPLE_RATE_HZ,
+  TTS_V17_DEFAULT_MAX_CHUNK_CHARS,
+  TurnTakingMachineV17,
+  createTurnTakingMachineV17,
+  defaultTurnTakingV17Options,
+  validateTurnTakingV17Options,
+  isTurnTakingV17Live,
+  isTurnTakingV17UserTurn,
+  isTurnTakingV17ModelSpeaking,
+  turnTakingV17Summary,
+  turnTakingV17Markdown,
+  TURN_TAKING_V17_STATES,
+  TURN_TAKING_V17_TRANSITIONS,
+  VoiceProfileStoreV17,
+  createVoiceProfileStoreV17,
+  defaultVoiceProfileV17,
+  validateVoiceProfileV17,
+  presetVoiceProfilesV17,
+  isVoiceProfileV17Context,
+  voiceProfilesV17Summary,
+  voiceProfilesV17Markdown,
+  VOICE_V17_CONTEXTS,
+  VoiceSessionV17,
+  VoiceSessionManagerV17,
+  createVoiceSessionV17,
+  createVoiceSessionManagerV17,
+  defaultVoiceSessionV17Options,
+  voiceSessionV17Summary,
+  voiceSessionV17Markdown,
+} from './voiceV17/index';
+export type {
+  VadV17FrameClass,
+  VadV17Options,
+  VadV17FrameFeatures,
+  VadV17Segment,
+  VadV17EventKind,
+  VadV17Event,
+  VadV17EventSink,
+  VadV17Stats,
+  BargeInV17ResumeAction,
+  BargeInV17InterruptionKind,
+  BargeInV17Options,
+  BargeInV17ResumePlan,
+  BargeInV17EventKind,
+  BargeInV17Event,
+  BargeInV17EventSink,
+  BargeInV17Stats,
+  BargeInV17CutRecord,
+  TtsV17ChunkPriority,
+  TtsStreamV17Options,
+  TtsPlayItemV17,
+  TtsStreamV17State,
+  TtsStreamV17EventKind,
+  TtsStreamV17Event,
+  TtsStreamV17Sink,
+  TtsStreamV17Stats,
+  TurnTakingV17State,
+  TurnTakingV17EventKind,
+  TurnTakingV17EventInput,
+  TurnTakingV17Transition,
+  TurnTakingV17MachineEvent,
+  TurnTakingV17EventSink,
+  TurnTakingV17TransitionResult,
+  TurnTakingV17Options,
+  TurnTakingV17Stats,
+  VoiceProfileV17Context,
+  VoiceProfileV17,
+  VoiceProfileV17ResolveVia,
+  VoiceProfileV17ResolveInput,
+  VoiceProfileV17ResolveResult,
+  VoiceProfileV17Stats,
+  VoiceSessionV17State,
+  VoiceSessionV17EventKind,
+  VoiceSessionV17Event,
+  VoiceSessionV17Sink,
+  VoiceSessionV17Options,
+  VoiceSessionV17Turn,
+  VoiceSessionV17Stats,
+} from './voiceV17/index';
+// --- v1.19 (Đội T5): voice v18 realtime — VAD v6 adaptive +
+// false-trigger guard, noise chain v18, barge-in v6, TTS
+// streaming v4, profiles v3, realtime v3 + recovery, eval v18 ---
+export * from './voiceV18/index';
+// --- v1.27 (Đội T5): voice v19 realtime — session manager v19
+// (lifecycle + duration limits + sweeper + UI sync + restore),
+// prosody control (emotion presets + SSML), eval v19
+// (naturalness + clarity + regression gate), open-turn resume ---
+// Ported into v1.29 from merge/v128 (v129 forked from merge/v120
+// before v19 landed there).
+export * from './voiceV19/index';
+// --- v1.28 (Đội T5): voice realtime v20 — adaptive session fabric:
+// jitter buffer, transcript reconciliation, barge-in v7,
+// prosody-aware TTS v5, mock provider registry + failover,
+// multi-session manager + handoff, long-session compaction ---
+// Ported into v1.29 from merge/v128 (same reason as v19 above).
+export * from './voiceV20/index';
+// --- v1.34 (Đội T5): voice realtime v21 — voice-driven tool
+// calls + spoken confirmation, turn-taking, barge-in, WER/latency
+// eval, streaming TTS cache, monitor panel ---
+export * from './voiceV21/index';
+// --- v1.35 (Đội T5): voice realtime v22 — durable sessions:
+// journal + checkpoints, resume after disconnect, barge-in v2
+// with resume queue, floor arbitration, voice profiles,
+// recovery loop, durability monitor panel ---
+export * from './voiceV22/index';
+// --- v1.36 (Đội T5): voice realtime v23 — eval harness + MOS-proxy,
+// adaptive streaming + endpointing v2, interruption policy v2,
+// session manager v2, calibration + per-device profiles, monitor ---
+export * from './voiceV23/index';
 export type {
   S2SProviderKindV15,
   S2SStateV15,
@@ -8144,6 +8649,16 @@ export * from './router/local/index';
 // LRU + TTL theo RAM/VRAM that, crash isolation + restart backoff,
 // swap-groups, picker v2, CLI probe sau, fallback chain + circuit breaker ---
 export * from './routerV2/index';
+// --- v1.18 (Doi T3): local-model router v3 — LiteLLM-style: 100+
+// provider OpenAI-compatible, capability matrix, cost table + latency
+// that, fallback chain + retry + circuit breaker per provider, quet
+// Ollama/vLLM/LM Studio/llama.cpp/textgen + health dinh ky ---
+export * from './routerV3/index';
+// --- v1.33 (Doi T5): inference broker v2 — capability matrix 4 engine
+// local (llama.cpp/Ollama/vLLM/SGLang), probe tool-call parser that,
+// validate tool call truoc khi thuc thi, prefix-cache Radix-style cho
+// multi-turn agent loop, voice realtime v22 (mock khi chua co key) ---
+export * from './inferenceBrokerV2/index';
 // --- v1.15 (Đội T4): coding agent v7 — stateless agent + event log
 // append-only (replay/fork/pause/resume/snapshot), CodeAct-lite v3
 // (bash/python/edit/read qua DSL an toàn, executor tự chủ trong
@@ -8153,6 +8668,40 @@ export * from './routerV2/index';
 // eval coding mẫu đo pass rate trên repo mẫu trong /tmp. Học ý tưởng
 // OpenHands V1 SDK, nối coding agent v6 (v1.14) ---
 export * from './codingV7/index';
+// --- v1.17 (Đội T4): coding agent v9 — AST-aware edit (thay
+// function/class/import theo vị trí AST, fallback search-replace),
+// sandbox execution loop kiểu OpenHands (edit → test → lặp, tối đa
+// N vòng), git-first atomic commit + message tự sinh + draft-PR,
+// eval harness kiểu SWE-bench (task mẫu, pass@k, so sánh lần chạy).
+// Học ý tưởng Aider / OpenHands / Claude Code / SWE-bench, nối
+// coding agent v8 (parser v8, policy v8) + harness v5 ---
+export * from './codingV9/index';
+// --- v1.18 (Đội T2): coding agent v10 — event-sourced session
+// (Action/Observation, snapshot/replay/fork/pause-resume), CodeAct
+// execution, repo map hierarchical summaries, edit strategies,
+// eval harness theo phiên bản agent. Nối v9 + repo map v3 (v8) +
+// CodeAct executor hiện có.
+export * from './codingV10/index';
+// --- v1.19 (Đội T2): coding agent v11 — CodeAct v9 (nhiều loại
+// action, dry-run, xác nhận, rollback theo patch), call graph +
+// PageRank v2 (resolve theo import, HITS, impact set, chu trình),
+// multi-file refactor (rename/split/move, kiểm tra tham chiếu đầy
+// đủ, preview diff), eval harness v2 (trọng số + partial credit,
+// flaky, baseline regression), patch review tự động, testgen v2
+// (mock-first, chạy thật). Nối v10 + repo map v3 (v8) + refactor v8.
+export * from './codingV11/index';
+// --- v1.20 (Đội T3): coding agent v12 — dependency graph kiểu Large
+// Codebase SDK (topo lá-trước, Tarjan, coordinator), visualizer v2
+// realtime, budget meters, ACP model switching giữa chừng, edit
+// strategy diff/patch kiểu Aider v2 (atomic commit từng edit, verify,
+// rollback), eval v3 (4 chiều: đúng file, test pass, không regression,
+// diff gọn), pipeline agent nối 6 lớp + v11.
+export * from './codingV12/index';
+// --- v1.29 (Đội T3): coding agent v14 — OpenHands-style condenser tăng
+// dần (incremental + retention policy), stuck detection v2 + recovery
+// (loop signature, oscillation, edit journal rollback), reasoning-block
+// persistence (sidecar JSONL hash-chained + digest event trong run log).
+export * from './codingV14/index';
 // --- v1.02 (rescue port of v0.99/v1.00): ACP agent side, context engineering,
 // durable execution, orchestration, gateway, substrate, deep dream, observability ---
 // NOTE: `AcpClient` (providers/cli) and `Supervisor` (agent/supervisor) already
@@ -8938,6 +9487,23 @@ export type {
   SandboxUsage,
 } from './sandbox/index';
 
+// --- v1.34 (Đội T2): Sandbox v2 — tiered isolation (bwrap → syscall
+// policy → microVM descriptor), policy-as-code, token broker, kill
+// switch + lifetime cap, per-run isolation report ---
+export * from './sandboxV2/index';
+
+// --- v1.35 (Đội T2): Sandbox v3 — deep sandbox: per-tier syscall
+// allowlist, egress policy gate, lifetime cap + auto-stop, COW
+// snapshots, pause/resume lifecycle, Pre/PostToolUse hooks ---
+export * from './sandboxV3/index';
+
+// --- v1.36 (Đội T4): Sandbox v4 — per-conversation runtime,
+// agent profiles (persona + skill catalog + own LLM profile),
+// conversation budget meter (token / $ / time, soft block),
+// secret-request flow (single-use, never logged), dependency
+// map for the coding agent ---
+export * from './sandboxV4/index';
+
 // --- v1.03 (Đội T2): Memory v4 — shared blocks, judge, scored dream, validity, scoped retrieval ---
 export {
   SharedBlockGroupStore,
@@ -9358,6 +9924,13 @@ export type {
   RolloutValidationIssue,
   RolloutValidationResult,
 } from './eval/index';
+// --- v1.34 (Đội T4): Eval Harness v2 — task container hoá 2 loại +
+// oracle + runner song song + scorer 4 chiều + regression gate ---
+export * from './evalHarnessV2/index';
+// --- v1.35 (Đội T4): Eval Harness v3 — container spec tường minh +
+// guardrails (input/output/tool + tripwire) + decision tracing +
+// eval registry + regression gate 6 ngưỡng + scorer pass@k/flake-adjusted ---
+export * from './evalHarnessV3/index';
 // --- v1.06 (Đội T6): fleet bot scheduling v2 + fleet status v4 (re-export qua fleet/index) ---
 export {
   BOT_PRIORITIES,
@@ -10900,6 +11473,839 @@ export type {
   V15EvalResult,
   V15EvalOptions,
 } from './memoryV15/eval';
+export {
+  M16BlockError,
+  M16_BLOCK_KINDS,
+  M16_CORE_KINDS,
+  M16_MAX_BLOCK_CHARS,
+  M16_MAX_BLOCKS,
+  M16_MAX_LABEL_CHARS,
+  M16_TOTAL_CHAR_BUDGET,
+  M16_KIND_CHAR_BUDGET,
+  M16_BLOCK_KIND_PRIORITY,
+  blockPromptPriorityM16,
+  M16_DEFAULT_CORE_CONTENT,
+  isValidBlockLabelM16,
+  normalizeBlockLabelM16,
+  validateBlockContentM16,
+  M16BlockStore,
+  coreMemoryReplaceM16,
+  previewReplaceM16,
+  applyBlockEditM16,
+  compileBlocksM16,
+  exportAuditM16,
+  searchBlocksM16,
+  M16_SLEEP_IDLE_THRESHOLD_MS,
+  M16_MERGE_SMALL_CHARS,
+  M16_SUMMARIZE_CHARS,
+  splitSentencesM16,
+  summarizeBlockExtractiveM16,
+  truncateBlockM16,
+  runSleepReorganizeM16,
+} from './memoryV16/blocks';
+export type {
+  M16BlockKind,
+  M16BlockVersion,
+  M16PinnedSnapshot,
+  M16MemoryBlock,
+  M16BudgetReport,
+  M16BlockAuditEntry,
+  M16BlockEditAction,
+  M16BlockEditOp,
+  M16BlockEditResult,
+  M16BlockSearchHit,
+  M16ReplacePreview,
+  M16SleepAction,
+  M16SleepLogEntry,
+  M16SleepOptions,
+  M16SleepReport,
+} from './memoryV16/blocks';
+export {
+  M16ConsolidationError,
+  M16_SINGLE_VALUED_PREDICATES,
+  isSingleValuedPredicateM16,
+  M16_DEFAULT_MIN_CONFIDENCE,
+  M16_SESSION_PROMOTE_REPEATS,
+  clamp01M16,
+  extractFactsM16Sync,
+  objectOverlapM16,
+  planFuseM16,
+  applyFuseM16,
+  consolidateTurnsM16,
+  factKeyM16,
+  M16SleepConsolidator,
+  runSleepConsolidationM16,
+  previewConsolidationM16,
+} from './memoryV16/consolidation';
+export type {
+  M16Scope,
+  M16FactIntent,
+  M16ExtractedFact,
+  M16FuseDecision,
+  M16FusePlan,
+  M16FuseResult,
+  M16FuseOptions,
+  M16TurnInput,
+  M16ConsolidationReport,
+  M16PendingTurn,
+  M16SleepConsolidationOptions,
+  M16SleepConsolidationReport,
+  M16FusePreviewItem,
+  M16ConsolidationPreview,
+} from './memoryV16/consolidation';
+export {
+  M16TemporalError,
+  parseIsoM16,
+  validateWindowM16,
+  M16ValidityLedger,
+  effectiveWindowM16,
+  validityStatusM16,
+  isFactValidAtM16,
+  windowsOverlapM16,
+  factsValidAtM16,
+  factsExpiringSoonM16,
+  expiredFactsM16,
+  sweepExpiredM16,
+  replaceFactM16,
+  factValidityTimelineM16,
+  formatValidityTimelineM16,
+  validityReportM16,
+  formatValidityReportM16,
+  supersessionChainM16,
+  defaultM16Scope,
+} from './memoryV16/temporalKg';
+export type {
+  M16ValidityWindow,
+  M16ValidityRecord,
+  M16ValidityStatus,
+  M16FactsValidAtOptions,
+  M16FactsValidAtResult,
+  M16ExpiringFact,
+  M16ExpirySweepReport,
+  M16ReplaceFactOptions,
+  M16ReplaceFactResult,
+  M16ValidityTimelineStep,
+  M16ValidityReport,
+} from './memoryV16/temporalKg';
+export {
+  M16ArchivalError,
+  M16_DEFAULT_ARCHIVAL_WEIGHTS,
+  M16_RRF_K,
+  M16_DEFAULT_RECENCY_HALF_LIFE_DAYS,
+  M16_IMPORTANCE_HALF_LIFE_DAYS,
+  normalizeArchivalWeightsM16,
+  archivalTokensM16,
+  archivalIndexTextM16,
+  archivalTextScoreM16,
+  archivalRecencyScoreM16,
+  archivalAccessScoreM16,
+  M16ArchivalStore,
+  archivalDocFreqM16,
+  archivalRecallM16,
+  archivalImportanceTopM16,
+  M16ArchivalRetriever,
+  archiveExpiredFactsM16,
+  promoteArchivedToGraphM16,
+  suggestArchivalCandidatesM16,
+} from './memoryV16/hybridSearch';
+export type {
+  M16ArchivalRecord,
+  M16ArchivalWeights,
+  M16ArchivalMode,
+  M16ArchivalHit,
+  M16ArchivalRecallOptions,
+  M16ArchivalRecallResult,
+  M16ArchivalCandidate,
+} from './memoryV16/hybridSearch';
+export {
+  M16EvalError,
+  M16_EVAL_THRESHOLDS,
+  buildM16EvalDataset,
+  runM16Eval,
+  formatM16EvalReport,
+} from './memoryV16/eval';
+export type {
+  M16EvalCategory,
+  M16EvalCase,
+  M16EvalPerCase,
+  M16EvalCategoryScore,
+  M16EvalThresholds,
+  M16EvalResult,
+  M16EvalOptions,
+} from './memoryV16/eval';
+
+// v1.36 (Doi T1): memory v17 (mem0-v3 style) — add-only single-pass
+// extraction, entity linking (collection phu `<name>_entities` + typed
+// edge), conflict detector + update resolver (overwrite/merge/keep-both),
+// bi-temporal graph (validFrom + learnedAt, invalid thay vi xoa),
+// retrieval fusion (semantic + BM25 + entity + time-aware), scope
+// isolation chat (bai hoc vu ro ri cross-tenant mem0 20/10/2026).
+// LUU Y: ten M17* o day la memory v17 mem0-style; memory v17 kieu block
+// cua v1.18 van nam o ./memory/v17/* voi tien to V17* (khong xung dot).
+export {
+  M17Error,
+  M17_DEFAULT_SCOPE,
+  M17_EDGE_TYPES,
+  M17_SINGLE_VALUED_EDGES,
+  M17_MULTI_VALUED_EDGES,
+  isValidEdgeTypeM17,
+  isSingleValuedEdgeM17,
+  M17_ENTITY_KINDS,
+  isValidEntityKindM17,
+  M17_MAX_FACTS_PER_SCOPE,
+  M17_MAX_ENTITIES_PER_SCOPE,
+  M17_MAX_EDGES_PER_SCOPE,
+  M17_MAX_OBJECT_CHARS,
+  M17_MAX_SUBJECT_CHARS,
+  M17_MAX_SOURCE_TEXT_CHARS,
+  M17_MAX_ALIASES_PER_ENTITY,
+  M17_DEFAULT_MIN_CONFIDENCE,
+  M17_DEFAULT_FUSION_TOP_K,
+  M17_HIGH_CONFIDENCE_GATE,
+  M17_ENTITY_COLLECTION_SUFFIX,
+  entityCollectionNameM17,
+  normalizeEntityNameM17,
+  normalizeCompareTextM17,
+  validateScopeM17,
+  scopeKeyM17,
+  scopesEqualM17,
+  truncateTextM17,
+  makeM17Id,
+  parseIsoM17,
+  validWindowsOverlapM17,
+  clamp01M17,
+} from './memoryV17/types';
+export type {
+  M17Scope,
+  M17EdgeType,
+  M17EntityKind,
+  M17FactStatus,
+  M17EntityStatus,
+  M17Provenance,
+  M17Fact,
+  M17Entity,
+  M17EntityEdge,
+  M17ExtractedFact,
+  M17ExtractionResult,
+  M17Conflict,
+  M17ResolutionStrategy,
+  M17Resolution,
+  M17ScopeViolation,
+  M17ScopeGrant,
+  M17FusionScore,
+  M17FusionHit,
+} from './memoryV17/types';
+export {
+  M17_EXTRACT_MIN_CONFIDENCE,
+  M17_RULE_STRONG_CONFIDENCE,
+  M17_RULE_MEDIUM_CONFIDENCE,
+  M17_LLM_DEFAULT_CONFIDENCE,
+  M17_MAX_LLM_CALLS_PER_PASS,
+  classifyTurnNoiseM17,
+  detectNegationM17,
+  parseValidityWindowM17,
+  extractionKeyM17,
+  cleanExtractedObjectM17,
+  extractFromSentenceM17,
+  splitSentencesM17,
+  filterCandidatesM17,
+  extractTurnsSinglePassM17,
+  extractSingleTurnM17,
+} from './memoryV17/extraction';
+export type {
+  M17LlmExtractFn,
+  M17TurnInput,
+  M17ExtractOptions,
+  M17TurnNoise,
+} from './memoryV17/extraction';
+export {
+  M17EntityError,
+  M17_ENTITY_LINK_EXACT_SCORE,
+  M17_ENTITY_SUGGEST_MIN_SCORE,
+  M17EntityStore,
+  describeEntityM17,
+  shortEntityNameM17,
+} from './memoryV17/entities';
+export type {
+  M17EntityLinkResult,
+  M17EntitySuggestion,
+  M17EntityMergeResult,
+  M17EntityStoreOptions,
+} from './memoryV17/entities';
+export {
+  M17ConflictError,
+  detectConflictsM17,
+  maxConflictSeverityM17,
+  needsHumanReviewM17,
+  autoResolveStrategyM17,
+  resolutionEffectM17,
+  mergeObjectsM17,
+  mergeObjectsPairM17,
+  validateResolutionM17,
+  makeResolutionM17,
+  M17ConflictQueue,
+  describeConflictM17,
+} from './memoryV17/conflicts';
+export type {
+  M17AutoStrategy,
+  M17ConflictDetectorOptions,
+  M17ResolutionEffect,
+  M17ConflictAuditEntry,
+} from './memoryV17/conflicts';
+export {
+  M17BiTemporalError,
+  M17BiTemporalStore,
+  formatFactTimelineM17,
+} from './memoryV17/biTemporal';
+export type {
+  M17BiTemporalStoreOptions,
+  M17AddFactOptions,
+  M17FactTimelineStep,
+  M17StateAtResult,
+  M17MarkResult,
+  M17FactHistoryEntry,
+} from './memoryV17/biTemporal';
+export {
+  M17FusionError,
+  M17_DEFAULT_FUSION_WEIGHTS,
+  M17_RRF_K,
+  M17_EMBEDDING_DIM,
+  M17_DEFAULT_RECENCY_HALF_LIFE_DAYS,
+  M17_BM25_K1,
+  M17_BM25_B,
+  fusionTokensM17,
+  meaningfulTokensM17,
+  fnv1aHashM17,
+  hashEmbeddingM17,
+  cosineSimilarityM17,
+  factIndexTextM17,
+  docFrequenciesM17,
+  bm25ScoreM17,
+  entityScoreM17,
+  timeScoreM17,
+  normalizeFusionWeightsM17,
+  rrfScoreM17,
+  fusionSearchM17,
+  formatFusionHitM17,
+} from './memoryV17/fusion';
+export type {
+  M17FusionWeights,
+  M17FusionSearchOptions,
+  M17FusionSearchResult,
+} from './memoryV17/fusion';
+export {
+  M17ScopeError,
+  redactedScopeKeyM17,
+  scopeMatchesStrictM17,
+  isEmptyScopeM17,
+  validateReadScopeM17,
+  checkReadAccessM17,
+  filterReadableM17,
+  M17ScopeGuard,
+  scanForScopeLeaksM17,
+  formatLeakReportM17,
+} from './memoryV17/scope';
+export type {
+  M17AccessCheck,
+  M17LeakReport,
+} from './memoryV17/scope';
+export {
+  M17StoreError,
+  M17Store,
+  M17_LOCAL_SCOPE,
+  createM17Store,
+} from './memoryV17/store';
+export type {
+  M17StoreOptions,
+  M17IngestResult,
+  M17StoreStats,
+} from './memoryV17/store';
+export {
+  M17EvalError,
+  M17_EVAL_THRESHOLDS,
+  buildM17EvalDataset,
+  runM17Eval,
+  formatM17EvalReport,
+} from './memoryV17/eval';
+export type {
+  M17EvalCategory,
+  M17EvalCase,
+  M17EvalPerCase,
+  M17EvalCategoryScore,
+  M17EvalThresholds,
+  M17EvalResult,
+  M17EvalOptions,
+} from './memoryV17/eval';
+
+// v1.17 (Đội T1): memory v16 — sleep-time consolidation agent v2,
+// Mem0-style consolidation 4 thao tac + entity linking, validity
+// window v2, poisoning guard v2 (allowlist/provenance/core gate),
+// core promotion. Re-export tu memory/v16/index.
+export {
+  V16EntityLinkError,
+  V16_DEFAULT_LINK_THRESHOLD,
+  V16_ABBREVIATION_SCORE,
+  V16_MIN_ABBREV_CHARS,
+  V16_LOCATION_PREFIXES,
+  normalizeEntityNameV16,
+  entityTokensV16,
+  tokenJaccardV16,
+  isAbbreviationOfV16,
+  entityMatchScoreV16,
+  isSameEntityV16,
+  V16EntityLinker,
+  scanDuplicateEntitiesV16,
+  mergeEntitiesV16,
+} from './memory/v16/entityLinking';
+export type {
+  V16EntityMatchDetail,
+  V16EntityLink,
+  V16EntityLinkTableJson,
+  V16ResolveResult,
+  V16EntityLinkerOptions,
+  V16DuplicateCluster,
+  V16EntityMergeResult,
+} from './memory/v16/entityLinking';
+export {
+  V16ConsolidationError,
+  V16_DEFAULT_MIN_CONFIDENCE,
+  V16_DEFAULT_MIN_OBJECT_CHARS,
+  V16_CONSOLIDATION_AUDIT_REL_PATH,
+  V16_MAX_AUDIT_LINES,
+  clamp01V16,
+  decideOpV16,
+  decideOpsV16,
+  appendV16ConsolidationAudit,
+  readV16ConsolidationAudit,
+  applyOpV16,
+  applyConsolidationV16,
+} from './memory/v16/consolidationOps';
+export type {
+  V16CandidateFact,
+  V16ConsolidationOp,
+  V16OpDecision,
+  V16AppliedOp,
+  V16ConsolidateOptions,
+  V16ConsolidationReport,
+  V16ConsolidationAuditEntry,
+} from './memory/v16/consolidationOps';
+export {
+  V16ValidityError,
+  V16_TTL_PRESETS,
+  V16_DEFAULT_TTL_DAYS,
+  ttlDaysForPredicateV16,
+  applyTtlV16,
+  queryFactsValidAtV16,
+  supersessionChainV16,
+  entityTimelineV16,
+  findOverlappingWindowsV16,
+  scheduleValidityV16,
+  parseValidityHintV16,
+  V16_EXPIRY_SWEEP_AUDIT_REL_PATH,
+  sweepExpiredFactsV16,
+} from './memory/v16/validityWindow';
+export type {
+  V16ValidAtOptions,
+  V16ValidAtResult,
+  V16SupersessionStep,
+  V16SupersessionChain,
+  V16EntityTimelineStep,
+  V16OverlappingWindow,
+  V16ExpirySweepReport,
+} from './memory/v16/validityWindow';
+export {
+  V16PoisoningGuardError,
+  V16_UNKNOWN_SOURCE_TRUST,
+  V16_DEFAULT_QUARANTINE_TTL_DAYS,
+  V16SourceAllowlist,
+  verifyProvenanceV16,
+  toV14CandidateV16,
+  corePromotionGateV16,
+  corePromotionGateForFactV16,
+  quarantineCandidateV16,
+  reviewQuarantineBatchV16,
+  quarantineAgingReportV16,
+  expireStaleQuarantineV16,
+  reopenQuarantineV16,
+  V16_GATE_AUDIT_REL_PATH,
+  appendV16GateAudit,
+} from './memory/v16/poisoningGuard';
+export type {
+  V16SourceStatus,
+  V16SourceEntry,
+  V16SourceAllowlistJson,
+  V16ProvenanceCheck,
+  V16GateDecision,
+  V16CoreGateResult,
+  V16CoreGateOptions,
+  V16QuarantineReview,
+  V16QuarantineAgingReport,
+} from './memory/v16/poisoningGuard';
+export {
+  V16PromotionError,
+  V16_PROMOTION_BLOCK_LABELS,
+  V16_ARCHIVAL_BLOCK_LABEL,
+  V16_DEFAULT_MAX_BLOCK_CHARS,
+  targetBlockKindForPredicateV16,
+  formatFactLineV16,
+  blockLineKeyV16,
+  V16V15BlockAdapter,
+  promoteFactsToCoreV16,
+  promoteActiveFactsV16,
+} from './memory/v16/corePromotion';
+export type {
+  V16BlockAdapter,
+  V16PromotedFact,
+  V16PromotionReport,
+  V16PromotionOptions,
+} from './memory/v16/corePromotion';
+export {
+  V16SleepError,
+  V16_DEFAULT_SLEEP_CONFIG,
+  V16_SLEEP_STATE_REL_PATH,
+  V16_SLEEP_RUNS_REL_PATH,
+  V16_MAX_RUN_LOG_LINES,
+  defaultV16SleepState,
+  loadV16SleepState,
+  saveV16SleepState,
+  appendV16SleepRunLog,
+  readV16SleepRunLogs,
+  sourceNameForEpisodeV16,
+  V16SleepConsolidationAgent,
+  createV16SleepAgent,
+} from './memory/v16/sleepConsolidation';
+export type {
+  V16SleepTrigger,
+  V16SleepConfig,
+  V16SleepState,
+  V16SleepRunReport,
+  V16SleepRunOptions,
+} from './memory/v16/sleepConsolidation';
+export {
+  V16EvalError,
+  V16_EVAL_THRESHOLDS,
+  buildV16EvalDataset,
+  seedV16EvalFact,
+  runV16Eval,
+  formatV16EvalReport,
+} from './memory/v16/eval';
+export type {
+  V16EvalCategory,
+  V16EvalConsolidationCase,
+  V16EvalLinkingCase,
+  V16EvalValidityCase,
+  V16EvalGateCase,
+  V16EvalDataset,
+  V16EvalCaseResult,
+  V16EvalCategoryScore,
+  V16EvalResult,
+  V16EvalOptions,
+} from './memory/v16/eval';
+
+// v1.18 (Đội T1): memory v17 — block lifecycle v2 (pin/read-only/
+// maxChars rieng/quota/template), sleep scheduler v2 (lich + quiet
+// hours + compact trigger), archival promote/demote scoring, block
+// versioning + audit git-backed, poisoning guard v2 (admission
+// pipeline + provenance chain), eval 25 case. Re-export tu memory/v17/index.
+export {
+  V17BlockLifecycleError,
+  V17_BLOCK_TEMPLATES,
+  listBlockTemplatesV17,
+  getBlockTemplateV17,
+  renderBlockTemplateV17,
+  V17_DEFAULT_TOTAL_QUOTA_CHARS,
+  V17_MAX_PINNED_BLOCKS,
+  V17BlockLifecycleManager,
+  V17_LIFECYCLE_CONFIG_REL_PATH,
+  loadLifecycleConfigV17,
+  saveLifecycleConfigV17,
+  compileBlocksWithLifecycleV17,
+  compileBlocksPlainV17,
+} from './memory/v17/blockLifecycle';
+export type {
+  V17BlockTemplateName,
+  V17BlockTemplate,
+  V17BlockLifecycleConfig,
+  V17LifecycleConfigJson,
+  V17QuotaReport,
+} from './memory/v17/blockLifecycle';
+export {
+  V17SleepSchedulerError,
+  V17_DEFAULT_SLEEP_SCHEDULE_CONFIG,
+  validateQuietHoursV17,
+  isInQuietHoursV17,
+  endOfQuietHoursV17,
+  defaultV17SleepScheduleState,
+  nextRunAtV17,
+  shouldRunScheduledV17,
+  V17_SLEEP_SCHEDULE_STATE_REL_PATH,
+  V17_SLEEP_SCHEDULE_RUNS_REL_PATH,
+  loadV17SleepScheduleState,
+  saveV17SleepScheduleState,
+  appendV17SleepScheduleRunLog,
+  V17SleepScheduler,
+  createV17SleepScheduler,
+} from './memory/v17/sleepScheduler';
+export type {
+  V17QuietHours,
+  V17SleepScheduleConfig,
+  V17SleepScheduleState,
+  V17ScheduleDecision,
+  V17SleepSchedulerOptions,
+} from './memory/v17/sleepScheduler';
+export {
+  V17ArchivalScoringError,
+  V17_ARCHIVAL_SCORING_DEFAULTS,
+  V17_PASSAGE_ACCESS_REL_PATH,
+  V17_DEMOTED_REL_PATH,
+  loadPassageAccessV17,
+  savePassageAccessV17,
+  recordAccessV17,
+  loadDemotedV17,
+  appendDemotedV17,
+  scorePassageV17,
+  scoreAllPassagesV17,
+  promotePassagesV17,
+  demotePassagesV17,
+  archivalScoringReportV17,
+} from './memory/v17/archivalScoring';
+export type {
+  V17ScoringWeights,
+  V17ArchivalThresholds,
+  V17ArchivalScoringConfig,
+  V17PassageSignals,
+  V17PassageScore,
+  V17PassageAccessEntry,
+  V17PassageAccessJson,
+  V17DemotedPassage,
+  V17DemotedJson,
+  V17ArchivalMoveReport,
+  V17ArchivalMoveOptions,
+  V17ArchivalScoringReport,
+} from './memory/v17/archivalScoring';
+export {
+  V17BlockVersioningError,
+  V17_BLOCK_GIT_REL_PATH,
+  V17_BLOCK_GIT_COMMITS_DIR,
+  V17_BLOCK_GIT_REFS_FILE,
+  V17_BLOCK_GIT_AUDIT_FILE,
+  V17_COMMIT_HASH_SHORT_LEN,
+  computeCommitHashV17,
+  shortHashV17,
+  resolveCommitHashV17,
+  readBlockRefsV17,
+  readBlockCommitV17,
+  diffLinesV17,
+  countDiffV17,
+  commitBlockV17,
+  blockCommitHistoryV17,
+  diffCommitsV17,
+  rollbackToCommitV17,
+  readBlockAuditV17,
+  queryBlockAuditV17,
+  blockGitStatsV17,
+} from './memory/v17/blockVersioning';
+export type {
+  V17BlockCommit,
+  V17DiffLine,
+  V17BlockDiff,
+  V17BlockAuditEntry,
+  V17AuditQuery,
+} from './memory/v17/blockVersioning';
+export {
+  V17PoisoningGuardError,
+  V17_ADMISSION_AUDIT_REL_PATH,
+  V17_DEFAULT_MAX_AUTO_ADMIT_RISK,
+  V17_DEFAULT_MIN_AUTO_ADMIT_CONFIDENCE,
+  V17_DEFAULT_MAX_CHAIN_DEPTH,
+  appendV17AdmissionAudit,
+  readV17AdmissionAudit,
+  verifyProvenanceChainV17,
+  admitCandidateV17,
+  reviewAdmissionV17,
+  admitBatchV17,
+  admissionStatsV17,
+  exportProvenanceChainV17,
+} from './memory/v17/poisoningGuardV2';
+export type {
+  V17AdmissionDecision,
+  V17ProvenanceChainCheck,
+  V17AdmissionCandidate,
+  V17AdmissionResult,
+  V17AdmissionOptions,
+  V17AdmissionAuditEntry,
+  V17AdmissionBatchReport,
+  V17AdmissionStats,
+} from './memory/v17/poisoningGuardV2';
+export {
+  V17EvalError,
+  V17_EVAL_THRESHOLDS,
+  buildV17EvalDataset,
+  runV17Eval,
+  formatV17EvalReport,
+} from './memory/v17/eval';
+export type {
+  V17EvalCategory,
+  V17EvalCase,
+  V17EvalCaseResult,
+  V17EvalCategoryScore,
+  V17EvalResult,
+} from './memory/v17/eval';
+
+// v1.19 (Đội T1): memory v18 — extraction v2 + entity linking,
+// hybrid retrieval 3 tin hieu (semantic + BM25 + entity), Letta
+// blocks v3 (guardrail chong drift + snapshot + rollback), temporal
+// KG bi-temporal v2, poisoning guard v3 (source trust scoring +
+// contradiction alert), duong xoa GDPR, sleep-time consolidation v2,
+// eval nho dai han kieu LOCOMO chay local. Re-export tu memory/v18/index.
+export {
+  V18ExtractionError,
+  V18_DEFAULT_MIN_CONFIDENCE,
+  V18_MAX_SUBJECT_CHARS,
+  detectSubjectV18,
+  clamp01V18,
+  dedupeCandidatesV18,
+  extractV18,
+  extractAndWriteV18,
+  extractEpisodeV18,
+} from './memory/v18/extractionV2';
+export type {
+  V18ExtractionProvenance,
+  V18ExtractedFact,
+  V18ExtractInput,
+  V18SkippedCandidate,
+  V18ExtractReport,
+} from './memory/v18/extractionV2';
+export {
+  V18HybridError,
+  V18_DEFAULT_HYBRID_WEIGHTS,
+  clamp01V18Hybrid,
+  normalizeWeightsV18,
+  minMaxNormalizeV18,
+  entityScoreForFactV18,
+  retrieveFromFactsV18,
+  retrieveV18,
+  explainHitV18,
+} from './memory/v18/hybridRetrievalV2';
+export type {
+  V18HybridWeights,
+  V18HitSignals,
+  V18HybridHit,
+  V18HybridOptions,
+} from './memory/v18/hybridRetrievalV2';
+export {
+  V18BlockError,
+  V18_DEFAULT_MAX_CHANGED_CHARS,
+  V18_DEFAULT_MAX_CHANGED_FRACTION,
+  V18_DEFAULT_MAX_SNAPSHOTS_PER_BLOCK,
+  V18_DEFAULT_BLOCK_GUARD_CONFIG,
+  V18_DEFAULT_FORBIDDEN_PATTERNS,
+  changedCharsV18,
+  changedFractionV18,
+  linesKeptV18,
+  findForbiddenV18,
+  previewEditV18,
+  V18BlockEditor,
+  createBlockV18,
+} from './memory/v18/blocksV3';
+export type {
+  V18BlockGuardConfig,
+  V18BlockSnapshot,
+  V18GuardCheck,
+  V18BlockEditAudit,
+  V18BlockDriftReport,
+} from './memory/v18/blocksV3';
+export {
+  V18BiTemporalError,
+  toBiTemporalViewV18,
+  snapshotAtV18,
+  applyCorrectionV18,
+  correctionTimelineV18,
+  diffKnownAtV18,
+  explainBiTemporalViewV18,
+} from './memory/v18/biTemporalV2';
+export type {
+  V18BiTemporalView,
+  V18CorrectionRecord,
+  V18BiTemporalSnapshot,
+  V18CorrectionTimelineStep,
+} from './memory/v18/biTemporalV2';
+export {
+  V18PoisoningError,
+  V18_UNKNOWN_SOURCE_TRUST,
+  V18_DEFAULT_CONTRADICTION_MIN_CONFIDENCE,
+  V18_DEFAULT_MIN_TRUST_AUTO_ADMIT,
+  V18_TRUST_LEARN_STEP,
+  V18_INJECTION_PATTERNS,
+  clamp01V18Poison,
+  scanInjectionV18,
+  V18SourceTrustBook,
+  checkContradictionV18,
+  screenCandidateV18,
+  recordReviewOutcomeV18,
+} from './memory/v18/poisoningGuardV3';
+export type {
+  V18SourceTrustEntry,
+  V18ContradictionAlert,
+  V18ScreenDecision,
+  V18ScreenResult,
+  V18ScreenOptions,
+} from './memory/v18/poisoningGuardV3';
+export {
+  V18ErasureError,
+  V18_ERASURE_AUDIT_REL_PATH,
+  V18_MAX_ERASURE_AUDIT_LINES,
+  countErasureV18,
+  readErasureAuditV18,
+  eraseV18,
+  targetLabelV18,
+} from './memory/v18/gdprErasure';
+export type {
+  V18ErasureMode,
+  V18ErasureScopeKind,
+  V18ErasureRequest,
+  V18ErasureResult,
+  V18ErasureAuditEntry,
+} from './memory/v18/gdprErasure';
+export {
+  V18SleepConsolidationError,
+  V18_SLEEP_CONSOLIDATION_RUNS_REL_PATH,
+  V18_DEFAULT_MAX_FACTS_PER_RUN,
+  V18_DEFAULT_MAX_MERGES_PER_RUN,
+  V18_DEFAULT_MAX_MS_PER_RUN,
+  V18_DEFAULT_STALE_AFTER_DAYS,
+  V18_DEFAULT_DECAY_STEP,
+  V18_SLEEP_DEFAULT_MIN_CONFIDENCE,
+  V18_DEFAULT_SLEEP_CONSOLIDATION_CONFIG,
+  findDuplicateFactGroupsV18,
+  pickKeepFactV18,
+  isStaleFactV18,
+  runSleepConsolidationV18,
+} from './memory/v18/sleepConsolidationV2';
+export type {
+  V18SleepConsolidationConfig,
+  V18SleepConsolidationReport,
+} from './memory/v18/sleepConsolidationV2';
+export {
+  V18LocomoEvalError,
+  V18_LOCOMO_THRESHOLDS,
+  V18_LOCOMO_DEFAULT_TOP_K,
+  V18_LOCOMO_DEFAULT_MIN_SCORE,
+  buildV18LocomoDataset,
+  seedV18LocomoDataset,
+  runV18LocomoEval,
+  formatV18LocomoReport,
+} from './memory/v18/evalLocomo';
+export type {
+  V18LocomoCategory,
+  V18LocomoSeedFact,
+  V18LocomoCase,
+  V18LocomoDataset,
+  V18LocomoCaseResult,
+  V18LocomoCategoryScore,
+  V18LocomoResult,
+  V18LocomoEvalOptions,
+} from './memory/v18/evalLocomo';
 
 // v1.12 (Đội T6): fleet scheduling v2 — re-export từ fleet/index.
 export {
@@ -11588,6 +12994,470 @@ export type {
   MockComposioV114Result,
 } from './composio/index';
 
+// v1.18 (Đội T4): Composio v118 — mock toolkits canva/pandadoc/loom, polling v5 adaptive per-connection, trigger instances, OAuth state machine, webhook ingestion.
+export {
+  COMPOSIO_V118_DEFAULT_BURST_AFTER_HITS,
+  COMPOSIO_V118_DEFAULT_DEDUPE_WINDOW_MS,
+  COMPOSIO_V118_DEFAULT_IDLE_CAP_AFTER_MISSES,
+  COMPOSIO_V118_DEFAULT_MAX_AUTO_REFRESHES,
+  COMPOSIO_V118_DEFAULT_MAX_SEEN_IDS,
+  COMPOSIO_V118_DEFAULT_REFRESH_BEFORE_EXPIRY_MS,
+  COMPOSIO_V118_MAX_AUDIT_LINES,
+  COMPOSIO_V118_MAX_INSTANCES,
+  COMPOSIO_V118_MAX_OAUTH_AUDIT_ENTRIES,
+  COMPOSIO_V118_MAX_WEBHOOK_LOG_LINES,
+  COMPOSIO_V118_MOCK_TOOLKITS,
+  COMPOSIO_V118_OAUTH_STATES,
+  COMPOSIO_V118_OAUTH_TRANSITIONS,
+  COMPOSIO_V118_POLL_STATE_FILE,
+  COMPOSIO_V118_POLL_STATE_VERSION,
+  COMPOSIO_V118_SILENT_AFTER_MS,
+  COMPOSIO_V118_STALE_AFTER_MS,
+  COMPOSIO_V118_TRIGGER_AUDIT_ACTIONS,
+  COMPOSIO_V118_TRIGGER_INSTANCES_FILE,
+  COMPOSIO_V118_TRIGGER_INSTANCES_VERSION,
+  COMPOSIO_V118_TRIGGER_INSTANCE_AUDIT_FILE,
+  COMPOSIO_V118_WEBHOOK_DEDUPE_WINDOW_MS,
+  COMPOSIO_V118_WEBHOOK_LOG_FILE,
+  COMPOSIO_V118_WEBHOOK_PATH,
+  ComposioV118PollEngine,
+  ComposioV118WebhookIngester,
+  JsonFileComposioV118PollStateStore,
+  JsonFileComposioV118TriggerInstanceStore,
+  MemoryComposioV118PollStateStore,
+  MemoryComposioV118TriggerInstanceStore,
+  MockComposioV118Executor,
+  appendComposioV118WebhookLog,
+  autoRefreshComposioV118OAuth,
+  composioV118MsUntilNextPoll,
+  composioV118OAuthUiState,
+  composioV118PollMode,
+  createComposioV118ConnState,
+  createComposioV118OAuthEntry,
+  createComposioV118TriggerAuditEntry,
+  createComposioV118TriggerInstance,
+  createMockComposioV118AppDefinitions,
+  decideComposioV118AutoRefresh,
+  defaultComposioV118IntervalMs,
+  disableComposioV118TriggerInstance,
+  enableComposioV118TriggerInstance,
+  evaluateComposioV118TriggerHealth,
+  executeMockComposioV118Tool,
+  filterComposioV118NewItems,
+  filterComposioV118TriggerInstances,
+  findMockComposioV118Toolkit,
+  getComposioV118PollStatePath,
+  getComposioV118TriggerInstanceAuditPath,
+  getComposioV118TriggerInstancesPath,
+  getComposioV118WebhookLogPath,
+  hashComposioV118WebhookBody,
+  isComposioV118ConnDue,
+  isComposioV118LoopbackAddress,
+  isComposioV118OAuthTransitionAllowed,
+  isComposioV118TokenExpired,
+  isComposioV118TokenExpiringSoon,
+  isMockComposioV118Slug,
+  listComposioV118WebhookLog,
+  missedComposioV118Polls,
+  mockComposioV118AppId,
+  mockComposioV118DeterministicId,
+  mockComposioV118Slugs,
+  mockComposioV118ToolNeedsApproval,
+  nextComposioV118Poll,
+  parseComposioV118PollState,
+  recordComposioV118TriggerError,
+  recordComposioV118TriggerFired,
+  resolveMockComposioV118Slug,
+  serializeComposioV118PollState,
+  summarizeComposioV118OAuth,
+  summarizeComposioV118TriggerInstance,
+  summarizeComposioV118TriggerInstances,
+  summarizeMockComposioV118Catalogue,
+  syncComposioV118OAuthExpiry,
+  transitionComposioV118OAuth,
+  validateComposioV118ConnState,
+  validateComposioV118OAuthEntry,
+  validateComposioV118TriggerAuditEntry,
+  validateComposioV118TriggerInstance,
+  validateComposioV118WebhookLogEntry,
+} from './composio/index';
+export type {
+  ComposioV118AuthKind,
+  ComposioV118CreateConnStateInput,
+  ComposioV118FetchFn,
+  ComposioV118InstanceLookupFn,
+  ComposioV118MockToolkitDef,
+  ComposioV118OAuthAuditEntry,
+  ComposioV118OAuthEntry,
+  ComposioV118OAuthState,
+  ComposioV118OAuthUiAction,
+  ComposioV118OAuthUiState,
+  ComposioV118PollConnState,
+  ComposioV118PollEngineOptions,
+  ComposioV118PollItem,
+  ComposioV118PollMode,
+  ComposioV118PollStateDoc,
+  ComposioV118PollStateStore,
+  ComposioV118RefreshFn,
+  ComposioV118RefreshResult,
+  ComposioV118RegisterTriggerInput,
+  ComposioV118TickResult,
+  ComposioV118TriggerAuditAction,
+  ComposioV118TriggerAuditEntry,
+  ComposioV118TriggerHealth,
+  ComposioV118TriggerInstance,
+  ComposioV118TriggerInstanceFilter,
+  ComposioV118TriggerInstanceStatus,
+  ComposioV118TriggerInstanceStore,
+  ComposioV118WebhookIngesterOptions,
+  ComposioV118WebhookLogEntry,
+  ComposioV118WebhookRequest,
+  ComposioV118WebhookResult,
+  ComposioV118WebhookRoute,
+  ComposioV118WebhookSecretFn,
+  ComposioV118WebhookTokenFn,
+  JsonFileComposioV118PollStateStoreOptions,
+  MockComposioV118Result,
+} from './composio/index';
+
+// v1.19 (Đội T4): Composio v119 — mock toolkits wrike/bamboohr/ringcentral, polling v6 batch + cursor dedup + bounded retry, trigger instances v2, OAuth refresh v2, webhook v2, toolkit prefs per-user, usage metering.
+export {
+  COMPOSIO_V119_DEFAULT_BATCH_SIZE,
+  COMPOSIO_V119_DEFAULT_CONCURRENCY,
+  COMPOSIO_V119_DEFAULT_DAILY_CAP_GLOBAL,
+  COMPOSIO_V119_DEFAULT_DAILY_CAP_PER_TOOLKIT,
+  COMPOSIO_V119_DEFAULT_DAILY_CAP_PER_USER,
+  COMPOSIO_V119_DEFAULT_DAILY_RETRY_BUDGET,
+  COMPOSIO_V119_DEFAULT_DEDUPE_WINDOW_MS,
+  COMPOSIO_V119_DEFAULT_MAX_ATTEMPTS,
+  COMPOSIO_V119_DEFAULT_MAX_BATCH_ITEMS,
+  COMPOSIO_V119_DEFAULT_MAX_CONSECUTIVE_FAILURES,
+  COMPOSIO_V119_DEFAULT_MAX_DAYS_KEPT,
+  COMPOSIO_V119_DEFAULT_MAX_DEAD_LETTERS,
+  COMPOSIO_V119_DEFAULT_MAX_EVENT_AGE_MS,
+  COMPOSIO_V119_DEFAULT_MAX_QUEUE_SIZE,
+  COMPOSIO_V119_DEFAULT_MAX_REFRESH_ATTEMPTS,
+  COMPOSIO_V119_DEFAULT_MAX_REFRESH_RETRY_DELAY_MS,
+  COMPOSIO_V119_DEFAULT_MAX_RETRIES,
+  COMPOSIO_V119_DEFAULT_MAX_RETRY_DELAY_MS,
+  COMPOSIO_V119_DEFAULT_MAX_RUNS_PER_INSTANCE,
+  COMPOSIO_V119_DEFAULT_MAX_SEEN_CURSORS,
+  COMPOSIO_V119_DEFAULT_REFRESH_BACKOFF_MULTIPLIER,
+  COMPOSIO_V119_DEFAULT_REFRESH_BEFORE_EXPIRY_MS,
+  COMPOSIO_V119_DEFAULT_REFRESH_JITTER_FRACTION,
+  COMPOSIO_V119_DEFAULT_REFRESH_RETRY_DELAY_MS,
+  COMPOSIO_V119_DEFAULT_RETRY_BACKOFF_MULTIPLIER,
+  COMPOSIO_V119_DEFAULT_RETRY_DELAY_MS,
+  COMPOSIO_V119_DEFAULT_RETRY_JITTER_FRACTION,
+  COMPOSIO_V119_DEFAULT_TOP_N,
+  COMPOSIO_V119_MAX_AUDIT_LINES,
+  COMPOSIO_V119_MAX_CONCURRENCY,
+  COMPOSIO_V119_MAX_INSTANCES,
+  COMPOSIO_V119_MAX_PREFS_AUDIT_LINES,
+  COMPOSIO_V119_MAX_PREFS_USERS,
+  COMPOSIO_V119_MAX_REASON_CHARS,
+  COMPOSIO_V119_MAX_REFRESH_AUDIT_ENTRIES,
+  COMPOSIO_V119_MAX_TOOLKITS_PER_USER,
+  COMPOSIO_V119_MOCK_TOOLKITS,
+  COMPOSIO_V119_OAUTH_REFRESH_NAMESPACE,
+  COMPOSIO_V119_POLL_STATE_VERSION,
+  COMPOSIO_V119_STUCK_RUN_AFTER_MS,
+  COMPOSIO_V119_TOOLKIT_PREFS_AUDIT_FILE,
+  COMPOSIO_V119_TOOLKIT_PREFS_FILE,
+  COMPOSIO_V119_TOOLKIT_PREFS_VERSION,
+  COMPOSIO_V119_TRIGGER_AUDIT_ACTIONS,
+  COMPOSIO_V119_TRIGGER_INSTANCES_FILE,
+  COMPOSIO_V119_TRIGGER_INSTANCES_VERSION,
+  COMPOSIO_V119_TRIGGER_INSTANCE_AUDIT_FILE,
+  COMPOSIO_V119_TRIGGER_LIFECYCLES,
+  COMPOSIO_V119_TRIGGER_LIFECYCLE_TRANSITIONS,
+  COMPOSIO_V119_USAGE_FILE,
+  COMPOSIO_V119_USAGE_VERSION,
+  COMPOSIO_V119_WEBHOOK_STATE_VERSION,
+  COMPOSIO_V119_WEBHOOK_TOLERANCE_SECONDS,
+  COMPOSIO_V119_WEBHOOK_DEFAULT_MAX_RETRY_DELAY_MS,
+  COMPOSIO_V119_WEBHOOK_DEFAULT_RETRY_BACKOFF_MULTIPLIER,
+  COMPOSIO_V119_WEBHOOK_DEFAULT_RETRY_DELAY_MS,
+  ComposioV119PollEngine,
+  ComposioV119WebhookQueue,
+  DEFAULT_COMPOSIO_V119_POLL_BATCH_CONFIG,
+  DEFAULT_COMPOSIO_V119_QUOTA,
+  DEFAULT_COMPOSIO_V119_REFRESH_POLICY,
+  DEFAULT_COMPOSIO_V119_WEBHOOK_CONFIG,
+  JsonFileComposioV119ToolkitPrefsStore,
+  JsonFileComposioV119TriggerInstanceStore,
+  JsonFileComposioV119UsageStore,
+  MemoryComposioV119ToolkitPrefsStore,
+  MemoryComposioV119TriggerInstanceStore,
+  MemoryComposioV119UsageStore,
+  MockComposioV119Executor,
+  attemptComposioV119Refresh,
+  buildComposioV119UsageReport,
+  checkComposioV119Quota,
+  clearComposioV119ToolkitPref,
+  composioV119CanRetry,
+  composioV119DayKey,
+  composioV119GlobalCallsToday,
+  composioV119RefreshDelayMs,
+  composioV119RetriesLeftToday,
+  composioV119RetryDelayMs,
+  composioV119RunDurationMs,
+  composioV119ToolkitCallsToday,
+  composioV119UsageDayKey,
+  composioV119UserCallsToday,
+  composioV119WebhookRetryDelayMs,
+  countComposioV119RunningRuns,
+  createComposioV119ConnState,
+  createComposioV119PollConnBatchState,
+  createComposioV119RefreshAuditEntry,
+  createComposioV119RefreshState,
+  createComposioV119ToolkitPrefsAuditEntry,
+  createComposioV119TriggerAuditEntry,
+  createComposioV119TriggerInstance,
+  createComposioV119UsageState,
+  createComposioV119UserToolkitPrefs,
+  createMockComposioV119AppDefinitions,
+  deleteComposioV119RefreshToken,
+  effectiveComposioV119ToolkitEnabledForUser,
+  executeMockComposioV119Tool,
+  fetchComposioV119Batch,
+  fetchComposioV119BatchWithRetry,
+  filterComposioV119TriggerInstances,
+  findComposioV119StuckRuns,
+  findMockComposioV119Toolkit,
+  finishComposioV119TriggerRun,
+  getComposioV119ToolkitPrefsAuditPath,
+  getComposioV119ToolkitPrefsPath,
+  getComposioV119TriggerInstanceAuditPath,
+  getComposioV119TriggerInstancesPath,
+  getComposioV119UsagePath,
+  hasComposioV119RefreshToken,
+  hashComposioV119WebhookBody,
+  isComposioV119CursorDuplicate,
+  isComposioV119LifecycleTransitionAllowed,
+  isComposioV119RefreshDue,
+  isComposioV119ToolkitEnabledForUser,
+  isComposioV119TriggerInstanceRunnable,
+  isMockComposioV119Slug,
+  listComposioV119EnabledToolkitsForUser,
+  mockComposioV119AppId,
+  mockComposioV119DeterministicId,
+  mockComposioV119Slugs,
+  mockComposioV119ToolNeedsApproval,
+  parseComposioV119EventTimestamp,
+  pruneComposioV119Runs,
+  pruneComposioV119SeenCursors,
+  pruneComposioV119Usage,
+  recordComposioV119SeenCursor,
+  recordComposioV119Usage,
+  resetComposioV119Refresh,
+  resolveMockComposioV119Slug,
+  rolloverComposioV119RetryBudget,
+  setComposioV119RefreshToken,
+  setComposioV119ToolkitPref,
+  setComposioV119ToolkitPrefsBulk,
+  startComposioV119TriggerRun,
+  summarizeComposioV119Refresh,
+  summarizeComposioV119TriggerInstance,
+  summarizeComposioV119TriggerInstances,
+  summarizeComposioV119TriggerRuns,
+  summarizeComposioV119Usage,
+  summarizeComposioV119UserToolkitPrefs,
+  summarizeMockComposioV119Catalogue,
+  transitionComposioV119TriggerLifecycle,
+  validateComposioV119PollBatchConfig,
+  validateComposioV119PollConnBatchState,
+  validateComposioV119Quota,
+  validateComposioV119RefreshAuditEntry,
+  validateComposioV119RefreshPolicy,
+  validateComposioV119RefreshState,
+  validateComposioV119ToolkitPref,
+  validateComposioV119ToolkitPrefsAuditEntry,
+  validateComposioV119TriggerAuditEntry,
+  validateComposioV119TriggerInstance,
+  validateComposioV119TriggerRun,
+  validateComposioV119UsageCounter,
+  validateComposioV119UsageState,
+  validateComposioV119UserToolkitPrefs,
+  validateComposioV119QueuedWebhookEvent,
+  validateComposioV119WebhookConfig,
+} from './composio/index';
+export type {
+  ComposioV119AuthKind,
+  ComposioV119BatchResult,
+  ComposioV119DeadLetter,
+  ComposioV119FetchPageFn,
+  ComposioV119MockToolkitDef,
+  ComposioV119PollBatchConfig,
+  ComposioV119PollConnBatchState,
+  ComposioV119PollEngineOptions,
+  ComposioV119PollPage,
+  ComposioV119Quota,
+  ComposioV119QueuedWebhookEvent,
+  ComposioV119RecordResult,
+  ComposioV119RefreshAttempt,
+  ComposioV119RefreshAuditEntry,
+  ComposioV119RefreshFn,
+  ComposioV119RefreshOutcome,
+  ComposioV119RefreshPolicy,
+  ComposioV119RefreshState,
+  ComposioV119RefreshTokenVault,
+  ComposioV119RegisterTriggerInput,
+  ComposioV119RunStatus,
+  ComposioV119SeenCursor,
+  ComposioV119TickResult,
+  ComposioV119ToolkitPref,
+  ComposioV119ToolkitPrefsAuditEntry,
+  ComposioV119ToolkitPrefsStore,
+  ComposioV119TriggerAuditAction,
+  ComposioV119TriggerAuditEntry,
+  ComposioV119TriggerInstance,
+  ComposioV119TriggerInstanceFilter,
+  ComposioV119TriggerInstanceStore,
+  ComposioV119TriggerLifecycle,
+  ComposioV119TriggerRun,
+  ComposioV119UsageCounter,
+  ComposioV119UsageReport,
+  ComposioV119UsageState,
+  ComposioV119UsageStore,
+  ComposioV119UsageTopEntry,
+  ComposioV119UserToolkitPrefs,
+  ComposioV119WebhookAcceptResult,
+  ComposioV119WebhookConfig,
+  ComposioV119WebhookEventStatus,
+  ComposioV119WebhookHandler,
+  ComposioV119WebhookQueueOptions,
+  ComposioV119WebhookRejectReason,
+  MockComposioV119Result,
+} from './composio/index';
+
+// v1.29 (Đội T4): Composio v6 — mock toolkits smartsheet/servicenow/
+// klaviyo/onedrive, background long jobs, job polling (backoff +
+// timeout + cancel), per-conversation sandbox boundary, app bindings.
+export {
+  COMPOSIO_V129_BINDINGS_MAX_AUDIT_ENTRIES,
+  COMPOSIO_V129_BINDINGS_VERSION,
+  COMPOSIO_V129_JOB_CHECKPOINT_VERSION,
+  COMPOSIO_V129_MOCK_TOOLKITS,
+  COMPOSIO_V129_MOCK_TOOL_PARAM_NAMES,
+  COMPOSIO_V129_POLL_SCHEDULE_VERSION,
+  COMPOSIO_V129_SANDBOX_MAX_AUDIT_ENTRIES,
+  COMPOSIO_V129_SANDBOX_VERSION,
+  COMPOSIO_V129_TERMINAL_JOB_STATUSES,
+  DEFAULT_COMPOSIO_V129_JOB_CONFIG,
+  DEFAULT_COMPOSIO_V129_POLL_POLICY,
+  DEFAULT_COMPOSIO_V129_SANDBOX_LIMITS,
+  MemoryComposioV129BindingStore,
+  MemoryComposioV129JobStore,
+  MemoryComposioV129SandboxStore,
+  MockComposioV129Executor,
+  admitComposioV129SandboxCall,
+  advanceComposioV129Job,
+  checkComposioV129AppBinding,
+  checkComposioV129JobTimeout,
+  composioV129BindingId,
+  composioV129Hash32,
+  composioV129JobElapsedMs,
+  composioV129JobId,
+  composioV129JobNeedsApproval,
+  composioV129JobProgress,
+  composioV129JobTimeLeftMs,
+  composioV129MsUntilNextPoll,
+  composioV129NextPollDelayMs,
+  composioV129PollDelayMs,
+  composioV129PollDelayTable,
+  composioV129PollJitterMs,
+  composioV129SandboxId,
+  composioV129SandboxNeedsApproval,
+  composioV129ScopeForSlug,
+  composioV129ScopesCover,
+  createComposioV129AppBinding,
+  createComposioV129Job,
+  createComposioV129PollSchedule,
+  createComposioV129SandboxBoundary,
+  createMockComposioV129AppDefinitions,
+  defaultComposioV129MachineBindings,
+  executeMockComposioV129Tool,
+  failComposioV129Job,
+  filterComposioV129SandboxAudit,
+  findMockComposioV129Toolkit,
+  isComposioV129PollDue,
+  isComposioV129SandboxExpired,
+  isComposioV129TerminalJobStatus,
+  isComposioV129ToolkitAllowed,
+  isMockComposioV129Slug,
+  listComposioV129EffectiveApps,
+  listComposioV129Jobs,
+  mockComposioV129AppId,
+  mockComposioV129DeterministicId,
+  mockComposioV129ParamNames,
+  mockComposioV129Slugs,
+  mockComposioV129ToolNeedsApproval,
+  parseComposioV129Job,
+  parseComposioV129PollSchedule,
+  parseComposioV129SandboxBoundary,
+  pollComposioV129JobOnce,
+  pollComposioV129JobsBatch,
+  recordComposioV129SandboxCall,
+  recordComposioV129SandboxDenial,
+  recordComposioV129SandboxJobFinished,
+  requestComposioV129JobCancel,
+  resolveComposioV129EffectiveParams,
+  resolveComposioV129JobConfig,
+  resolveComposioV129PollPolicy,
+  resolveComposioV129SandboxLimits,
+  resolveMockComposioV129Slug,
+  serializeComposioV129Job,
+  serializeComposioV129PollSchedule,
+  serializeComposioV129SandboxBoundary,
+  summarizeComposioV129Bindings,
+  summarizeComposioV129Job,
+  summarizeComposioV129Jobs,
+  summarizeComposioV129Sandbox,
+  summarizeMockComposioV129Catalogue,
+  updateComposioV129PollSchedule,
+  validateComposioV129AppBinding,
+  validateComposioV129BindingDefaultParams,
+  validateComposioV129Job,
+  validateComposioV129JobConfig,
+  validateComposioV129PollPolicy,
+  validateComposioV129PollSchedule,
+  validateComposioV129SandboxBoundary,
+  validateComposioV129SandboxLimits,
+  validateMockComposioV129Params,
+} from './composio/index';
+export type {
+  ComposioV129AdvanceResult,
+  ComposioV129AdmitResult,
+  ComposioV129AppBinding,
+  ComposioV129AppScope,
+  ComposioV129AuthKind,
+  ComposioV129BindAppInput,
+  ComposioV129BindingAuditAction,
+  ComposioV129BindingAuditEntry,
+  ComposioV129BindingCheck,
+  ComposioV129CreateJobInput,
+  ComposioV129CreateSandboxInput,
+  ComposioV129JobConfig,
+  ComposioV129JobFilter,
+  ComposioV129JobStatus,
+  ComposioV129LongJob,
+  ComposioV129MockToolkitDef,
+  ComposioV129PollOnceResult,
+  ComposioV129PollOutcome,
+  ComposioV129PollPolicy,
+  ComposioV129PollSchedule,
+  ComposioV129SandboxAuditAction,
+  ComposioV129SandboxAuditEntry,
+  ComposioV129SandboxBoundary,
+  ComposioV129SandboxCall,
+  ComposioV129SandboxCallKind,
+  ComposioV129SandboxLimits,
+  ComposioV129SandboxUsage,
+  ComposioV129StepFn,
+  MockComposioV129Result,
+} from './composio/index';
+
 // --- v1.15 (T2): protocol triad — AG-UI 1.0 stream (31 types),
 // A2UI generative surfaces, A2A v1.0 signed cards, MCP stateless 2026-07-28 ---
 export {
@@ -11750,3 +13620,53 @@ export type {
 
 // v1.16 (T2): protocols v2 — MCP Tasks/Skills/discover, A2A signed cards v2, AG-UI stream v2, A2UI catalog v2.
 export * from './protocolsV2/index';
+
+// v1.19 (T3): protocols v3 — MCP stateless core migration, Streamable HTTP v3, MRTR v3, A2A v1.1 two-way streaming, AG-UI 1.0 run, A2UI v3, Skills over MCP v3, MCP Apps v3.
+export * from './protocolsV3/index';
+
+// v1.20 (Đội T1): memory v19 — BYOK writer model registry, eval harness
+// dual benchmark LoCoMo + FrontierMemory, token-budget governor,
+// consolidation pipeline bất đồng bộ (dedup + conflict resolution +
+// decay), supersedes semantics kiểu Mnemoverse, feedback
+// POSITIVE/NEGATIVE, poisoning guard (lớp mở rộng trên v18).
+// Re-export từ memory/v19/index.
+export * from './memory/v19/index';
+// v1.28 (Đội T1): memory v20 — Letta-style core memory blocks do
+// agent tu sua bang tool + sleep-time consolidation chay nen giua
+// session + block versioning (lich su append-only, diff, rollback
+// tao version moi). Dang ky barrel o v1.29 (v20 truoc day chi dung
+// qua duong dan sau ./memory/v20/index, chua vao barrel core).
+// Re-export từ memory/v20/index.
+export * from './memory/v20/index';
+// v1.29 (Đội T1): memory v21 — portable memory theo huong Open
+// Memory Spec / OKF: export/import cross-format (OKF Markdown+YAML
+// frontmatter, MemFS git-backed blocks, OpenHands 2-tier MEMORY.md
+// + daily logs), converter hai chieu co loss report, validation +
+// bao loi ro, sync 3 chieu + conflict detection, versioning
+// append-only, deletion tombstones, sleep-time consolidation mo
+// rong xuyen session (noi tiep v20).
+// Re-export từ memory/v21/index.
+export * from './memory/v21/index';
+// v1.20 (T2): protocols v4 — version matrix, Poppy 1.0 profile exchange, A2A v1.1 RC SendLiveMessage live session, MCP sampling cleanup, AG-UI 1.0 conformance, IETF agentproto watch-track.
+export * from './protocolsV4/index';
+// v1.29 (T2): protocols v5 — version matrix (ACP v2 draft + A2A 1.1 final, Linux Foundation), background MCP tasks (SDK-style task id / placeholder / task_notification), per-tool permission_policy, MCP OAuth elicitation/reconnect, ACP v2 client adapter + agent registry/discovery + BYOA adapter with A2A alignment.
+export * from './protocolsV5/index';
+// v1.34 (Đội T6): fleet v21 — sandbox-tier-aware scheduling, multi-node
+// placement (bin-packing + affinity/anti-affinity + rebalance + audit
+// log), panels + dashboard tổng hợp, tool defs thuần (18 tool).
+// Durable automation v2 export trực tiếp từ file mới (không qua
+// durable/index — file đó không sửa trong sóng này).
+export * from './fleetV21/index';
+export * from './durable/automationV2';
+// v1.35 (Đội T6): fleet v22 — fleet đa người dùng (user/quota), per-bot
+// computer (3 loại), probe + phân vùng tài nguyên (headroom cho host),
+// orchestration 2 mẫu (subagent delegation + handoff chuyển giao),
+// panels + dashboard tổng hợp, tool defs thuần (24 tool).
+export * from './fleetV22/index';
+// v1.36 (Đội T6): fleet v23 — topology (zone/group, spread,
+// affinity/anti-affinity mức group, thiệt hại zone chết), scheduler v2
+// (hàng đợi ưu tiên + aging + cron + SLA + preemption), placement v2
+// (chấm điểm 6 tiêu chí + chi phí + Pareto + capacity forecast),
+// rebalance v2 (đo lệch tải + kế hoạch + dry-run + thực thi có xác
+// minh/rollback), panels + dashboard tổng hợp, tool defs thuần (24 tool).
+export * from './fleetV23/index';
