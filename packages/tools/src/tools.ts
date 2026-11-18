@@ -60,6 +60,18 @@ import { HARNESS_V4_TOOLS } from './harnessV4Tools';
 import { WORKSPACE_TOOLS } from './workspaceTools';
 // --- v1.03 (Team T6): fleet overview/scheduling + marketplace v3 tools ---
 import { FLEET_V103_TOOLS, createFleetV103Tools } from './fleetV103Tools';
+// --- v1.34 (Đội T6): fleet v21 tools (tier-aware scheduling, multi-node
+// placement, durable automation v2, fleet dashboard — 18 tools) ---
+import { FLEET_V21_TOOLS, createFleetV21Tools } from './fleetV21Tools';
+import type { FleetV21ToolState } from './fleetV21Tools';
+// --- v1.35 (Đội T6): fleet v22 tools (multi-user + per-bot computer +
+// probe/partition + delegation + handoff + orchestration — 24 tools) ---
+import { FLEET_V22_TOOLS, createFleetV22Tools } from './fleetV22Tools';
+import type { FleetV22ToolState } from './fleetV22Tools';
+// --- v1.36 (Đội T6): fleet v23 tools (topology + scheduler v2 +
+// placement v2 + rebalance v2 + dashboard — 24 tools) ---
+import { FLEET_V23_TOOLS, createFleetV23Tools } from './fleetV23Tools';
+import type { FleetV23ToolState } from './fleetV23Tools';
 // --- v1.05 (Đội T3): OpenMausBot parity — doctor, team YAML, model
 // refresh, per-bot computer v2, headless status (8 tools) ---
 import { OPENMAUSBOT_V105_TOOLS, createOpenmausbotV105Tools } from './openmausbotV105Tools';
@@ -96,6 +108,32 @@ import { MEMORY_V14_TOOLS, createMemoryV14Tools } from './memoryV14Tools';
 // search 4 tin hieu, state-at, time-travel, block edit/list, sleep
 // reorganize, eval) — 8 tools, placeholder trong ALL_TOOLS ---
 import { MEMORY_V15_TOOLS, createMemoryV15Tools } from './memoryV15Tools';
+// --- v1.35 (Doi T1): memory v16 tools (core_memory_replace exact-match,
+// block edit/list/pin, sleep consolidate + reorganize, extract/fuse da
+// scope, validity set/query, archival recall/promote, eval) — 12 tools,
+// placeholder trong ALL_TOOLS ---
+import { MEMORY_V16_TOOLS, createMemoryV16Tools } from './memoryV16Tools';
+// --- v1.18 (Đội T1): memory v17 tools (block lifecycle v2: template/
+// pin/read-only/maxChars/quota, sleep scheduler v2, archival scoring
+// promote/demote, block commit/history/rollback/audit git-backed,
+// admission pipeline poisoning guard v2, eval 25 case) ---
+import { MEMORY_V17_TOOLS, createMemoryV17Tools } from './memoryV17Tools';
+// --- v1.36 (Doi T1): memory v17 mem0-style tools (add-only single-pass
+// extract, entity linking <name>_entities + typed edge, conflict
+// detector + resolver, retrieval fusion, bi-temporal state-at, scope
+// audit, eval 40 case) — 11 tools, placeholder trong ALL_TOOLS ---
+// LUU Y: ten memory_v17_* thuoc memory v17 kieu block cua v1.18; file nay
+// dung tien to memory_v17_mem0_ de khong xung dot.
+import { MEMORY_V17_MEM0_TOOLS, createMemoryV17Mem0Tools } from './memoryV17Mem0Tools';
+// --- v1.19 (Đội T1-TEST): memory v18 tools (extract v2, hybrid retrieval
+// 3 tin hieu, block edit guardrail v3 + rollback/drift, bi-temporal
+// correct/snapshot, poisoning screen v3, GDPR erase, sleep consolidation
+// v2, LOCOMO eval) — 12 tools, placeholder trong ALL_TOOLS ---
+import { MEMORY_V18_TOOLS, createMemoryV18Tools } from './memoryV18Tools';
+// --- v1.29 (Đội T1): memory v21 tools (portable memory OKF/MemFS/
+// OpenHands: export/import/convert/validate/sync/tombstone/version/
+// sleep/record/bundle-info) — 10 tools, placeholder trong ALL_TOOLS ---
+import { MEMORY_V21_TOOLS, createMemoryV21Tools } from './memoryV21Tools';
 // --- v1.09 (Đội T2): memory v9 kiểu Letta tools (core memory tự sửa
 // qua tool, recall, archival, entity bền vững, sleep pass/proposals)
 // — 23 tools, placeholder trong ALL_TOOLS ---
@@ -145,6 +183,26 @@ import { FLEET_V7_TOOLS, createFleetV7Tools } from './fleetV7Tools';
 // (9 tools) — placeholder trong ALL_TOOLS ---
 import { EVAL_V111_TOOLS, createEvalV111Tools } from './evalV111Tools';
 import type { EvalV111ToolOptions } from './evalV111Tools';
+// --- v1.34 (Đội T2): Sandbox v2 — tiered isolation, policy-as-code,
+// token broker, kill switch, per-run report (9 tools) ---
+import { SANDBOX_V2_TOOLS, createSandboxV2Tools } from './sandboxV2Tools';
+import type { SandboxV2ToolOptions } from './sandboxV2Tools';
+// --- v1.35 (Đội T2): Sandbox v3 — deep sandbox: per-tier syscall
+// allowlist, egress gate, lifetime cap + auto-stop, COW snapshots,
+// pause/resume, Pre/PostToolUse hooks (15 tools) ---
+import { SANDBOX_V3_TOOLS, createSandboxV3Tools } from './sandboxV3Tools';
+import type { SandboxV3ToolOptions } from './sandboxV3Tools';
+import { SANDBOX_V4_TOOLS, createSandboxV4Tools } from './sandboxV4Tools';
+import type { SandboxV4ToolOptions } from './sandboxV4Tools';
+// --- v1.34 (Đội T4): Eval Harness v2 — task container hoá 2 loại +
+// oracle + runner song song + scorer 4 chiều + regression gate (6 tools)
+// — placeholder trong ALL_TOOLS ---
+import { EVAL_HARNESS_V2_TOOLS, createEvalHarnessV2Tools } from './evalHarnessV2Tools';
+import type { EvalHarnessV2ToolOptions } from './evalHarnessV2Tools';
+// --- v1.35 (Đội T4): Eval Harness v3 — container spec + guardrails +
+// tracing + registry + gate 6 ngưỡng (8 tools) — placeholder trong ALL_TOOLS ---
+import { EVAL_HARNESS_V3_TOOLS, createEvalHarnessV3Tools } from './evalHarnessV3Tools';
+import type { EvalHarnessV3ToolOptions } from './evalHarnessV3Tools';
 // --- v1.12 (Đội T2): event-sourced conversation + CodeAct-lite +
 // skill workspace on-demand (11 tools) — placeholder trong ALL_TOOLS ---
 import { CONVERSATION_V112_TOOLS, createConversationV112Tools } from './conversationV112Tools';
@@ -162,6 +220,13 @@ import { FLEET_V9_TOOLS, createFleetV9Tools } from './fleetV9Tools';
 // --- v1.13 (Đội T1): Agent Skills loader v13 — SKILL.md validation +
 // session index + internal registry + interop + marketplace + audit (8 tools) ---
 import { SKILLS_V13_TOOLS, createSkillsV13Tools } from './skillsV13Tools';
+// --- v1.34 (Đội T1): Agent Skills v14 — strict AAIF validation + dual-path
+// discovery + progressive-disclosure loader + local index + import/export (10 tools) ---
+import { SKILLS_V14_TOOLS, createSkillsV14Tools } from './skillsV14Tools';
+// --- v1.36 (Đội T2): Agent Skills v15 — multi-platform (.agents canonical +
+// .claude/.github/.codex/.opencode mirrors) + compatibility registry +
+// budgeted disclosure + migration + mirror sync + audit + packs + export plan (17 tools) ---
+import { SKILLS_V15_TOOLS, createSkillsV15Tools } from './skillsV15Tools';
 // --- v1.13 (Đội T2): MCP Apps host v13 — ui:// registry + ui/ dialect +
 // display modes + component kit (7 tools) ---
 import { MCP_APPS_V113_TOOLS, createMcpAppsV113Tools } from './mcpAppsV113Tools';
@@ -169,6 +234,18 @@ import { MCP_APPS_V113_TOOLS, createMcpAppsV113Tools } from './mcpAppsV113Tools'
 // 2 chiều + gallery/template + bundler/CSP + permissions mic/camera +
 // component kit v2 (8 tools) ---
 import { MCP_APPS_V2_TOOLS, createMcpAppsV2Tools } from './mcpAppsV2Tools';
+// --- v1.34 (Đội T3): MCP Apps host v14 — ui:// registry v14 + _meta.ui +
+// text fallback bắt buộc + capability negotiation + bridge ui/* consent +
+// sandbox CSP + preview panel + audit (8 tools) ---
+import { MCP_APPS_V14_TOOLS, createMcpAppsV14Tools } from './mcpAppsV14Tools';
+// --- v1.35 (Đội T3): MCP Apps host v15 — ui:// registry v15 + MIME
+// profile + app manifest + host context + bridge JSON-RPC 2.0 +
+// consent bắt buộc + auto-visualiser + Agent Skills tạo app (11 tools) ---
+import { MCP_APPS_V15_TOOLS, createMcpAppsV15Tools } from './mcpAppsV15Tools';
+// --- v1.36 (Đội T3): MCP Apps v16 + MCP 2026-07-28 — stateless client
+// v16 + MRTR SEP-2322 + URL elicitation + extension negotiation +
+// deprecation policy + Client ID Metadata + Apps v16 pipeline + migration (15 tools) ---
+import { MCP_APPS_V16_TOOLS, createMcpAppsV16Tools } from './mcpAppsV16Tools';
 // --- v1.13 (Đội T3): repo map v5 — topology + summaries + incremental
 // index + code graph search + jump-to-definition (6 tools) ---
 import { REPOMAP_V5_TOOLS, createRepomapV5Tools } from './repoMapV5Tools';
@@ -181,6 +258,17 @@ import { CODING_V6_TOOLS, createCodingV6Tools } from './codingV6Tools';
 import type { CodingV6ToolOptions } from './codingV6Tools';
 import { CODING_V7_TOOLS, createCodingV7Tools } from './codingV7Tools';
 import type { CodingV7ToolOptions } from './codingV7Tools';
+import { CODING_V9_TOOLS, createCodingV9Tools } from './codingV9Tools';
+import type { CodingV9ToolOptions } from './codingV9Tools';
+import { CODING_V10_TOOLS, createCodingV10Tools } from './codingV10Tools';
+import type { CodingV10ToolOptions } from './codingV10Tools';
+import { CODING_V14_TOOLS, createCodingV14Tools } from './codingV14Tools';
+import type { CodingV14ToolOptions } from './codingV14Tools';
+// --- v1.29 (Đội T2): protocols v5 — negotiate/bg-tasks/permission-policy/
+// oauth/acp (12 tools, placeholder trong ALL_TOOLS, bind qua
+// createProtocolV5Tools) ---
+import { PROTOCOL_V5_TOOLS, createProtocolV5Tools } from './protocolV5Tools';
+import type { ProtocolV5ToolOptions } from './protocolV5Tools';
 // --- v1.13 (Đội T5): voice v12 realtime — barge-in + TTS streaming +
 // turn-taking + overlap (8 tools) ---
 import { VOICE_V12_TOOLS, createVoiceV12Tools } from './voiceV12Tools';
@@ -190,12 +278,52 @@ import { VOICE_V13_TOOLS, createVoiceV13Tools } from './voiceV13Tools';
 // --- v1.15 (Đội T5): voice v14 realtime — latency budget v2 +
 // providers v2 + Smart Turn v2 + wake word v2 + barge-in v2 (9 tools) ---
 import { VOICE_V14_TOOLS, createVoiceV14Tools } from './voiceV14Tools';
+// --- v1.27 (Đội T5): voice v19 realtime — session manager v19 +
+// prosody control + eval v19 + open-turn resume (13 tools) ---
+// Ported into v1.29 from merge/v128; wired into ALL_TOOLS here
+// (v128 exported it but never spread it — pinned-count note).
+import { VOICE_V19_TOOLS, createVoiceV19Tools } from './voiceV19Tools';
+import type { VoiceV19ToolOptions } from './voiceV19Tools';
+// --- v1.29 (Đội T5): voice v20 extensions — durable session
+// persistence, resume v2, open-turn v8, transcript accuracy,
+// extended eval harness (8 tools) ---
+import { VOICE_V20_TOOLS, createVoiceV20Tools } from './voiceV20Tools';
+import type { VoiceV20ToolOptions } from './voiceV20Tools';
+// --- v1.34 (Đội T5): voice v21 realtime — voice-driven tool
+// calls + spoken confirmation, turn-taking, barge-in, WER/latency
+// eval, streaming TTS cache, monitor panel (8 tools) ---
+import { VOICE_V21_TOOLS, createVoiceV21Tools } from './voiceV21Tools';
+import type { VoiceV21ToolOptions } from './voiceV21Tools';
+// --- v1.35 (Đội T5): voice v22 durable realtime — durable
+// session, barge-in v2, floor turn-taking, voice profiles,
+// recovery loop, durability monitor (6 tools) ---
+import { VOICE_V22_TOOLS, createVoiceV22Tools } from './voiceV22Tools';
+import type { VoiceV22ToolOptions } from './voiceV22Tools';
+// --- v1.36 (Đội T5): voice v23 eval + streaming + endpointing +
+// interruption v2, session manager v2, calibration + device
+// profiles, monitor panel v2 (7 tools) ---
+import { VOICE_V23_TOOLS, createVoiceV23Tools } from './voiceV23Tools';
+import type { VoiceV23ToolOptions } from './voiceV23Tools';
 // --- v1.13 (Đội T6): fleet v10 — event triggers + schedules +
 // multi-user + ACP dashboard (11 tools) ---
 import { FLEET_V10_TOOLS, createFleetV10Tools } from './fleetV10Tools';
 // --- v1.14 (Đội T4): Composio v114 — mock toolkits + poll scheduler v2 +
 // connection health + trigger templates + MCP App bridge (6 tools) ---
 import { COMPOSIO_V114_TOOLS, createComposioV114Tools } from './composioV114Tools';
+// --- v1.18 (Đội T4): Composio v118 — mock toolkits canva/pandadoc/loom +
+// polling v5 adaptive + trigger instances + OAuth state machine +
+// webhook ingestion (6 tools) ---
+import { COMPOSIO_V118_TOOLS, createComposioV118Tools } from './composioV118Tools';
+// --- v1.19 (Đội T4): Composio v119 — mock toolkits wrike/bamboohr/
+// ringcentral + polling v6 batch + trigger instances v2 + OAuth
+// refresh v2 + webhook v2 queue + toolkit prefs per-user + usage
+// metering (8 tools) ---
+import { COMPOSIO_V119_TOOLS, createComposioV119Tools } from './composioV119Tools';
+// --- v1.29 (Đội T4): Composio v6 — long jobs submit/poll/get/list/
+// cancel (5) + mock toolkits list/execute (2) + sandbox create/status
+// (2) + app bind (1) = 10 ---
+import { COMPOSIO_V129_TOOLS, createComposioV129Tools } from './composioV129Tools';
+import type { ComposioV129ToolOptions } from './composioV129Tools';
 // --- v1.14 (Đội T6): fleet v11 — health + staged rollout + panels (9 tools) ---
 import { FLEET_V11_TOOLS, createFleetV11Tools } from './fleetV11Tools';
 // --- v1.15 (Đội T3): local model router — catalogue + load/unload +
@@ -203,6 +331,16 @@ import { FLEET_V11_TOOLS, createFleetV11Tools } from './fleetV11Tools';
 import { ROUTER_LOCAL_V115_TOOLS, createRouterLocalV115Tools } from './routerLocalV115Tools';
 // --- v1.15 (Đội T6): fleet v12 — model pinning + % rollout + health v12 + panels (9 tools) ---
 import { FLEET_V12_TOOLS, createFleetV12Tools } from './fleetV12Tools';
+// --- v1.18 (Đội T3): local-model router v3 — catalog 100+ provider +
+// capability check + cost estimate + rank + chat + local scan/status +
+// cost set + circuit + latency (10 tools) ---
+import { ROUTER_V3_TOOLS, createRouterV3Tools } from './routerV3Tools';
+import type { RouterV3State } from './routerV3Tools';
+// --- v1.33 (Đội T5): inference broker v2 — capability matrix 4 engine
+// local + probe that + validate tool call + prefix cache + voice v22
+// (7 tools) ---
+import { INFERENCE_BROKER_V2_TOOLS, createInferenceBrokerV2Tools } from './inferenceBrokerV2Tools';
+import type { InferenceBrokerV2State } from './inferenceBrokerV2Tools';
 
 // Shared helper: MAX_TOOL_RESULT_CHARS nay song o ./truncate (cung gia tri
 // 20.000) — re-export de code import tu module nay khong phai sua.
@@ -953,6 +1091,15 @@ export const ALL_TOOLS: Tool[] = [
   ...WORKSPACE_TOOLS,
   // --- v1.03 (Team T6): fleet overview + scheduling + marketplace v3 (4) ---
   ...FLEET_V103_TOOLS,
+  // --- v1.34 (Đội T6): fleet v21 — tier-aware scheduling + multi-node
+  // placement + durable automation v2 + fleet dashboard (18) ---
+  ...FLEET_V21_TOOLS,
+  // --- v1.35 (Đội T6): fleet v22 — multi-user + per-bot computer +
+  // probe/partition + delegation + handoff + orchestration (24) ---
+  ...FLEET_V22_TOOLS,
+  // --- v1.36 (Đội T6): fleet v23 — topology + scheduler v2 +
+  // placement v2 + rebalance v2 + fleet dashboard (24) ---
+  ...FLEET_V23_TOOLS,
   // --- v1.05 (Đội T3): OpenMausBot parity — doctor (1) + team YAML (3) +
   // model refresh (1) + per-bot computer v2 (2) + headless status (1) = 8 ---
   ...OPENMAUSBOT_V105_TOOLS,
@@ -1000,6 +1147,33 @@ export const ALL_TOOLS: Tool[] = [
   // state-at (1) + time-travel (1) + block edit (1) + block list (1) +
   // sleep reorganize (1) + eval (1) = 8 ---
   ...MEMORY_V15_TOOLS,
+  // --- v1.35 (Doi T1): memory v16 — core_memory_replace (1) + block edit
+  // (1) + block list (1) + block pin (1) + block audit (1) + sleep
+  // consolidate (1) + extract/fuse (1) + validity set (1) + validity
+  // query (1) + archival recall (1) + archival promote (1) + sleep
+  // reorganize (1) + eval (1) = 13 ---
+  ...MEMORY_V16_TOOLS,
+  // --- v1.18 (Doi T1): memory v17 — block template (1) + lifecycle (1) +
+  // compile (1) + sleep schedule (1) + archival score (1) + block
+  // commit (1) + history/diff (1) + rollback (1) + audit (1) + admit (1) +
+  // eval (1) = 11 ---
+  ...MEMORY_V17_TOOLS,
+  // --- v1.36 (Doi T1): memory v17 mem0-style — extract (1) + entity link
+  // (1) + entity list (1) + entity merge (1) + conflict list (1) +
+  // conflict resolve (1) + search (1) + state-at (1) + fact timeline (1)
+  // + scope audit (1) + eval (1) = 11 ---
+  // LUU Y: ten memory_v17_* (khong co _mem0_) thuoc memory v17 kieu block
+  // cua v1.18; tool nay dung tien to memory_v17_mem0_ de khong xung dot.
+  ...MEMORY_V17_MEM0_TOOLS,
+  // --- v1.19 (Đội T1-TEST): memory v18 — extract (1) + retrieve (1) +
+  // block edit (1) + rollback (1) + drift/audit (1) + correct/timeline
+  // (1) + snapshot (1) + screen/trust/review (1) + erase (1) + sleep
+  // (1) + eval (1) + erase audit (1) = 12 ---
+  ...MEMORY_V18_TOOLS,
+  // --- v1.29 (Đội T1): memory v21 — export (1) + import (1) + convert (1)
+  // + validate (1) + sync (1) + tombstone (1) + version (1) + sleep (1)
+  // + record (1) + bundle info (1) = 10 ---
+  ...MEMORY_V21_TOOLS,
   // --- v1.07 (Đội T2): harness v3 — delegate (1) + budget meter (1) + LLM profile (1) = 3 ---
   ...HARNESS_V107_TOOLS,
   // --- v1.08 (Đội T3): harness v4 — EventLog (6) + CodeAct run/loop (2) + dependency sweep (4) = 12 ---
@@ -1049,6 +1223,25 @@ export const ALL_TOOLS: Tool[] = [
   // run suite (1) + export rollout (1) + profiles list/set/for-task (3) +
   // report (1) = 9 ---
   ...EVAL_V111_TOOLS,
+  // --- v1.34 (Đội T2): Sandbox v2 — list/validate/select (3) + run (1) +
+  // report (1) + token issue/revoke (2) + microVM dry-run (1) + kill (1) = 9 ---
+  ...SANDBOX_V2_TOOLS,
+  // --- v1.35 (Đội T2): Sandbox v3 — list/validate (2) + session
+  // create/list (2) + run command/step (2) + report (1) + pause/
+  // resume/stop (3) + snapshot/restore (2) + egress/syscall check (2) +
+  // hook register (1) = 15 ---
+  ...SANDBOX_V3_TOOLS,
+  // --- v1.36 (Đội T4): Sandbox v4 — runtime create/list/report/
+  // stop/cleanup (5) + profile list/validate/create/set (4) +
+  // budget status/set-limits/record (3) + secret request/approve/
+  // deny/list (4) + depmap build/order/conflicts (3) = 19 ---
+  ...SANDBOX_V4_TOOLS,
+  // --- v1.34 (Đội T4): Eval Harness v2 — list/validate/run task (3) +
+  // run suite (1) + baseline (1) + gate (1) = 6 ---
+  ...EVAL_HARNESS_V2_TOOLS,
+  // --- v1.35 (Đội T4): Eval Harness v3 — list/validate/run task (3) +
+  // run suite (1) + run set (1) + baseline (1) + gate (1) + trace (1) = 8 ---
+  ...EVAL_HARNESS_V3_TOOLS,
   // --- v1.12 (Đội T2): event-sourced conversation — start/append/
   // replay/branch/snapshot/compact/export/timetravel (8) + CodeAct-lite
   // run text (1) + skill workspace list/load (2) = 11 ---
@@ -1072,10 +1265,23 @@ export const ALL_TOOLS: Tool[] = [
   ...FLEET_V9_TOOLS,
   // --- v1.13 (Đội T1): Agent Skills loader v13 (8) ---
   ...SKILLS_V13_TOOLS,
+  // --- v1.34 (Đội T1): Agent Skills v14 (10) ---
+  ...SKILLS_V14_TOOLS,
+  // --- v1.36 (Đội T2): Agent Skills v15 — platforms/status/export-multi/
+  // import-multi/remove (5) + validate-platform/compat/disclose (3) +
+  // registry/sync/sync-repair/migrate (4) + audit/pack-create/pack-verify/
+  // pack-install/export-plan (5) = 17 ---
+  ...SKILLS_V15_TOOLS,
   // --- v1.13 (Đội T2): MCP Apps host v13 (7) ---
   ...MCP_APPS_V113_TOOLS,
   // --- v1.14 (Đội T2): MCP Apps v2 + Tasks chuẩn 2026-07-28 (8) ---
   ...MCP_APPS_V2_TOOLS,
+  // --- v1.34 (Đội T3): MCP Apps host v14 (8) ---
+  ...MCP_APPS_V14_TOOLS,
+  // --- v1.35 (Đội T3): MCP Apps host v15 (11) ---
+  ...MCP_APPS_V15_TOOLS,
+  // --- v1.36 (Đội T3): MCP Apps v16 + MCP 2026-07-28 (15) ---
+  ...MCP_APPS_V16_TOOLS,
   // --- v1.13 (Đội T3): repo map v5 (6) ---
   ...REPOMAP_V5_TOOLS,
   // --- v1.13 (Đội T4): coding agent v5 git-native (11) ---
@@ -1086,18 +1292,60 @@ export const ALL_TOOLS: Tool[] = [
   // --- v1.15 (Đội T4): coding agent v7 — start/step/pause/resume/
   // replay/security/condense/skills/eval (9) ---
   ...CODING_V7_TOOLS,
+  // --- v1.17 (Đội T4): coding agent v9 — ast-edit/loop/commit/pr/
+  // eval/agent (6) ---
+  ...CODING_V9_TOOLS,
+  // --- v1.18 (Đội T2): coding agent v10 — session/codeact/repomap/
+  // edit/eval/agent/snapshot (7) ---
+  ...CODING_V10_TOOLS,
+  // --- v1.29 (Đội T3): coding agent v14 — condense/stuck-check/
+  // recover/reasoning/agent/resume (6) ---
+  ...CODING_V14_TOOLS,
+  // --- v1.29 (Đội T2): protocols v5 — negotiate/bg-task start/get/
+  // list/cancel (5) + permission evaluate/set/ask-resolve (3) +
+  // oauth state/reconnect (2) + acp discover/session (2) = 12 ---
+  ...PROTOCOL_V5_TOOLS,
   // --- v1.13 (Đội T5): voice v12 realtime (8) ---
   ...VOICE_V12_TOOLS,
   // --- v1.14 (Đội T5): voice v13 realtime (8) ---
   ...VOICE_V13_TOOLS,
   // --- v1.15 (Đội T5): voice v14 realtime (9) ---
   ...VOICE_V14_TOOLS,
+  // --- v1.27 (Đội T5): voice v19 realtime — session manager /
+  // prosody / eval / open-turn resume (13) ---
+  ...VOICE_V19_TOOLS,
+  // --- v1.29 (Đội T5): voice v20 extensions — persistence /
+  // resume v2 / open-turn v8 / transcript accuracy / eval (8) ---
+  ...VOICE_V20_TOOLS,
+  // --- v1.34 (Đội T5): voice v21 realtime — voice-driven tool
+  // calls, turn-taking, barge-in, eval, TTS cache, monitor (8) ---
+  ...VOICE_V21_TOOLS,
+  // --- v1.35 (Đội T5): voice v22 durable realtime — durable
+  // session, barge-in v2, floor turn-taking, voice profiles,
+  // recovery loop, durability monitor (6) ---
+  ...VOICE_V22_TOOLS,
+  // --- v1.36 (Đội T5): voice v23 eval + streaming + endpointing
+  // v2, interruption v2, session manager v2, calibration +
+  // device profiles, monitor panel v2 (7) ---
+  ...VOICE_V23_TOOLS,
   // --- v1.13 (Đội T6): fleet v10 (11) ---
   ...FLEET_V10_TOOLS,
   // --- v1.14 (Đội T4): Composio v114 — mock toolkits list/execute (2) +
   // poll schedule v2 (1) + connection health (1) + trigger templates (1) +
   // MCP App open (1) = 6 ---
   ...COMPOSIO_V114_TOOLS,
+  // --- v1.18 (Đội T4): Composio v118 — mock toolkits list/execute (2) +
+  // poll adaptive v5 (1) + trigger instances (1) + OAuth state (1) +
+  // webhook ingest (1) = 6 ---
+  ...COMPOSIO_V118_TOOLS,
+  // --- v1.19 (Đội T4): Composio v119 — mock toolkits list/execute (2) +
+  // poll batch v6 (1) + trigger instances v2 (1) + OAuth refresh v2 (1) +
+  // webhook queue v2 (1) + toolkit prefs per-user (1) + usage metering (1) = 8 ---
+  ...COMPOSIO_V119_TOOLS,
+  // --- v1.29 (Đội T4): Composio v6 — long jobs submit/poll/get/list/
+  // cancel (5) + mock toolkits list/execute (2) + sandbox create/
+  // status (2) + app bind (1) = 10 ---
+  ...COMPOSIO_V129_TOOLS,
   // --- v1.14 (Đội T6): fleet v11 (9) ---
   ...FLEET_V11_TOOLS,
   // --- v1.15 (Đội T3): local model router — catalogue list/validate (2) +
@@ -1106,6 +1354,13 @@ export const ALL_TOOLS: Tool[] = [
   ...ROUTER_LOCAL_V115_TOOLS,
   // --- v1.15 (Đội T6): fleet v12 (9) ---
   ...FLEET_V12_TOOLS,
+  // --- v1.18 (Đội T3): local-model router v3 — catalog/capability/cost/
+  // rank/chat/local scan+status/cost set/circuit/latency (10) ---
+  ...ROUTER_V3_TOOLS,
+  // --- v1.33 (Đội T5): inference broker v2 — matrix (1) + route (1) +
+  // probe (1) + probe status (1) + validate (1) + prefix cache (1) +
+  // voice v22 status/turn (1) = 7 ---
+  ...INFERENCE_BROKER_V2_TOOLS,
 ];
 
 export function createDefaultTools(opts?: {
@@ -1137,6 +1392,35 @@ export function createDefaultTools(opts?: {
    * plugins `<userData>/plugins`).
    */
   getFleetV103BaseDir?: () => string | null | undefined;
+  /**
+   * v1.34 (Đội T6): fleet v21 wiring. When given, the 18 fleet v21
+   * placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern as fleet v3) — same 18 names, never a
+   * duplicate. `getFleetV21State` resolves the host's live fleet state
+   * (nodes + running runs + durable automation store + placement log);
+   * without it the v21 tools answer "not configured".
+   */
+  getFleetV21State?: () => FleetV21ToolState | null | undefined;
+  /**
+   * v1.35 (Đội T6): fleet v22 wiring. When given, the 24 fleet v22
+   * placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern as fleet v21) — same 24 names, never a
+   * duplicate. `getFleetV22State` resolves the host's live fleet state
+   * (user/computer/delegation registries + handoff agents + routing
+   * rules + audit log + usage + probe); without it the v22 tools
+   * answer "not configured".
+   */
+  getFleetV22State?: () => FleetV22ToolState | null | undefined;
+  /**
+   * v1.36 (Đội T6): fleet v23 wiring. When given, the 24 fleet v23
+   * placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern as fleet v22) — same 24 names, never a
+   * duplicate. `getFleetV23State` resolves the host's live fleet state
+   * (topology + scheduler queue + node snapshots + placement + growth
+   * + plans + history); without it the v23 tools answer
+   * "not configured".
+   */
+  getFleetV23State?: () => FleetV23ToolState | null | undefined;
   /**
    * v1.05 (Đội T3): OpenMausBot-parity wiring. When given, the 8
    * v1.05 placeholders in ALL_TOOLS are replaced by bound tools
@@ -1307,6 +1591,63 @@ export function createDefaultTools(opts?: {
   /** v1.11 (Đội T2): executor thật + test timeout cho eval v111 tools. */
   getEvalV111ToolOptions?: () => EvalV111ToolOptions | undefined;
   /**
+   * v1.34 (Đội T2): Sandbox v2 wiring. When given, the 9 sandbox v2
+   * placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern) — never registered twice.
+   * `getSandboxV2BaseDir` resolves the app userData dir (per-run
+   * workspaces live under `<userData>/sandbox-v2/`).
+   */
+  getSandboxV2BaseDir?: () => string | null | undefined;
+  /** v1.34 (Đội T2): base dir override cho sandbox v2 tools. */
+  getSandboxV2ToolOptions?: () => SandboxV2ToolOptions | undefined;
+  /**
+   * v1.35 (Đội T2): Sandbox v3 wiring. When given, the 15 sandbox v3
+   * placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern) — never registered twice.
+   * `getSandboxV3BaseDir` resolves the app userData dir (sessions
+   * live under `<userData>/sandbox-v3/`, snapshots under
+   * `<userData>/sandbox-v3/snapshots/`).
+   */
+  getSandboxV3BaseDir?: () => string | null | undefined;
+  /** v1.35 (Đội T2): base dir override cho sandbox v3 tools. */
+  getSandboxV3ToolOptions?: () => SandboxV3ToolOptions | undefined;
+  /**
+   * v1.36 (Đội T4): Sandbox v4 wiring. When given, the 19 sandbox v4
+   * placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern) — never registered twice.
+   * `getSandboxV4BaseDir` resolves the app userData dir (runtimes
+   * live under `<userData>/sandbox-v4/conversations/<id>/`, v3
+   * sessions under `<userData>/sandbox-v4/v3-sessions/`).
+   */
+  getSandboxV4BaseDir?: () => string | null | undefined;
+  /** v1.36 (Đội T4): base dir override cho sandbox v4 tools. */
+  getSandboxV4ToolOptions?: () => SandboxV4ToolOptions | undefined;
+  /**
+   * v1.34 (Đội T4): Eval Harness v2 wiring. When given, the 6 eval
+   * harness v2 placeholders in ALL_TOOLS are replaced by bound tools
+   * (same replace-in-place pattern) — never registered twice.
+   * `getEvalHarnessV2BaseDir` resolves the app userData dir (tasks
+   * `<userData>/eval-harness-v2-tasks`, baseline
+   * `<userData>/eval-harness-v2/baseline.json`, reports
+   * `<userData>/eval-harness-v2-reports/`).
+   */
+  getEvalHarnessV2BaseDir?: () => string | null | undefined;
+  /** v1.34 (Đội T4): executor thật + plan scripted cho eval harness v2 tools. */
+  getEvalHarnessV2ToolOptions?: () => EvalHarnessV2ToolOptions | undefined;
+  /**
+   * v1.35 (Đội T4): Eval Harness v3 wiring. When given, the 8 eval
+   * harness v3 placeholders in ALL_TOOLS are replaced by bound tools
+   * (same replace-in-place pattern) — never registered twice.
+   * `getEvalHarnessV3BaseDir` resolves the app userData dir (tasks
+   * `<userData>/eval-harness-v3-tasks`, baseline
+   * `<userData>/eval-harness-v3/baseline.json`, reports
+   * `<userData>/eval-harness-v3-reports/`, traces
+   * `<userData>/eval-harness-v3-traces/`).
+   */
+  getEvalHarnessV3BaseDir?: () => string | null | undefined;
+  /** v1.35 (Đội T4): executor thật + plan scripted cho eval harness v3 tools. */
+  getEvalHarnessV3ToolOptions?: () => EvalHarnessV3ToolOptions | undefined;
+  /**
    * v1.12 (Đội T2): event-sourced conversation wiring. When given,
    * the 11 conversation v112 placeholders in ALL_TOOLS are replaced
    * by bound tools (same replace-in-place pattern) — never registered
@@ -1337,6 +1678,53 @@ export function createDefaultTools(opts?: {
   /** v1.15 (Đội T4): model generator + workspace fallback + skills dir cho coding v7 tools. */
   getCodingV7ToolOptions?: () => CodingV7ToolOptions | undefined;
   /**
+   * v1.17 (Đội T4): coding agent v9 wiring. When given, the 6 coding
+   * v9 placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern) — never registered twice.
+   * `getCodingV9BaseDir` resolves the app userData dir (data dir
+   * `<userData>/coding-v9/`).
+   */
+  getCodingV9BaseDir?: () => string | null | undefined;
+  /** v1.17 (Đội T4): workspace fallback cho coding v9 tools. */
+  getCodingV9ToolOptions?: () => CodingV9ToolOptions | undefined;
+  /**
+   * v1.18 (Đội T2): coding agent v10 wiring. When given, the 7 coding
+   * v10 placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern) — never registered twice.
+   * `getCodingV10BaseDir` resolves the app userData dir (data dir
+   * `<userData>/coding-v10/`).
+   */
+  getCodingV10BaseDir?: () => string | null | undefined;
+  /** v1.18 (Đội T2): workspace fallback cho coding v10 tools. */
+  getCodingV10ToolOptions?: () => CodingV10ToolOptions | undefined;
+  /**
+   * v1.29 (Đội T3): coding agent v14 wiring. When given, the 6 coding
+   * v14 placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern) — never registered twice.
+   * `getCodingV14BaseDir` resolves the app userData dir (data dir
+   * `<userData>/coding-v14/`).
+   */
+  getCodingV14BaseDir?: () => string | null | undefined;
+  /** v1.29 (Đội T3): workspace fallback cho coding v14 tools. */
+  getCodingV14ToolOptions?: () => CodingV14ToolOptions | undefined;
+  /**
+   * v1.29 (Đội T2): protocols v5 wiring. When given, the 12 protocol
+   * v5 placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern) — never registered twice. Host binds the
+   * background-task runner, token provider, permission registry, auth
+   * manager, ACP registry/client via ProtocolV5ToolOptions.
+   */
+  getProtocolV5ToolOptions?: () => ProtocolV5ToolOptions | undefined;
+  /**
+   * v1.29 (Đội T4): Composio v6 wiring. When given, the 10 Composio
+   * v129 placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern) — never registered twice. Host binds
+   * the shared job/sandbox/binding stores + poll schedules + machine
+   * defaults via ComposioV129ToolOptions so several turns share one
+   * session state.
+   */
+  getComposioV129ToolOptions?: () => ComposioV129ToolOptions | undefined;
+  /**
    * v1.11 (Đội T5): voice v10 wiring. When given, the 10 voice v10
    * placeholders in ALL_TOOLS are replaced by bound tools (same
    * replace-in-place pattern) — never registered twice.
@@ -1356,6 +1744,55 @@ export function createDefaultTools(opts?: {
    * with a plain message).
    */
   getVoiceV11Manager?: () => import('./voiceV11Tools').VoiceV11ManagerLike | null;
+  /**
+   * v1.29 (Đội T5): voice v19 wiring. When given, the 13 voice v19
+   * placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern) — never registered twice.
+   * `getVoiceV19Manager` returns the host's VoiceSessionManagerV19,
+   * `getVoiceV19Prosody` its ProsodyControllerV19, `getVoiceV19TurnStore`
+   * its OpenTurnStoreV19 (or null when voice is not wired).
+   */
+  getVoiceV19Manager?: () => import('@open-bot/core').VoiceSessionManagerV19 | null;
+  getVoiceV19Prosody?: () => import('@open-bot/core').ProsodyControllerV19 | null;
+  getVoiceV19TurnStore?: () => import('@open-bot/core').OpenTurnStoreV19 | null;
+  /** v1.29 (Đội T5): session options for the default v19 manager. */
+  getVoiceV19ToolOptions?: () => VoiceV19ToolOptions | undefined;
+  /**
+   * v1.29 (Đội T5): voice v20 wiring. When given, the 8 voice v20
+   * placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern) — never registered twice.
+   * The options carry the host's persistence store, resume
+   * orchestrator, open-turn engine and eval harness accessors.
+   */
+  getVoiceV20ToolOptions?: () => VoiceV20ToolOptions | undefined;
+  /**
+   * v1.34 (Đội T5): voice v21 wiring. When given, the 8 voice v21
+   * placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern) — never registered twice.
+   * The options carry the host's session, tool-call engine,
+   * turn machine, barge-in engine, eval harness, TTS cache and
+   * monitor panel accessors.
+   */
+  getVoiceV21ToolOptions?: () => VoiceV21ToolOptions | undefined;
+  /**
+   * v1.35 (Đội T5): voice v22 wiring. When given, the 6 voice v22
+   * placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern) — never registered twice.
+   * The options carry the host's session, turn machine, barge-in
+   * engine, profile registry, recovery engine, store, resume engine
+   * and monitor panel accessors.
+   */
+  getVoiceV22ToolOptions?: () => VoiceV22ToolOptions | undefined;
+  /**
+   * v1.36 (Đội T5): voice v23 wiring. When given, the 7 voice v23
+   * placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern) — never registered twice.
+   * The options carry the host's harness, buffer, pacer,
+   * endpointing engine, interruption policy/ledger, session
+   * manager, calibration engine, device registry and panel
+   * accessors.
+   */
+  getVoiceV23ToolOptions?: () => VoiceV23ToolOptions | undefined;
   /**
    * v1.11 (Đội T6): fleet v8 wiring. When given, the 13 fleet v8
    * placeholders in ALL_TOOLS are replaced by bound tools (same
@@ -1406,8 +1843,24 @@ export function createDefaultTools(opts?: {
    * keep working.
    */
   getProvidersV108Opts?: () => ProvidersV108ToolOptions | null | undefined;
+  /**
+   * v1.18 (Đội T3): router v3 wiring. When given, the 10 router v3
+   * placeholders in ALL_TOOLS are replaced by bound tools (same
+   * replace-in-place pattern) — never registered twice. The getter
+   * returns the router state the host owns (UnifiedRouterV3 +
+   * fetch + apiKeys do host nap); tra null thi giu placeholder.
+   */
+  getRouterV3State?: () => RouterV3State | null | undefined;
+  /**
+   * v1.33 (Đội T5): inference broker v2 wiring. When given, the 7
+   * broker v2 placeholders in ALL_TOOLS are replaced by bound tools
+   * (same replace-in-place pattern) — never registered twice. The
+   * getter returns the broker state the host owns (broker + fetch +
+   * hasLiveKey); tra null thi giu placeholder.
+   */
+  getInferenceBrokerV2State?: () => InferenceBrokerV2State | null | undefined;
 }): Tool[] {
-  if (!opts?.getDaemon && !opts?.getEgressPolicy && !opts?.getInternetDataFile && !opts?.getBraveSearchApiKey && !opts?.onWatchChanged && !opts?.getFleetV103BaseDir && !opts?.getOpenmausbotV105BaseDir && !opts?.getEvalFleetV105BaseDir && !opts?.getPlatformV4BaseDir && !opts?.getMemoryV8WorkspaceDir && !opts?.getMemoryV9WorkspaceDir && !opts?.getMemoryV10WorkspaceDir && !opts?.getMemoryV11WorkspaceDir && !opts?.getMemoryV11BotId && !opts?.getMemoryV12WorkspaceDir && !opts?.getMemoryV12BotId && !opts?.getMemoryV14WorkspaceDir && !opts?.getMemoryV14BotId && !opts?.getSkillsPluginsV107Opts && !opts?.getFleetV4TeamsBaseDir && !opts?.getCodingV2WorkspaceDir && !opts?.getCodingV3WorkspaceDir && !opts?.getCodingV4WorkspaceDir && !opts?.getProvidersV108Opts && !opts?.getFleetV5BaseDir && !opts?.getAgentTeamsV109BaseDir && !opts?.getFleetV6BaseDir && !opts?.getFleetV7BaseDir && !opts?.getEvalV111BaseDir && !opts?.getConversationV112BaseDir && !opts?.getVoiceV10Manager && !opts?.hasVoiceV10LiveKey && !opts?.getVoiceV11Manager && !opts?.getFleetV8BaseDir && !opts?.getFleetV9BaseDir && !opts?.getCodingV6BaseDir && !opts?.getFleetV11BaseDir && !opts?.getCodingV7BaseDir && !opts?.getFleetV12BaseDir) return [...ALL_TOOLS];
+  if (!opts?.getDaemon && !opts?.getEgressPolicy && !opts?.getInternetDataFile && !opts?.getBraveSearchApiKey && !opts?.onWatchChanged && !opts?.getFleetV103BaseDir && !opts?.getOpenmausbotV105BaseDir && !opts?.getEvalFleetV105BaseDir && !opts?.getPlatformV4BaseDir && !opts?.getMemoryV8WorkspaceDir && !opts?.getMemoryV9WorkspaceDir && !opts?.getMemoryV10WorkspaceDir && !opts?.getMemoryV11WorkspaceDir && !opts?.getMemoryV11BotId && !opts?.getMemoryV12WorkspaceDir && !opts?.getMemoryV12BotId && !opts?.getMemoryV14WorkspaceDir && !opts?.getMemoryV14BotId && !opts?.getSkillsPluginsV107Opts && !opts?.getFleetV4TeamsBaseDir && !opts?.getCodingV2WorkspaceDir && !opts?.getCodingV3WorkspaceDir && !opts?.getCodingV4WorkspaceDir && !opts?.getProvidersV108Opts && !opts?.getFleetV5BaseDir && !opts?.getAgentTeamsV109BaseDir && !opts?.getFleetV6BaseDir && !opts?.getFleetV7BaseDir && !opts?.getEvalV111BaseDir && !opts?.getConversationV112BaseDir && !opts?.getVoiceV10Manager && !opts?.hasVoiceV10LiveKey && !opts?.getVoiceV11Manager && !opts?.getFleetV8BaseDir && !opts?.getFleetV9BaseDir && !opts?.getCodingV6BaseDir && !opts?.getFleetV11BaseDir && !opts?.getCodingV7BaseDir && !opts?.getFleetV12BaseDir && !opts?.getCodingV9BaseDir && !opts?.getCodingV10BaseDir && !opts?.getCodingV14BaseDir && !opts?.getVoiceV19Manager && !opts?.getVoiceV19Prosody && !opts?.getVoiceV19TurnStore && !opts?.getVoiceV19ToolOptions && !opts?.getVoiceV20ToolOptions && !opts?.getVoiceV21ToolOptions && !opts?.getVoiceV22ToolOptions && !opts?.getVoiceV23ToolOptions && !opts?.getRouterV3State && !opts?.getComposioV129ToolOptions && !opts?.getInferenceBrokerV2State && !opts?.getFleetV21State && !opts?.getFleetV22State && !opts?.getFleetV23State && !opts?.getEvalHarnessV2BaseDir && !opts?.getEvalHarnessV3BaseDir) return [...ALL_TOOLS];
   let tools = [...ALL_TOOLS];
   const idx = tools.indexOf(shellExecTool);
   if (idx !== -1) {
@@ -1449,6 +1902,45 @@ export function createDefaultTools(opts?: {
     const bound = createFleetV103Tools(opts.getFleetV103BaseDir, () =>
       tools.map((t) => t.definition.name),
     );
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
+  // v1.34 (Đội T6): bind the fleet v21 tools when the host wires them
+  // (live fleet state). Same replace-in-place pattern as fleet v3 —
+  // same 18 names, never a duplicate.
+  if (opts?.getFleetV21State) {
+    const bound = createFleetV21Tools(opts.getFleetV21State);
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
+  // v1.35 (Đội T6): bind the fleet v22 tools when the host wires them
+  // (live fleet v22 state). Same replace-in-place pattern as fleet v21
+  // — same 24 names, never a duplicate.
+  if (opts?.getFleetV22State) {
+    const bound = createFleetV22Tools(opts.getFleetV22State);
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
+  // v1.36 (Đội T6): bind the fleet v23 tools when the host wires them
+  // (live fleet v23 state). Same replace-in-place pattern as fleet v22
+  // — same 24 names, never a duplicate.
+  if (opts?.getFleetV23State) {
+    const bound = createFleetV23Tools(opts.getFleetV23State);
     const boundNames = new Set(bound.map((t) => t.definition.name));
     const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
     if (firstIdx !== -1) {
@@ -1541,7 +2033,7 @@ export function createDefaultTools(opts?: {
   }
   // v1.09 (Đội T2): bind the memory v9 Letta tools with the same
   // workspace dir as the v9 tools (same replace-in-place pattern —
-  // same 23 names, never a duplicate). Without this opt the
+  // same 24 names, never a duplicate). Without this opt the
   // placeholders refuse with a clear error (workspaceDir is required).
   if (opts?.getMemoryV9WorkspaceDir) {
     const workspaceDir = opts.getMemoryV9WorkspaceDir();
@@ -1812,6 +2304,86 @@ export function createDefaultTools(opts?: {
       tools = kept;
     }
   }
+  // v1.34 (Đội T2): bind the sandbox v2 tools when the host wires
+  // them (userData dir). Same replace-in-place pattern — same 9
+  // names, never a duplicate.
+  if (opts?.getSandboxV2BaseDir) {
+    const bound = createSandboxV2Tools(
+      opts.getSandboxV2BaseDir,
+      opts.getSandboxV2ToolOptions?.() ?? {},
+    );
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
+  // v1.35 (Đội T2): bind the sandbox v3 tools when the host wires
+  // them (userData dir). Same replace-in-place pattern — same 15
+  // names, never a duplicate.
+  if (opts?.getSandboxV3BaseDir) {
+    const bound = createSandboxV3Tools(
+      opts.getSandboxV3BaseDir,
+      opts.getSandboxV3ToolOptions?.() ?? {},
+    );
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
+  // v1.36 (Đội T4): bind the sandbox v4 tools when the host wires
+  // them (userData dir). Same replace-in-place pattern — same 19
+  // names, never a duplicate.
+  if (opts?.getSandboxV4BaseDir) {
+    const bound = createSandboxV4Tools(
+      opts.getSandboxV4BaseDir,
+      opts.getSandboxV4ToolOptions?.() ?? {},
+    );
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
+  // v1.34 (Đội T4): bind the eval harness v2 tools when the host
+  // wires them (userData dir). Same replace-in-place pattern — same 6
+  // names, never a duplicate.
+  if (opts?.getEvalHarnessV2BaseDir) {
+    const bound = createEvalHarnessV2Tools(
+      opts.getEvalHarnessV2BaseDir,
+      opts.getEvalHarnessV2ToolOptions?.() ?? {},
+    );
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
+  // v1.35 (Đội T4): bind the eval harness v3 tools when the host
+  // wires them (userData dir). Same replace-in-place pattern — same 8
+  // names, never a duplicate.
+  if (opts?.getEvalHarnessV3BaseDir) {
+    const bound = createEvalHarnessV3Tools(
+      opts.getEvalHarnessV3BaseDir,
+      opts.getEvalHarnessV3ToolOptions?.() ?? {},
+    );
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
   // v1.12 (Đội T2): bind the conversation v112 tools when the host
   // wires them (userData dir). Same replace-in-place pattern — same
   // 11 names, never a duplicate.
@@ -1860,6 +2432,78 @@ export function createDefaultTools(opts?: {
       tools = kept;
     }
   }
+  // v1.17 (Đội T4): bind the coding v9 tools when the host wires
+  // them (userData dir). Same replace-in-place pattern — same
+  // 6 names, never a duplicate.
+  if (opts?.getCodingV9BaseDir) {
+    const bound = createCodingV9Tools(
+      opts.getCodingV9BaseDir,
+      opts.getCodingV9ToolOptions?.() ?? {},
+    );
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
+  // v1.18 (Đội T2): bind the coding v10 tools when the host wires
+  // them (userData dir). Same replace-in-place pattern — same
+  // 7 names, never a duplicate.
+  if (opts?.getCodingV10BaseDir) {
+    const bound = createCodingV10Tools(
+      opts.getCodingV10BaseDir,
+      opts.getCodingV10ToolOptions?.() ?? {},
+    );
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
+  // v1.29 (Đội T3): bind the coding v14 tools when the host wires
+  // them (userData dir). Same replace-in-place pattern — same
+  // 6 names, never a duplicate.
+  if (opts?.getCodingV14BaseDir) {
+    const bound = createCodingV14Tools(
+      opts.getCodingV14BaseDir,
+      opts.getCodingV14ToolOptions?.() ?? {},
+    );
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
+  // v1.29 (Đội T2): bind the protocol v5 tools when the host wires
+  // them (same replace-in-place pattern — same 12 names, never a duplicate).
+  if (opts?.getProtocolV5ToolOptions) {
+    const bound = createProtocolV5Tools(opts.getProtocolV5ToolOptions() ?? {});
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
+  // v1.29 (Đội T4): bind the Composio v129 tools when the host wires
+  // them (same replace-in-place pattern — same 10 names, never a duplicate).
+  if (opts?.getComposioV129ToolOptions) {
+    const bound = createComposioV129Tools(opts.getComposioV129ToolOptions() ?? {});
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
   // v1.11 (Đội T5): bind the voice v10 tools when the host wires
   // them (same replace-in-place pattern — same 10 names, never a duplicate).
   if (opts?.getVoiceV10Manager || opts?.hasVoiceV10LiveKey) {
@@ -1881,6 +2525,71 @@ export function createDefaultTools(opts?: {
     const bound = createVoiceV11Tools({
       getManager: opts.getVoiceV11Manager,
     });
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
+  // v1.29 (Đội T5): bind the voice v19 tools when the host wires
+  // them (same replace-in-place pattern — same 13 names, never a duplicate).
+  if (opts?.getVoiceV19Manager || opts?.getVoiceV19Prosody || opts?.getVoiceV19TurnStore || opts?.getVoiceV19ToolOptions) {
+    const bound = createVoiceV19Tools({
+      ...(opts?.getVoiceV19Manager ? { getManager: opts.getVoiceV19Manager } : {}),
+      ...(opts?.getVoiceV19Prosody ? { getProsody: opts.getVoiceV19Prosody } : {}),
+      ...(opts?.getVoiceV19TurnStore ? { getTurnStore: opts.getVoiceV19TurnStore } : {}),
+      ...(opts?.getVoiceV19ToolOptions ? { ...opts.getVoiceV19ToolOptions() } : {}),
+    });
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
+  // v1.29 (Đội T5): bind the voice v20 tools when the host wires
+  // them (same replace-in-place pattern — same 8 names, never a duplicate).
+  if (opts?.getVoiceV20ToolOptions) {
+    const bound = createVoiceV20Tools(opts.getVoiceV20ToolOptions() ?? {});
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
+  // v1.34 (Đội T5): bind the voice v21 tools when the host wires
+  // them (same replace-in-place pattern — same 8 names, never a duplicate).
+  if (opts?.getVoiceV21ToolOptions) {
+    const bound = createVoiceV21Tools(opts.getVoiceV21ToolOptions() ?? {});
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
+  // v1.35 (Đội T5): bind the voice v22 tools when the host wires
+  // them (same replace-in-place pattern — same 6 names, never a duplicate).
+  if (opts?.getVoiceV22ToolOptions) {
+    const bound = createVoiceV22Tools(opts.getVoiceV22ToolOptions() ?? {});
+    const boundNames = new Set(bound.map((t) => t.definition.name));
+    const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+    if (firstIdx !== -1) {
+      const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+      kept.splice(firstIdx, 0, ...bound);
+      tools = kept;
+    }
+  }
+  // v1.36 (Đội T5): bind the voice v23 tools when the host wires
+  // them (same replace-in-place pattern — same 7 names, never a duplicate).
+  if (opts?.getVoiceV23ToolOptions) {
+    const bound = createVoiceV23Tools(opts.getVoiceV23ToolOptions() ?? {});
     const boundNames = new Set(bound.map((t) => t.definition.name));
     const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
     if (firstIdx !== -1) {
@@ -1928,6 +2637,44 @@ export function createDefaultTools(opts?: {
       tools = kept;
     }
   }
+  // v1.18 (Đội T3): bind the router v3 tools when the host wires
+  // them (router state: apiKeys + fetch + config). Same
+  // replace-in-place pattern — same 10 names, never a duplicate.
+  // Without this opt the placeholders use the default state (no
+  // keys: chat tra guidance, local scan dung global fetch).
+  if (opts?.getRouterV3State) {
+    const routerV3State = opts.getRouterV3State();
+    if (routerV3State) {
+      const bound = createRouterV3Tools(routerV3State);
+      const boundNames = new Set(bound.map((t) => t.definition.name));
+      const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+      if (firstIdx !== -1) {
+        const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+        kept.splice(firstIdx, 0, ...bound);
+        tools = kept;
+      }
+    }
+  }
+  // v1.33 (Đội T5): bind the inference broker v2 tools when the host
+  // wires them (broker state: broker + fetch + hasLiveKey). Same
+  // replace-in-place pattern — same 7 names, never a duplicate.
+  if (opts?.getInferenceBrokerV2State) {
+    const brokerV2State = opts.getInferenceBrokerV2State();
+    if (brokerV2State) {
+      const bound = createInferenceBrokerV2Tools(brokerV2State);
+      const boundNames = new Set(bound.map((t) => t.definition.name));
+      const firstIdx = tools.findIndex((t) => boundNames.has(t.definition.name));
+      if (firstIdx !== -1) {
+        const kept = tools.filter((t) => !boundNames.has(t.definition.name));
+        kept.splice(firstIdx, 0, ...bound);
+        tools = kept;
+      }
+    }
+  }
+  // v1.18 merge fix round 1: restore the fleet v12 binding block that
+  // v118-t3 accidentally deleted (it exists in base 063970db and in
+  // every other v118 team branch; without it the 9 fleet_v12_* tools
+  // stay placeholders and never bind to the host userData dir).
   // v1.15 (Đội T6): bind the fleet v12 tools when the host wires
   // them (userData dir). Same replace-in-place pattern — same 9
   // names, never a duplicate.

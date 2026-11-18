@@ -37,11 +37,26 @@ import type { ProtocolV115ToolOptions } from './protocolV115Tools';
 // v1.16 (T2): protocols v2 tools — đăng ký qua registerProtocolV2Tools() dưới đây.
 import { createProtocolV2Tools } from './protocolV2Tools';
 import type { ProtocolV2ToolOptions } from './protocolV2Tools';
+// v1.19 (T3): protocols v3 tools — đăng ký qua registerProtocolV3Tools() dưới đây.
+import { createProtocolV3Tools } from './protocolV3Tools';
+import type { ProtocolV3ToolOptions } from './protocolV3Tools';
+// v1.29 (T2): protocols v5 tools — đăng ký qua registerProtocolV5Tools() dưới đây.
+import { createProtocolV5Tools } from './protocolV5Tools';
+import type { ProtocolV5ToolOptions } from './protocolV5Tools';
+// v1.29 (T4): Composio v6 tools — đăng ký qua registerComposioV129Tools() dưới đây.
+import { createComposioV129Tools } from './composioV129Tools';
+import type { ComposioV129ToolOptions } from './composioV129Tools';
 
 export { PROTOCOL_V115_TOOLS, PROTOCOL_V115_TOOL_NAMES, createProtocolV115Tools, isProtocolV115ToolName } from './protocolV115Tools';
 export type { ProtocolV115ToolOptions } from './protocolV115Tools';
 export { PROTOCOL_V2_TOOLS, PROTOCOL_V2_TOOL_NAMES, createProtocolV2Tools, isProtocolV2ToolName } from './protocolV2Tools';
 export type { ProtocolV2ToolName, ProtocolV2ToolOptions } from './protocolV2Tools';
+export { PROTOCOL_V3_TOOLS, PROTOCOL_V3_TOOL_NAMES, createProtocolV3Tools, isProtocolV3ToolName } from './protocolV3Tools';
+export type { ProtocolV3ToolName, ProtocolV3ToolOptions } from './protocolV3Tools';
+export { PROTOCOL_V5_TOOLS, PROTOCOL_V5_TOOL_NAMES, createProtocolV5Tools, isProtocolV5ToolName } from './protocolV5Tools';
+export type { ProtocolV5ToolName, ProtocolV5ToolOptions } from './protocolV5Tools';
+export { COMPOSIO_V129_TOOLS, COMPOSIO_V129_TOOL_NAMES, createComposioV129Tools, isComposioV129ToolName } from './composioV129Tools';
+export type { ComposioV129ToolOptions } from './composioV129Tools';
 
 export { A2A_TOOLS, A2A_TOOL_NAMES, createA2aTools, createFileTrustedAgentStore, createMemoryTrustedAgentStore, trustedAgentFromCard } from './a2aTools';
 export type { A2aToolOptions, TrustedA2aAgent, TrustedA2aAgentStore } from './a2aTools';
@@ -198,6 +213,45 @@ export class ToolRegistry {
    */
   registerProtocolV2Tools(options: ProtocolV2ToolOptions = {}): void {
     this.registerMany(createProtocolV2Tools(options));
+  }
+
+  /**
+   * v1.19 (T3): protocols v3 tools — negotiate, stateless request,
+   * migration advisor, deprecation gate, MRTR answer validation,
+   * A2A frame validation, AG-UI event build, A2UI v3 render,
+   * Skills-over-MCP catalog, MCP Apps v3 lifecycle + permissions.
+   * The host binds the A2UI catalog, skills catalog and apps
+   * manager via ProtocolV3ToolOptions; without them the tools fall
+   * back to fresh local instances.
+   */
+  registerProtocolV3Tools(options: ProtocolV3ToolOptions = {}): void {
+    this.registerMany(createProtocolV3Tools(options));
+  }
+
+  /**
+   * v1.29 (T2): protocols v5 tools — negotiate, background MCP
+   * tasks (start/get/list/cancel), per-tool permission_policy
+   * (evaluate/set/ask-resolve), MCP OAuth state/reconnect, ACP v2
+   * discover + sessions. The host binds the background-task
+   * runner, token provider, permission registry, auth manager,
+   * ACP registry and ACP client via ProtocolV5ToolOptions; without
+   * them the tools fall back to fresh local instances (or a local
+   * echo simulation, for background tasks and ACP prompts).
+   */
+  registerProtocolV5Tools(options: ProtocolV5ToolOptions = {}): void {
+    this.registerMany(createProtocolV5Tools(options));
+  }
+
+  /**
+   * v1.29 (T4): Composio v6 tools — long jobs submit/poll/get/list/
+   * cancel, mock toolkits list/execute, sandbox create/status, app
+   * bind. The host binds the shared job/sandbox/binding stores +
+   * poll schedules + machine defaults via ComposioV129ToolOptions;
+   * without them the tools fall back to fresh local in-memory
+   * stores (mock-only, no key, no network).
+   */
+  registerComposioV129Tools(options: ComposioV129ToolOptions = {}): void {
+    this.registerMany(createComposioV129Tools(options));
   }
 
   /** Look up a tool by name, or undefined when not registered. */
