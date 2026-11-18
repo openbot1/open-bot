@@ -106,6 +106,10 @@ export type { EvolvedSkill, EvolvedSkillStatus, SkillFeedback, TaskLogEntry } fr
 // index, internal registry, cross-CLI interop, local marketplace, audits ---
 export * from './v13/index';
 
+// --- v1.34 (T1): Agent Skills v14 — strict AAIF validation, dual-path
+// discovery, progressive-disclosure loader, local index, import/export ---
+export * from './v14/index';
+
 // --- v0.14: skill marketplace (install from URL/git) ---
 export {
   installSkillFromUrl,
