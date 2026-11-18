@@ -13,6 +13,8 @@
  * (node -e) trên máy chạy test, dùng binary thật của Node.
  */
 import { test, afterEach } from 'node:test';
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -622,6 +624,89 @@ test('B-computers sandbox: spawn backend lỗi thì fallback chạy thường v�
     assert.ok((result.isolation.warning ?? '').includes('fallback'));
   } else {
     assert.equal(result.isolation.kind, 'bwrap');
+  }
+});
+
+test('B-computers sandbox: stale backend close cannot settle fallback execution', async () => {
+  const binDir = makeTempDir();
+  const fakeBwrap = path.join(binDir, 'bwrap');
+  fs.writeFileSync(
+    fakeBwrap,
+    '#!/bin/sh\\nif [ "$1" = "--version" ]; then echo "bubblewrap 0.9.0"; exit 0; fi\\nexit 1\\n',
+    'utf8',
+  );
+  fs.chmodSync(fakeBwrap, 0o755);
+
+  const realPath = process.env.PATH ?? '';
+  process.env.PATH = `${binDir}:${realPath}`;
+
+  class ControlledChild extends EventEmitter {
+    constructor() {
+      super();
+      this.stdout = new PassThrough();
+      this.stderr = new PassThrough();
+      this.stdin = new PassThrough();
+      this.pid = 12345;
+      this.exitCode = null;
+      this.signalCode = null;
+    }
+
+    kill(signal) {
+      this.killedSignal = signal;
+      return true;
+    }
+  }
+
+  try {
+    const spawned = [];
+    const manager = new BotBoxManager({
+      rootDir: makeTempDir(),
+      spawnProcess(command, args, options) {
+        const child = new ControlledChild();
+        spawned.push({ command, args, options, child });
+        return child;
+      },
+    });
+
+    manager.createBox('stale-close', { isolation: 'bwrap' });
+    let settled = false;
+    const resultPromise = manager
+      .runInBox('stale-close', '/bin/echo', ['fallback-output'])
+      .then((result) => {
+        settled = true;
+        return result;
+      });
+
+    assert.equal(spawned.length, 1);
+    assert.equal(spawned[0].command, 'bwrap');
+    const backend = spawned[0].child;
+
+    backend.emit('error', Object.assign(new Error('spawn bwrap EAGAIN'), { code: 'EAGAIN' }));
+
+    assert.equal(spawned.length, 2);
+    const fallback = spawned[1].child;
+    assert.equal(spawned[1].command, '/bin/echo');
+
+    backend.exitCode = 1;
+    backend.emit('close', 1, null);
+    await Promise.resolve();
+
+    assert.equal(settled, false, 'stale backend close must not settle fallback execution');
+
+    fallback.stdout.write('fallback-output\\n');
+    fallback.exitCode = 23;
+    fallback.emit('close', 23, null);
+
+    const result = await resultPromise;
+    assert.equal(result.exitCode, 23);
+    assert.equal(result.signal, null);
+    assert.match(result.stdout, /fallback-output/);
+    assert.equal(result.isolation.kind, 'none');
+    assert.equal(result.isolation.isolated, false);
+    assert.match(result.isolation.warning ?? '', /fallback/);
+    assert.equal(settled, true);
+  } finally {
+    process.env.PATH = realPath;
   }
 });
 
