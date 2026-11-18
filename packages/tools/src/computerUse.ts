@@ -154,6 +154,7 @@ function runProcess(
   args: string[],
   timeoutMs: number,
   signal?: AbortSignal,
+  spawnProcess: typeof spawn = spawn,
 ): Promise<ProcResult> {
   return new Promise<ProcResult>((resolvePromise, rejectPromise) => {
     let stdoutChunks: Buffer[] = [];
@@ -162,7 +163,7 @@ function runProcess(
     let timedOut = false;
     let settled = false;
 
-    const child = spawn(command, args, {
+    const child = spawnProcess(command, args, {
       env: childEnv(),
       windowsHide: true,
     });
@@ -233,9 +234,10 @@ function runProcess(
 /** Screen size via `xdotool getdisplaygeometry` ("<width> <height>"). */
 export async function getDisplayGeometry(
   signal?: AbortSignal,
+  spawnProcess: typeof spawn = spawn,
 ): Promise<{ width: number; height: number }> {
   requireDisplay();
-  const result = await runProcess('xdotool', ['getdisplaygeometry'], CONTROL_TIMEOUT_MS, signal);
+  const result = await runProcess('xdotool', ['getdisplaygeometry'], CONTROL_TIMEOUT_MS, signal, spawnProcess);
   if (result.code !== 0) {
     throw new Error(
       `xdotool getdisplaygeometry failed (exit ${result.code}): ${result.stderr.trim() || 'no output'}`,
@@ -456,6 +458,8 @@ export interface ComputerUseOptions {
   defaultMaxDurationSeconds?: number;
   /** Default max recording file size in MB (10–500, default 200). */
   defaultMaxFileSizeMB?: number;
+  /** Injectable process spawner for deterministic recording lifecycle tests. */
+  spawnProcess?: typeof spawn;
 }
 
 interface RecordingInfo {
@@ -568,7 +572,8 @@ function finalizeRecording(entry: ActiveRecording, reason: string): Promise<Reco
 
 function makeRecordStartTool(
   recordings: Map<string, ActiveRecording>,
-  defaults: Required<ComputerUseOptions>,
+  defaults: Required<Pick<ComputerUseOptions, 'defaultMaxDurationSeconds' | 'defaultMaxFileSizeMB'>>,
+  spawnProcess: typeof spawn = spawn,
 ): Tool {
   return {
     definition: {
@@ -616,7 +621,7 @@ function makeRecordStartTool(
             `maxFileSizeMB must be between ${MIN_MAX_RECORD_MB} and ${MAX_MAX_RECORD_MB}, got ${maxFileSizeMB}.`,
           );
         }
-        const geometry = await getDisplayGeometry(ctx.signal);
+        const geometry = await getDisplayGeometry(ctx.signal, spawnProcess);
         const rawName = args['filename'] === undefined ? '' : getStringArg(args, 'filename', false);
         const filename =
           rawName.trim() === ''
@@ -629,7 +634,7 @@ function makeRecordStartTool(
         fs.mkdirSync(path.dirname(fullPath), { recursive: true });
 
         const recordingId = randomUUID();
-        const proc = spawn(
+        const proc = spawnProcess(
           'ffmpeg',
           [
             '-y',
@@ -1049,15 +1054,16 @@ function makeTypeTool(): Tool {
  * `opts` overrides the default recording duration / file-size limits.
  */
 export function createComputerUseTools(opts: ComputerUseOptions = {}): Tool[] {
-  const defaults: Required<ComputerUseOptions> = {
+  const defaults: Required<Pick<ComputerUseOptions, 'defaultMaxDurationSeconds' | 'defaultMaxFileSizeMB'>> = {
     defaultMaxDurationSeconds:
       opts.defaultMaxDurationSeconds ?? DEFAULT_MAX_RECORD_SECONDS,
     defaultMaxFileSizeMB: opts.defaultMaxFileSizeMB ?? DEFAULT_MAX_RECORD_MB,
   };
   const recordings = new Map<string, ActiveRecording>();
+  const spawnProcess = opts.spawnProcess ?? spawn;
   return [
     makeScreenshotTool(),
-    makeRecordStartTool(recordings, defaults),
+    makeRecordStartTool(recordings, defaults, spawnProcess),
     makeRecordStopTool(recordings),
     makeMouseMoveTool(),
     makeClickTool(),
