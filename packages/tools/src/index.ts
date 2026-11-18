@@ -211,6 +211,22 @@ export type {
   PluginPermission,
 } from './plugins/types';
 export { PluginLoadError, PLUGIN_PERMISSIONS } from './plugins/types';
+export {
+  PLUGIN_SDK_V4_MIN_SUPPORTED,
+  PLUGIN_SDK_V4_VERSION,
+  checkPluginSdkV4Capabilities,
+  parsePluginSdkV4ManifestJson,
+  pluginSdkV4ManifestToV3,
+  pluginSdkV4NeedsShellApproval,
+  summarizePluginSdkV4Sandbox,
+} from './plugins/sdkV4';
+export type {
+  PluginSdkV4CapabilityReq,
+  PluginSdkV4Dependency,
+  PluginSdkV4Manifest,
+  PluginSdkV4SandboxLimits,
+  PluginSdkV4SandboxSummary,
+} from './plugins/sdkV4';
 export type { Tool, ToolContext, ToolDefinition } from '@open-bot/core';
 
 export { createShellTools, defaultElevateRunner, SHELL_TOOLS } from './shellTools';
@@ -235,6 +251,35 @@ export type {
   BrowserPageDriver,
   BrowserLauncher,
 } from './browserAutomation';
+// --- v1.33 (Đội T4): browser driver v2 (a11y-tree snapshot + diff,
+// egress gate, vision fallback, Playwright MCP server mode,
+// WebVoyager-local eval) — 8 agent tool mới ---
+export {
+  createBrowserV2Tools,
+  createBrowserV2ToolsSession,
+  BROWSER_V2_TOOLS,
+} from './browserV2Tools';
+export type {
+  BrowserV2ToolsOptions,
+  BrowserV2ToolsSession,
+} from './browserV2Tools';
+export {
+  BrowserV2Session,
+  createBrowserV2Session,
+  launchPlaywrightBrowserV2,
+  BrowserEgressGate,
+  SnapshotCache,
+  VisionFallback,
+  PlaywrightMcpServer,
+  createPlaywrightMcpServer,
+  PLAYWRIGHT_MCP_TOOLS,
+  runWebVoyagerEval,
+  renderWebVoyagerReport,
+  WEBVOYAGER_TASKS,
+  parseAriaSnapshot,
+  serializeAriaSnapshot,
+  diffSnapshots,
+} from './browserV2/index';
 export {
   createWebMediaTools,
   WEB_MEDIA_TOOLS,
@@ -359,6 +404,21 @@ export type { MemoryV14ToolOptions } from './memoryV14Tools';
 // --- v1.16 (Doi T1): memory v15 tools (consolidate Mem0-v3 add-only, hybrid search 4 tin hieu, state-at, time-travel, block edit, block list, sleep reorganize, eval 40 case) ---
 export { createMemoryV15Tools, MEMORY_V15_TOOLS, MEMORY_V15_TOOL_NAMES } from './memoryV15Tools';
 export type { MemoryV15ToolOptions } from './memoryV15Tools';
+// --- v1.35 (Doi T1): memory v16 tools (core_memory_replace exact-match, block edit/list/pin, sleep consolidate + reorganize, extract/fuse da scope, validity set/query, archival recall/promote, eval 40 case) ---
+export { createMemoryV16Tools, MEMORY_V16_TOOLS, MEMORY_V16_TOOL_NAMES } from './memoryV16Tools';
+export type { MemoryV16ToolOptions } from './memoryV16Tools';
+// --- v1.18 (Doi T1): memory v17 tools (block lifecycle v2, sleep scheduler v2, archival scoring promote/demote, block versioning + audit git-backed, admission pipeline guard v2, eval 25 case) ---
+export { createMemoryV17Tools, MEMORY_V17_TOOLS, MEMORY_V17_TOOL_NAMES } from './memoryV17Tools';
+export type { MemoryV17ToolOptions } from './memoryV17Tools';
+// --- v1.36 (Doi T1): memory v17 mem0-style tools (add-only extract, entity linking, conflict resolver, fusion search, bi-temporal, scope audit, eval 40 case) ---
+export { createMemoryV17Mem0Tools, MEMORY_V17_MEM0_TOOLS, MEMORY_V17_MEM0_TOOL_NAMES } from './memoryV17Mem0Tools';
+export type { MemoryV17Mem0ToolOptions } from './memoryV17Mem0Tools';
+// --- v1.19 (Doi T1-TEST): memory v18 tools (extract v2, hybrid retrieval, block guardrail v3, bi-temporal, poisoning screen v3, GDPR erase, sleep consolidation v2, LOCOMO eval) ---
+export { createMemoryV18Tools, MEMORY_V18_TOOLS, MEMORY_V18_TOOL_NAMES } from './memoryV18Tools';
+export type { MemoryV18ToolOptions } from './memoryV18Tools';
+// --- v1.29 (Doi T1): memory v21 tools (portable memory OKF/MemFS/OpenHands: export/import/convert/validate/sync/tombstone/version/sleep/record/bundle-info) ---
+export { createMemoryV21Tools, MEMORY_V21_TOOLS, MEMORY_V21_TOOL_NAMES } from './memoryV21Tools';
+export type { MemoryV21ToolOptions } from './memoryV21Tools';
 export type { MemoryV9LettaToolOptions } from './memoryV9LettaTools';
 // --- v1.08 (Đội T2): coding agent v2 tools (repo map PageRank symbol-level, architect mode planner/editor, git-first commit/diff/revert/squash) ---
 export { createCodingV2Tools, CODING_V2_TOOLS, CODING_V2_TOOL_NAMES, isCodingV2ToolName } from './codingV2Tools';
@@ -399,6 +459,19 @@ export type { CodingV6ToolOptions, CodingV6ToolName } from './codingV6Tools';
 // condenser v3 + Skills + eval) ---
 export { createCodingV7Tools, CODING_V7_TOOLS, CODING_V7_TOOL_NAMES, isCodingV7ToolName, codingV7DataDir } from './codingV7Tools';
 export type { CodingV7ToolOptions, CodingV7ToolName } from './codingV7Tools';
+// --- v1.17 (Đội T4): coding agent v9 tools (AST-aware edit +
+// sandbox loop + atomic commit + draft-PR + eval + agent) ---
+export { createCodingV9Tools, CODING_V9_TOOLS, CODING_V9_TOOL_NAMES, isCodingV9ToolName, codingV9DataDir, codingV9EnsureDataDir } from './codingV9Tools';
+export type { CodingV9ToolOptions, CodingV9ToolName } from './codingV9Tools';
+// --- v1.18 (Đội T2): coding agent v10 tools (event-sourced session +
+// CodeAct execution + repo map hierarchical summaries + edit
+// strategies + versioned eval + agent) ---
+export { createCodingV10Tools, CODING_V10_TOOLS, CODING_V10_TOOL_NAMES, isCodingV10ToolName, codingV10DataDir, codingV10SessionsDir, codingV10EvalDir, codingV10EnsureDataDir } from './codingV10Tools';
+export type { CodingV10ToolOptions, CodingV10ToolName } from './codingV10Tools';
+// --- v1.29 (Đội T3): coding agent v14 tools (incremental condenser +
+// stuck detection v2 + recovery + reasoning-block persistence + agent/resume) ---
+export { createCodingV14Tools, CODING_V14_TOOLS, CODING_V14_TOOL_NAMES, isCodingV14ToolName, codingV14DataDir, codingV14RunLogsDir, codingV14ReasoningDir, codingV14EnsureDataDir, codingV14EnsureBaseDir } from './codingV14Tools';
+export type { CodingV14ToolOptions, CodingV14ToolName } from './codingV14Tools';
 // --- v1.06 (Đội T4): voice realtime v5 tools (multi-model router,
 // adaptive VAD config, diarized speakers + transcript, sessions) ---
 export { createVoiceV5Tools, VOICE_V5_TOOLS, VOICE_V5_TOOL_NAMES, isVoiceV5ToolName } from './voiceV5Tools';
@@ -435,6 +508,27 @@ export { createVoiceV14Tools, VOICE_V14_TOOLS, VOICE_V14_TOOL_NAMES, isVoiceV14T
 export type { VoiceV14ToolOptions, VoiceV14ManagerLike, VoiceV14SessionLike } from './voiceV14Tools';
 export { createVoiceV15Tools, VOICE_V15_TOOLS, VOICE_V15_TOOL_NAMES, isVoiceV15ToolName } from './voiceV15Tools';
 export type { VoiceV15ToolOptions } from './voiceV15Tools';
+export { createVoiceV16Tools, VOICE_V16_TOOLS, VOICE_V16_TOOL_NAMES, isVoiceV16ToolName } from './voiceV16Tools';
+export type { VoiceV16ToolOptions } from './voiceV16Tools';
+// --- v1.18 (Đội T5): voice v17 realtime — VAD v5 + barge-in v5 +
+// TTS streaming v3 + turn-taking v5 + multi-voice profiles v2 ---
+export { createVoiceV17Tools, VOICE_V17_TOOLS, VOICE_V17_TOOL_NAMES, isVoiceV17ToolName } from './voiceV17Tools';
+export type { VoiceV17ToolOptions } from './voiceV17Tools';
+// --- v1.19 (Đội T5): voice v18 realtime — VAD v6 adaptive +
+// noise chain, barge-in v6, TTS streaming v4, profiles v3,
+// realtime v3 + recovery, eval v18 (13 tools) ---
+export { createVoiceV18Tools, VOICE_V18_TOOLS, VOICE_V18_TOOL_NAMES, isVoiceV18ToolName } from './voiceV18Tools';
+export type { VoiceV18ToolOptions } from './voiceV18Tools';
+// --- v1.27 (Đội T5): voice v19 realtime — session manager v19,
+// prosody control, eval v19, open-turn resume (13 tools) ---
+// Ported into v1.29 from merge/v128; wired into ALL_TOOLS here
+// (v128 exported it but never spread it).
+export { createVoiceV19Tools, VOICE_V19_TOOLS, VOICE_V19_TOOL_NAMES, isVoiceV19ToolName } from './voiceV19Tools';
+export type { VoiceV19ToolOptions } from './voiceV19Tools';
+// --- v1.29 (Đội T5): voice v20 extensions — session persistence,
+// resume v2, open-turn v8, transcript accuracy, extended eval (8 tools) ---
+export { createVoiceV20Tools, VOICE_V20_TOOLS, VOICE_V20_TOOL_NAMES, isVoiceV20ToolName } from './voiceV20Tools';
+export type { VoiceV20ToolOptions } from './voiceV20Tools';
 // --- v1.10 (Đội T5): AG-UI generative UI v2 tools (suggest, validate,
 // request, answer, pending, capabilities) ---
 export { createAguiV2Tools, AGUI_V2_TOOLS, AGUI_V2_TOOL_NAMES, isAguiV2ToolName, AGUI_V2_DEFAULT_CAPABILITIES } from './aguiV2Tools';
@@ -448,6 +542,17 @@ export type { TeamsDashboardToolOptions } from './teamsDashboardTools';
 // MCP discover) ---
 export { createProtocolV115Tools, PROTOCOL_V115_TOOLS, PROTOCOL_V115_TOOL_NAMES, isProtocolV115ToolName } from './protocolV115Tools';
 export type { ProtocolV115ToolOptions } from './protocolV115Tools';
+// --- v1.19 (T3): protocols v3 tools (negotiate, stateless request,
+// migration advisor, deprecation gate, MRTR answer validation, A2A
+// frame validation, AG-UI event, A2UI v3 render, Skills catalog,
+// MCP Apps v3 lifecycle + permissions) ---
+export { createProtocolV3Tools, PROTOCOL_V3_TOOLS, PROTOCOL_V3_TOOL_NAMES, isProtocolV3ToolName } from './protocolV3Tools';
+export type { ProtocolV3ToolName, ProtocolV3ToolOptions } from './protocolV3Tools';
+// --- v1.29 (T2): protocols v5 tools (negotiate, background MCP tasks,
+// per-tool permission_policy, OAuth elicitation/reconnect, ACP v2
+// discover + sessions) ---
+export { createProtocolV5Tools, PROTOCOL_V5_TOOLS, PROTOCOL_V5_TOOL_NAMES, isProtocolV5ToolName } from './protocolV5Tools';
+export type { ProtocolV5ToolName, ProtocolV5ToolOptions } from './protocolV5Tools';
 export { createSessionHandoffTools, SESSION_HANDOFF_TOOLS, SESSION_HANDOFF_TOOL_NAMES } from './handoffTools';
 export type { SessionHandoffToolOptions } from './handoffTools';
 export { createA2aTools, A2A_TOOLS } from './a2aTools';

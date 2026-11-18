@@ -362,7 +362,12 @@ export function searchFilesDeep(opts: SearchFilesDeepOptions): SearchFilesDeepRe
       timedOut = true;
       break;
     }
-    if (Date.now() > deadline) {
+    // The deadline check must not fire before the first file is even
+    // attempted: with a 1ms budget the collect phase alone can eat
+    // the budget, and the search would report "timed out, 0 matches"
+    // although matches exist. The in-loop check (every 200 lines)
+    // still bounds the first file, so partial results survive.
+    if (Date.now() > deadline && (filesSearched > 0 || matches.length > 0)) {
       timedOut = true;
       break;
     }
