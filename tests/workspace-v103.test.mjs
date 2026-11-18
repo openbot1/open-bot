@@ -516,7 +516,7 @@ test('tools: 7 workspace_* tools trong ALL_TOOLS đúng 1 lần (ALL_TOOLS = 82:
   const names = ALL_TOOLS.map((t) => t.definition.name);
   // 345 là tổng registry agent (defaultToolFactory — xem
   // tests/rescue-v102-tools.test.mjs); ALL_TOOLS chỉ là tập tool gốc.
-  assert.equal(names.length, 359, `expected 359 tools in ALL_TOOLS, got ${names.length}`); // v1.10 merge: 236 + 53 = 289; v1.11 merge: 289 + 70 = 359
+  assert.equal(names.length, 899, `expected 899 tools in ALL_TOOLS, got ${names.length}`); // v1.36 re-pin: 825 + 74 = 899.
   assert.equal(new Set(names).size, names.length, 'duplicate tool names');
   const create = ALL_TOOLS.find((t) => t.definition.name === 'workspace_create');
   assert.equal(create.needsApproval, true);
