@@ -13,6 +13,8 @@
 
 import { useT } from '../i18n/useT';
 import type { ComposioToolkitConnectionView } from '../types';
+import { ComposioToolkitPrefsSection } from './ComposioToolkitPrefsSection';
+import type { ComposioToolkitPrefsSectionProps } from './ComposioToolkitPrefsSection';
 
 export interface ComposioAppToggle {
   /** Toolkit slug, e.g. 'gmail'. */
@@ -69,6 +71,13 @@ export interface ComposioAppsSectionProps {
   connectionError?: string;
   /** v0.89c: check the status of the enabled toolkits. */
   onCheckConnectionStatus: () => void;
+  /**
+   * v1.20 (Doi T4): per-toolkit prefs (action on/off + default
+   * params + quota) — null/undefined = section hidden (host has
+   * not wired the v120 prefs IPC yet). When provided, the
+   * section renders inside the Composio panel.
+   */
+  toolkitPrefs?: ComposioToolkitPrefsSectionProps | null;
 }
 
 export function ComposioAppsSection(props: ComposioAppsSectionProps) {
@@ -201,6 +210,12 @@ export function ComposioAppsSection(props: ComposioAppsSectionProps) {
               ? t('settings.composio.connectionChecking')
               : t('settings.composio.connectionCheck')}
           </button>
+
+          {/* v1.20 (Doi T4): per-toolkit prefs — action on/off,
+              default params, quota. Rendered only when the host
+              passes toolkitPrefs (SettingsView wires it to the
+              v120 prefs + usage stores). */}
+          {props.toolkitPrefs && <ComposioToolkitPrefsSection {...props.toolkitPrefs} />}
 
           <p className="hint">{t('settings.composio.routerNote')}</p>
         </div>

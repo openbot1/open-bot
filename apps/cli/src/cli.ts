@@ -71,6 +71,29 @@ import {
   validateHarborTask,
   validateRolloutJsonl,
   writeRolloutJsonl,
+  // v1.34 (Đội T4): Eval Harness v2 — task container hoá 2 loại +
+  // oracle + runner song song + scorer 4 chiều + regression gate.
+  BUILTIN_EVAL_HARNESS_V2_SUITE,
+  DEFAULT_EVAL_HARNESS_V2_GATE_THRESHOLDS,
+  buildEvalHarnessV2Baseline,
+  builtinEvalHarnessV2Tasks,
+  checkEvalHarnessV2Regression,
+  defaultEvalHarnessV2TasksDir,
+  loadEvalHarnessV2Baseline,
+  loadEvalHarnessV2TaskFromDir,
+  loadEvalHarnessV2TasksFromDir,
+  materializeBuiltinEvalHarnessV2Tasks,
+  noopEvalHarnessV2Executor,
+  renderEvalHarnessV2GateText,
+  renderEvalHarnessV2SuiteText,
+  renderOracleValidationText,
+  runEvalHarnessV2Suite,
+  runEvalHarnessV2Task,
+  saveEvalHarnessV2Baseline,
+  saveEvalHarnessV2Report,
+  scriptedEvalHarnessV2Executor,
+  validateEvalHarnessV2Task,
+  validateOracleSolution,
   HeadlessJobRunner,
   HOOK_COMMANDS_FILE,
   JsonFileRoutineStore,
@@ -171,6 +194,11 @@ import type {
   CreateBotProviderConfig,
   DoctorCheckId,
   HarborRunResult,
+  EvalHarnessV2AgentResult,
+  EvalHarnessV2Executor,
+  EvalHarnessV2Suite,
+  EvalHarnessV2SuiteResult,
+  EvalHarnessV2Task,
   RiskRule,
   HookCommandSettingsEntry,
   HookEventKind,
@@ -309,6 +337,32 @@ DÙNG:
   open-bot eval harbor report [--json]
                 (v1.11) Báo cáo tổng hợp từ các lần chạy Harbor đã
                 lưu (pass rate, reward, thời gian, token).
+  open-bot eval-harness list [--json]
+                (v1.34) Liệt kê task Eval Harness v2 mẫu + task trên
+                đĩa <dataDir>/eval-harness-v2-tasks (2 loại:
+                issue-patch kiểu SWE-bench và state-check kiểu
+                terminal-bench, mỗi task có oracle solution).
+  open-bot eval-harness validate <taskId|dir> [--oracle] [--json]
+                (v1.34) Validate một task v2 (format, oracle bắt buộc,
+                đường dẫn an toàn, lệnh test không phá hoại). --oracle
+                chạy thêm oracle để chứng minh task giải được.
+  open-bot eval-harness run <taskId> [--trials N] [--concurrency N] [--agent-files FILE.json] [--json]
+                (v1.34) Chạy một task N trial trong sandbox, chấm bằng
+                test xác định (không LLM judge). --agent-files là JSON
+                {đường dẫn: nội dung} mà agent (scripted) sẽ tạo;
+                không truyền thì chạy no-op. Exit 0 khi pass rate = 1,
+                exit 1 khi có trial fail.
+  open-bot eval-harness suite [--tasks a,b] [--trials N] [--concurrency N] [--agent-files-by-task FILE.json] [--json]
+                (v1.34) Chạy bộ task mẫu (hoặc danh sách --tasks), gom
+                báo cáo 4 chiều (đúng/sai, thời gian, bước, chi phí) +
+                Wilson CI 95%, lưu report JSON.
+  open-bot eval-harness baseline [--trials N] [--concurrency N] [--agent-files-by-task FILE.json] [--json]
+                (v1.34) Chạy suite rồi lưu điểm làm baseline local
+                (<dataDir>/eval-harness-v2/baseline.json) cho gate.
+  open-bot eval-harness gate [--trials N] [--concurrency N] [--agent-files-by-task FILE.json] [--json]
+                (v1.34) Regression gate cho CI: chạy suite rồi so với
+                baseline đã lưu — tụt quá ngưỡng thì FAIL, kèm task
+                nào tụt. Chưa có baseline thì PASS và lưu baseline mới.
 
 LỆNH:
   run           Chạy 1 prompt qua 1 bot, in kết quả ra stdout.
@@ -2511,6 +2565,315 @@ async function cmdEvalHarbor(
 }
 
 /**
+ * Lệnh `eval-harness ...` (v1.34, Đội T4) — Eval Harness v2 từ terminal.
+ *
+ * Các lệnh con (xem HELP): list / validate / run / suite / baseline /
+ * gate. Mọi lần chạy đều trong sandbox (bwrap khi có, fallback local
+ * có cảnh báo); agent chạy bằng executor scripted theo file JSON
+ * (--agent-files / --agent-files-by-task) hoặc no-op khi không truyền
+ * — CLI không gọi model trực tiếp, nên `eval-harness` không cần API
+ * key. Exit 0 khi trial pass rate = 1 (run/suite) hoặc gate PASS,
+ * exit 1 khi có trial fail / gate FAIL (để CI/script dùng được).
+ */
+async function cmdEvalHarnessV2(
+  action: string | undefined,
+  rest: string[],
+  flags: CliFlags,
+  dataDir: string,
+): Promise<number> {
+  const asJson = flags['json'] === true;
+  const out = (obj: unknown, text: string): void => {
+    process.stdout.write(asJson ? `${JSON.stringify(obj, null, 2)}\n` : text);
+  };
+  const tasksDir = defaultEvalHarnessV2TasksDir(dataDir);
+  const loadAvailableTasks = (): {
+    tasks: EvalHarnessV2Task[];
+    skipped: Array<{ dir: string; reason: string }>;
+  } => {
+    materializeBuiltinEvalHarnessV2Tasks(tasksDir);
+    const loaded = loadEvalHarnessV2TasksFromDir(tasksDir);
+    const byId = new Map(builtinEvalHarnessV2Tasks().map((t) => [t.id, t]));
+    for (const task of loaded.tasks) byId.set(task.id, task);
+    return {
+      tasks: [...byId.values()].sort((a, b) => a.id.localeCompare(b.id)),
+      skipped: loaded.skipped,
+    };
+  };
+  const readJsonFile = (filePath: string, what: string): Record<string, unknown> => {
+    try {
+      return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as Record<string, unknown>;
+    } catch (err) {
+      fail(`Không đọc được ${what} "${filePath}": ${(err as Error).message}`);
+    }
+  };
+  /** Đọc plan scripted: {taskId: {files, commands?, steps?, inputTokens?, outputTokens?}}. */
+  const readAgentPlan = (filePath: string): Record<string, EvalHarnessV2AgentResult> => {
+    const parsed = readJsonFile(filePath, 'agent plan');
+    const plan: Record<string, EvalHarnessV2AgentResult> = {};
+    for (const [taskId, entry] of Object.entries(parsed)) {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+        fail(`agent plan "${filePath}": giá trị của "${taskId}" phải là object {files, commands?, steps?, ...}.`);
+      }
+      const rec = entry as Record<string, unknown>;
+      const files = rec['files'];
+      if (!files || typeof files !== 'object' || Array.isArray(files)) {
+        fail(`agent plan "${filePath}": "${taskId}.files" phải là object {đường dẫn: nội dung}.`);
+      }
+      const mapped: Record<string, string> = {};
+      for (const [key, value] of Object.entries(files as Record<string, unknown>)) {
+        if (typeof value !== 'string') {
+          fail(`agent plan "${filePath}": giá trị của "${taskId}.files.${key}" phải là chuỗi.`);
+        }
+        mapped[key] = value;
+      }
+      const commands = rec['commands'];
+      if (commands !== undefined && (!Array.isArray(commands) || commands.some((c) => typeof c !== 'string'))) {
+        fail(`agent plan "${filePath}": "${taskId}.commands" phải là mảng chuỗi.`);
+      }
+      plan[taskId] = {
+        files: mapped,
+        commands: (commands as string[] | undefined) ?? [],
+        steps: typeof rec['steps'] === 'number' ? rec['steps'] : 0,
+        inputTokens: typeof rec['inputTokens'] === 'number' ? rec['inputTokens'] : 0,
+        outputTokens: typeof rec['outputTokens'] === 'number' ? rec['outputTokens'] : 0,
+      };
+    }
+    return plan;
+  };
+  const flagNumber = (name: string, defaultValue: number): number => {
+    const raw = flags[name];
+    if (raw === undefined || raw === true) return defaultValue;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n <= 0) {
+      fail(`--${name} phải là số > 0 (nhận "${String(raw)}").`);
+    }
+    return Math.floor(n);
+  };
+  const resolveExecutor = (): {
+    executor: EvalHarnessV2Executor;
+    agentLabel: string;
+    plan: Record<string, EvalHarnessV2AgentResult>;
+  } => {
+    const byTaskFlag = typeof flags['agent-files-by-task'] === 'string' ? flags['agent-files-by-task'] : '';
+    const filesFlag = typeof flags['agent-files'] === 'string' ? flags['agent-files'] : '';
+    const plan: Record<string, EvalHarnessV2AgentResult> = {};
+    if (byTaskFlag !== '') Object.assign(plan, readAgentPlan(byTaskFlag));
+    if (filesFlag !== '') {
+      // --agent-files: {đường dẫn: nội dung} cho task đang chạy (run 1 task).
+      const parsed = readJsonFile(filesFlag, 'agent files');
+      const files: Record<string, string> = {};
+      for (const [key, value] of Object.entries(parsed)) {
+        if (typeof value !== 'string') {
+          fail(`agent-files "${filesFlag}": giá trị của "${key}" phải là chuỗi.`);
+        }
+        files[key] = value;
+      }
+      const target = rest[0] ?? '';
+      if (target !== '') {
+        plan[target] = { files, commands: [], steps: 0, inputTokens: 0, outputTokens: 0 };
+      }
+    }
+    if (Object.keys(plan).length > 0) {
+      return { executor: scriptedEvalHarnessV2Executor(plan), agentLabel: 'scripted', plan };
+    }
+    return { executor: noopEvalHarnessV2Executor, agentLabel: 'noop', plan };
+  };
+  const runSuiteAndReport = async (
+    selected: EvalHarnessV2Task[],
+    suiteId: string,
+  ): Promise<EvalHarnessV2SuiteResult> => {
+    const { executor, agentLabel } = resolveExecutor();
+    const trials = flagNumber('trials', 0);
+    const suite: EvalHarnessV2Suite = {
+      id: suiteId,
+      name: 'Eval Harness v2 suite',
+      description: '',
+      tasks: selected,
+    };
+    return runEvalHarnessV2Suite(suite, executor, {
+      ...(trials === 0 ? {} : { trials }),
+      concurrency: flagNumber('concurrency', 4),
+      agentLabel,
+      // Không lưu report ở đây — lệnh con tự lưu khi cần (suite lưu
+      // report, baseline lưu baseline) để tránh ghi trùng file.
+      saveReport: false,
+    });
+  };
+
+  switch (action) {
+    case 'list': {
+      const { tasks, skipped } = loadAvailableTasks();
+      out(
+        {
+          tasks: tasks.map((t) => ({
+            id: t.id,
+            name: t.name,
+            kind: t.kind,
+            difficulty: t.difficulty,
+            description: t.description,
+            tests: t.tests.map((x) => x.id),
+            hasOracle:
+              Object.keys(t.oracle.files ?? {}).length > 0 ||
+              (t.oracle.commands ?? []).length > 0,
+            timeoutMs: t.timeoutMs,
+          })),
+          skippedDirs: skipped.length,
+        },
+        tasks.length === 0
+          ? 'Chưa có task Eval Harness v2 nào.\n'
+          : `${tasks
+              .map(
+                (t) =>
+                  `${t.id}  [${t.kind}/${t.difficulty}] ${t.name} — ${t.description} (tests: ${t.tests
+                    .map((x) => x.id)
+                    .join(', ')})`,
+              )
+              .join('\n')}\n`,
+      );
+      return 0;
+    }
+    case 'validate': {
+      const target = rest[0] ?? '';
+      if (target === '') {
+        fail('eval-harness validate cần <taskId|dir>: open-bot eval-harness validate v2-sample-add.');
+      }
+      const checkOracle = flags['oracle'] === true;
+      if (fs.existsSync(target) && fs.statSync(target).isDirectory()) {
+        let task: EvalHarnessV2Task;
+        try {
+          task = loadEvalHarnessV2TaskFromDir(target);
+        } catch (err) {
+          out(
+            { valid: false, issues: [{ field: 'task', message: (err as Error).message }] },
+            `Task không hợp lệ:\n  - task: ${(err as Error).message}\n`,
+          );
+          return 1;
+        }
+        let oracleText = '';
+        let oracleValid: boolean | null = null;
+        if (checkOracle) {
+          const oracleResult = await validateOracleSolution(task);
+          oracleValid = oracleResult.valid;
+          oracleText = renderOracleValidationText(oracleResult);
+        }
+        const valid = oracleValid ?? true;
+        out(
+          { taskId: task.id, valid, oracleValid },
+          `Task "${task.id}" hợp lệ.\n${oracleText}`,
+        );
+        return valid ? 0 : 1;
+      }
+      const { tasks } = loadAvailableTasks();
+      const found = tasks.find((t) => t.id === target);
+      if (!found) {
+        fail(`Không có task Eval Harness v2 "${target}". Xem bằng: open-bot eval-harness list.`);
+      }
+      const validation = validateEvalHarnessV2Task(found);
+      let oracleText = '';
+      let oracleValid: boolean | null = null;
+      if (checkOracle && validation.valid) {
+        const oracleResult = await validateOracleSolution(found);
+        oracleValid = oracleResult.valid;
+        oracleText = renderOracleValidationText(oracleResult);
+      }
+      const valid = validation.valid && (oracleValid ?? true);
+      out(
+        { taskId: found.id, valid, issues: validation.issues, warnings: validation.warnings, oracleValid },
+        valid
+          ? `Task "${found.id}" hợp lệ.\n${oracleText}`
+          : `Task "${found.id}" không hợp lệ:\n${validation.issues
+              .map((i) => `  - ${i.field}: ${i.message}`)
+              .join('\n')}\n${oracleText}`,
+      );
+      return valid ? 0 : 1;
+    }
+    case 'run': {
+      const taskId = rest[0] ?? '';
+      if (taskId === '') {
+        fail('eval-harness run cần <taskId>: open-bot eval-harness run v2-sample-add.');
+      }
+      const { tasks } = loadAvailableTasks();
+      const task = tasks.find((t) => t.id === taskId);
+      if (!task) {
+        fail(`Không có task Eval Harness v2 "${taskId}". Xem bằng: open-bot eval-harness list.`);
+      }
+      const { executor, agentLabel } = resolveExecutor();
+      const trials = flagNumber('trials', 0);
+      const result = await runEvalHarnessV2Task(task, executor, {
+        ...(trials === 0 ? {} : { trials }),
+        concurrency: flagNumber('concurrency', 4),
+      });
+      const text = [
+        `Task ${task.id} [${task.kind}/${task.difficulty}] — agent ${agentLabel}, pass rate ${(result.passRate * 100).toFixed(1)}%, mean score ${result.meanScore.toFixed(3)}`,
+        ...result.trials.map(
+          (t) =>
+            `  ${t.status === 'pass' ? 'PASS' : t.status.toUpperCase()}  ${t.trialId} score ${t.score.toFixed(2)}, ${t.durationMs}ms, ${t.steps} steps, $${t.estimatedCostUsd.toFixed(4)} — ${t.reason}`,
+        ),
+      ].join('\n');
+      out({ agentLabel, ...result }, `${text}\n`);
+      return result.passRate === 1 ? 0 : 1;
+    }
+    case 'suite': {
+      const tasksFlag = typeof flags['tasks'] === 'string' ? flags['tasks'] : '';
+      const requested = tasksFlag === '' ? [] : tasksFlag.split(',').map((s) => s.trim()).filter((s) => s !== '');
+      const { tasks } = loadAvailableTasks();
+      const selected = requested.length === 0 ? tasks : tasks.filter((t) => requested.includes(t.id));
+      if (selected.length === 0) {
+        fail('Không có task nào được chọn. Xem bằng: open-bot eval-harness list.');
+      }
+      const missing = requested.filter((id) => !tasks.some((t) => t.id === id));
+      if (missing.length > 0) fail(`Không có task Eval Harness v2: ${missing.join(', ')}.`);
+      const result = await runSuiteAndReport(
+        selected,
+        requested.length === 0 ? BUILTIN_EVAL_HARNESS_V2_SUITE.id : 'v2-custom',
+      );
+      const reportPath = saveEvalHarnessV2Report(dataDir, result);
+      out(
+        { reportPath, ...result },
+        `${renderEvalHarnessV2SuiteText(result)}Report saved to: ${reportPath}\n`,
+      );
+      return result.trialPassRate === 1 ? 0 : 1;
+    }
+    case 'baseline': {
+      const { tasks } = loadAvailableTasks();
+      const result = await runSuiteAndReport(tasks, BUILTIN_EVAL_HARNESS_V2_SUITE.id);
+      const baseline = buildEvalHarnessV2Baseline(result);
+      const baselinePath = saveEvalHarnessV2Baseline(dataDir, baseline);
+      out(
+        { baselinePath, ...baseline },
+        `Baseline đã lưu: ${baselinePath}\n` +
+          `Suite ${baseline.suiteId} — trial pass rate ${(baseline.trialPassRate * 100).toFixed(1)}%, ` +
+          `task pass rate ${(baseline.taskPassRate * 100).toFixed(1)}%, mean score ${baseline.meanScore.toFixed(3)}.\n`,
+      );
+      return 0;
+    }
+    case 'gate': {
+      const { tasks } = loadAvailableTasks();
+      const result = await runSuiteAndReport(tasks, BUILTIN_EVAL_HARNESS_V2_SUITE.id);
+      const baseline = loadEvalHarnessV2Baseline(dataDir);
+      const gate = checkEvalHarnessV2Regression(
+        baseline,
+        result,
+        DEFAULT_EVAL_HARNESS_V2_GATE_THRESHOLDS,
+      );
+      if (gate.noBaseline) {
+        // Lần chạy đầu: lưu luôn làm baseline để lần sau có cái để so.
+        saveEvalHarnessV2Baseline(dataDir, buildEvalHarnessV2Baseline(result));
+      }
+      out({ ...gate }, `${renderEvalHarnessV2GateText(gate)}`);
+      return gate.passed ? 0 : 1;
+    }
+    case undefined:
+      fail('eval-harness cần lệnh con: list | validate | run | suite | baseline | gate (vd: open-bot eval-harness list).');
+      break;
+    default:
+      fail(`Không rõ lệnh eval-harness "${action}".`);
+      break;
+  }
+  return 0;
+}
+
+/**
  * Lệnh `eval` (v1.06, Đội T6) — chạy eval benchmark từ terminal:
  *
  *   open-bot eval memory|mcp|all [--json] [--out FILE]
@@ -2921,6 +3284,9 @@ async function main(argv: string[]): Promise<number> {
   }
   if (cmd === 'eval') {
     return cmdEval(sub, positional.slice(2), flags);
+  }
+  if (cmd === 'eval-harness') {
+    return cmdEvalHarnessV2(sub, positional.slice(2), flags, resolveDataDir(flags));
   }
   if (cmd === 'coding-v7') {
     return cmdCodingV7(sub, positional.slice(2), flags, resolveDataDir(flags));
