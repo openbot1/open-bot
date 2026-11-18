@@ -954,6 +954,12 @@ export function defaultToolFactory(
     createLocalTools(opts?: { getDaemon?: () => ShellDaemonLike | null }): Tool[];
     createComputerUseTools(opts?: Record<string, unknown>): Tool[];
     createBrowserTools(opts?: Record<string, unknown>): Tool[];
+    /** v1.33 (Đội T4): browser driver v2 tools (browser_v2_navigate /
+     * browser_snapshot / browser_click_ref / browser_type_ref /
+     * browser_click_at / browser_v2_status / browser_egress_check /
+     * browser_v2_eval). Optional until the tools package ships the
+     * factory — guarded at the call site. */
+    createBrowserV2Tools?(opts?: Record<string, unknown>): Tool[];
     /** v0.97 (Team T6): git workflow tools (git_log / git_branch /
      * git_branch_create / git_branch_delete / git_show). git_blame already
      * lives in CODE_TOOLS (extended with a line range in v0.97).
@@ -1415,6 +1421,12 @@ export function defaultToolFactory(
     // v0.97 (Team T6): + browser_status / browser_reload /
     // browser_wait_for (state + wait verbs, same session).
     registry.registerMany(toolsMod.createBrowserTools());
+    // v1.33 (Đội T4): browser driver v2 (a11y-tree snapshot + diff,
+    // click/type theo ref, vision fallback, egress gate, WebVoyager
+    // eval). Guarded — thiếu factory thì bot chỉ không có tool v2.
+    if (typeof toolsMod.createBrowserV2Tools === 'function') {
+      registry.registerMany(toolsMod.createBrowserV2Tools());
+    }
     // v0.97 (Team T6): git workflow (log / branch / show / blame) +
     // deep file search — sandboxed to the workspace, no network.
     // Guarded like the memory/A2A factories: without the factory the

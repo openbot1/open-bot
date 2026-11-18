@@ -37,7 +37,9 @@ export type RunEventType =
   | 'checkpoint.saved'
   | 'event.redacted'
   | 'run.compacted'
-  | 'stuck.detected';
+  | 'stuck.detected'
+  | 'reasoning.block'
+  | 'stuck.recovered';
 
 /** Trạng thái cuối cùng (hoặc hiện tại) của một run. */
 export type RunStatus =
@@ -259,6 +261,52 @@ export interface StuckDetectedPayload {
   suggestionKey?: string;
 }
 
+/**
+ * Payload của `reasoning.block` (v1.29, Đội T3 — coding agent v14).
+ *
+ * Digest của một khối suy luận (thinking / reasoning_content): chỉ
+ * mang metadata + excerpt ngắn để audit/đối chiếu — FULL TEXT nằm ở
+ * sidecar JSONL của codingV14 (`reasoningBlocks.ts`), vì run log
+ * chung sanitize cắt chuỗi 2000 ký tự. `sha256` là hash của full text
+ * để replay đối chiếu với sidecar.
+ */
+export interface ReasoningBlockPayload {
+  /** Id của block trong sidecar (`rb-<runId>-<step>-<n>`). */
+  blockId: string;
+  /** Step mà block này thuộc về. */
+  step: number;
+  /** Loại khối: `thinking` | `reasoning_content` | `plan` | `self_critique`. */
+  kind: string;
+  /** Số ký tự của full text. */
+  chars: number;
+  /** SHA-256 hex của full text. */
+  sha256: string;
+  /** 200 ký tự đầu của text (đã sanitize). */
+  excerpt: string;
+  /** Model đã sinh khối này (nếu biết). */
+  model?: string;
+}
+
+/**
+ * Payload của `stuck.recovered` (v1.29, Đội T3 — coding agent v14).
+ *
+ * Ghi lại một lần recovery đã áp dụng sau khi phát hiện kẹt: chiến
+ * lược nào, tín hiệu nào đã kích hoạt, kết quả ra sao. Cặp với
+ * `stuck.detected` để audit toàn bộ vòng đời kẹt → phục hồi.
+ */
+export interface StuckRecoveredPayload {
+  /** Step mà recovery xảy ra. */
+  step: number;
+  /** Chiến lược recovery đã áp dụng. */
+  strategy: string;
+  /** Loại tín hiệu kẹt đã kích hoạt recovery. */
+  signalKind: string;
+  /** Mô tả những gì đã làm (đã sanitize, không chứa secret). */
+  detail: string;
+  /** true khi bước recovery thực thi thành công. */
+  applied: boolean;
+}
+
 /** Map từ loại event sang payload của nó. */
 export interface RunEventPayloadMap {
   'run.started': RunStartedPayload;
@@ -280,6 +328,8 @@ export interface RunEventPayloadMap {
   'event.redacted': EventRedactedPayload;
   'run.compacted': RunCompactedPayload;
   'stuck.detected': StuckDetectedPayload;
+  'reasoning.block': ReasoningBlockPayload;
+  'stuck.recovered': StuckRecoveredPayload;
 }
 
 /**
