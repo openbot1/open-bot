@@ -726,7 +726,7 @@ test('tools: đủ 15 tool v3, không trùng tên, ALL_TOOLS chứa đủ, bindi
   for (const name of TEAM_V3_TOOL_NAMES) {
     assert.ok(ALL_TOOLS.some((t) => t.definition.name === name), `ALL_TOOLS thiếu ${name}`);
   }
-  assert.equal(ALL_TOOLS.length, 544, 'v1.14 merge: 453 + 38 = 500'); // v1.14 merge re-pin.
+  assert.equal(ALL_TOOLS.length, 899, 'v1.14 merge: 453 + 38 = 500'); // v1.36 re-pin: 825 + 74 = 899.
   assert.equal(new Set(ALL_TOOLS.map((t) => t.definition.name)).size, ALL_TOOLS.length);
   const dir = tmpDir();
   const bound = createDefaultTools({ getAgentTeamsV109BaseDir: () => dir });
@@ -884,7 +884,7 @@ test('i18n: 40 key teamsV3 (39 teamsV3.* + sidebar.agentTeamsV3) đủ 6 locale'
   assert.equal(expected.length, 40);
   for (const loc of ['vi', 'en', 'zh', 'ja', 'es', 'fr']) {
     const dict = JSON.parse(readFileSync(join('apps', 'desktop', 'src', 'renderer', 'i18n', 'locales', `${loc}.json`), 'utf8'));
-    assert.equal(Object.keys(dict).length, 5704, `${loc} phải có 5704 key`); // v1.14 merge: 4983 + 35 mem v13 + 24 mcpAppsV2 + 39 codingV6 = 5081. // v1.14 merge re-pin.
+    assert.equal(Object.keys(dict).length, 7540, `${loc} phải có 7540 key`); // v1.14 merge: 4983 + 35 mem v13 + 24 mcpAppsV2 + 39 codingV6 = 5081. // v1.36 re-pin: 7540.
     for (const key of expected) {
       assert.ok(key in dict, `key ${key} thiếu trong ${loc}`);
       assert.equal(typeof dict[key], 'string');

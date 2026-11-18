@@ -49,7 +49,7 @@ function placeholders(value) {
 test('all 6 locales have the 18 codingV5 keys (4818 -> 4983 at v1.13, 5278 with v1.14)', () => {
   for (const name of LOCALE_NAMES) {
     const locale = loadLocale(name);
-    assert.equal(Object.keys(locale).length, 5704, `${name}: expected 5704 keys`); // v1.14 merge re-pin.
+    assert.equal(Object.keys(locale).length, 7540, `${name}: expected 7540 keys`); // v1.36 re-pin: 7540.
     for (const key of CODING_V5_KEYS) {
       assert.equal(typeof locale[key], 'string', `${name}: missing ${key}`);
       assert.ok(locale[key].trim() !== '', `${name}: empty ${key}`);

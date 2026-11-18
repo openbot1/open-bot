@@ -83,14 +83,14 @@ test('tool surface: 10 coding_v2_* tools, names match, approval flags split', ()
 
 test('registry wiring: ALL_TOOLS holds the 10 tools (491), binding keeps 491', (t) => {
   const dir = tmpDir(t);
-  assert.equal(ALL_TOOLS.length, 544); // v1.14 merge: 453 + 38 = 500; v1.13: 402 + 51 = 453; v1.10 merge: 236 + 9 memory_v10 + 18 teams_v2 + 12 coding_v3 + 14 fleet_v7 = 289; v1.11 merge: 289 + 70 = 359; v1.12 merge: 359 + 9 memory v12 = 368 // v1.14 merge re-pin.
+  assert.equal(ALL_TOOLS.length, 899); // v1.14 merge: 453 + 38 = 500; v1.13: 402 + 51 = 453; v1.10 merge: 236 + 9 memory_v10 + 18 teams_v2 + 12 coding_v3 + 14 fleet_v7 = 289; v1.11 merge: 289 + 70 = 359; v1.12 merge: 359 + 9 memory v12 = 368 // v1.36 re-pin: 825 + 74 = 899.
   for (const name of CODING_V2_TOOL_NAMES) {
     assert.ok(ALL_TOOLS.some((x) => x.definition.name === name), name);
   }
   assert.equal(new Set(ALL_TOOLS.map((x) => x.definition.name)).size, ALL_TOOLS.length);
   const bound = createDefaultTools({ getCodingV2WorkspaceDir: () => dir });
-  assert.equal(bound.length, 544); // v1.14 merge re-pin.
-  assert.equal(new Set(bound.map((x) => x.definition.name)).size, 544); // v1.14 merge re-pin.
+  assert.equal(bound.length, 899); // v1.36 re-pin: 825 + 74 = 899.
+  assert.equal(new Set(bound.map((x) => x.definition.name)).size, 899); // v1.36 re-pin: 825 + 74 = 899.
 });
 
 test('placeholder: unbound tools refuse without a workspace', async () => {
