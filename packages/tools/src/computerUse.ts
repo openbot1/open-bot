@@ -467,7 +467,7 @@ interface RecordingInfo {
   path: string;
   durationSeconds: number;
   sizeBytes: number;
-  status: 'recording' | 'stopped' | 'auto-stopped';
+  status: 'recording' | 'stopped' | 'auto-stopped' | 'failed';
   stopReason?: string;
 }
 
@@ -482,7 +482,8 @@ interface ActiveRecording {
   timer: NodeJS.Timeout;
   watchdog: NodeJS.Timeout;
   stderrTail: string;
-  finished: boolean;
+  state: 'recording' | 'stopping' | 'failed' | 'stopped' | 'auto-stopped';
+  closed: boolean;
   finishReason?: string;
   finishedAt?: number;
   exitCode?: number | null;
@@ -510,62 +511,93 @@ function recordingInfo(entry: ActiveRecording): RecordingInfo {
     path: entry.relPath,
     durationSeconds: Math.round(((finishedAt - entry.startedAt) / 1000) * 10) / 10,
     sizeBytes,
-    status: entry.finished
-      ? entry.finishReason === 'stopped'
-        ? 'stopped'
-        : 'auto-stopped'
-      : 'recording',
+    status: entry.state === 'stopping' ? 'recording' : entry.state,
     stopReason: entry.finishReason,
   };
 }
 
 /**
- * Gracefully stop an ffmpeg recording: SIGINT (lets ffmpeg finalize the
- * file), SIGKILL after a grace period. Idempotent — concurrent callers
- * share one finalize promise.
+ * Request a graceful ffmpeg stop and resolve only after ChildProcess.close,
+ * which is the point at which ffmpeg has closed its output handles. All
+ * callers share one promise; timeout/escalation never masquerades as success.
  */
 function finalizeRecording(entry: ActiveRecording, reason: string): Promise<RecordingInfo> {
   if (entry.finalizePromise) return entry.finalizePromise;
-  entry.finalizePromise = new Promise<RecordingInfo>((resolvePromise) => {
-    clearTimeout(entry.timer);
-    clearInterval(entry.watchdog);
-    entry.finished = true;
-    entry.finishReason = reason;
-    const done = (): void => {
+  if (entry.state === 'failed') {
+    return Promise.reject(new Error(entry.finishReason ?? 'Recording process failed.'));
+  }
+  if (entry.state === 'stopped' || entry.state === 'auto-stopped') {
+    return Promise.resolve(recordingInfo(entry));
+  }
+
+  entry.state = 'stopping';
+  entry.finishReason = reason;
+  clearTimeout(entry.timer);
+  clearInterval(entry.watchdog);
+
+  entry.finalizePromise = new Promise<RecordingInfo>((resolvePromise, rejectPromise) => {
+    let settled = false;
+    let killTimer: NodeJS.Timeout | undefined;
+    let hardTimer: NodeJS.Timeout | undefined;
+    const cleanup = (): void => {
+      if (killTimer) clearTimeout(killTimer);
+      if (hardTimer) clearTimeout(hardTimer);
+    };
+    const fail = (message: string): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      entry.state = 'failed';
+      entry.finishReason = message;
+      entry.finishedAt = Date.now();
+      rejectPromise(new Error(message));
+    };
+    const onClose = (code: number | null): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      entry.closed = true;
+      entry.exitCode = code;
+      if (entry.state === 'failed') {
+        rejectPromise(new Error(entry.finishReason ?? 'Recording process failed.'));
+        return;
+      }
+      entry.state = reason === 'stopped' ? 'stopped' : 'auto-stopped';
       entry.finishedAt = Date.now();
       resolvePromise(recordingInfo(entry));
     };
-    if (entry.proc.exitCode !== null && entry.proc.exitCode !== undefined) {
-      done();
+
+    if (entry.closed) {
+      if (entry.state === 'failed') {
+        fail(entry.finishReason ?? 'Recording process failed.');
+      } else {
+        onClose(entry.exitCode ?? null);
+      }
       return;
     }
-    const killTimer = setTimeout(() => {
+    entry.proc.once('close', onClose);
+    killTimer = setTimeout(() => {
       try {
         entry.proc.kill('SIGKILL');
       } catch {
-        // Already dead.
+        // The hard timeout below reports failure if close never arrives.
       }
     }, RECORD_KILL_GRACE_MS);
     if (typeof killTimer.unref === 'function') killTimer.unref();
-    entry.proc.once('close', () => {
-      clearTimeout(killTimer);
-      done();
-    });
-    try {
-      entry.proc.kill('SIGINT');
-    } catch {
-      done();
-    }
-    // Safety net: never hang the caller longer than the stop timeout.
-    const hardTimer = setTimeout(() => {
+    hardTimer = setTimeout(() => {
       try {
         entry.proc.kill('SIGKILL');
       } catch {
-        // Already dead.
+        // Still report the unconfirmed close as a failure.
       }
-      done();
+      fail(`ffmpeg did not close within ${RECORD_STOP_TIMEOUT_MS}ms; output finalization is unconfirmed.`);
     }, RECORD_STOP_TIMEOUT_MS);
     if (typeof hardTimer.unref === 'function') hardTimer.unref();
+    try {
+      entry.proc.kill('SIGINT');
+    } catch (err) {
+      fail(`Failed to signal ffmpeg: ${(err as Error).message}`);
+    }
   });
   return entry.finalizePromise;
 }
@@ -661,7 +693,8 @@ function makeRecordStartTool(
           timer: setTimeout(() => undefined, 0),
           watchdog: setInterval(() => undefined, 0),
           stderrTail: '',
-          finished: false,
+          state: 'recording',
+          closed: false,
         };
         clearTimeout(entry.timer);
         clearInterval(entry.watchdog);
@@ -672,18 +705,22 @@ function makeRecordStartTool(
           entry.stderrTail = (entry.stderrTail + text).slice(-2000);
         });
         proc.on('error', (err: Error) => {
-          entry.finished = true;
+          entry.state = 'failed';
           entry.finishReason = `spawn-failed: ${(err as NodeJS.ErrnoException).code === 'ENOENT'
             ? 'ffmpeg binary not found — is ffmpeg installed and on PATH?'
             : err.message}`;
           entry.finishedAt = Date.now();
-          recordings.delete(recordingId);
+          clearTimeout(entry.timer);
+          clearInterval(entry.watchdog);
         });
         proc.on('close', (code: number | null) => {
           entry.exitCode = code;
-          if (!entry.finished) {
-            entry.finished = true;
+          if (entry.state === 'recording') {
+            entry.state = 'failed';
             entry.finishReason = `ffmpeg exited unexpectedly (code ${code}): ${entry.stderrTail.trim().slice(-500) || 'no output'}`;
+            entry.finishedAt = Date.now();
+          } else if (entry.state === 'stopping') {
+            entry.state = entry.finishReason === 'stopped' ? 'stopped' : 'auto-stopped';
             entry.finishedAt = Date.now();
           }
           clearTimeout(entry.timer);
@@ -708,22 +745,21 @@ function makeRecordStartTool(
         // Wait briefly: if ffmpeg dies immediately (bad display, no
         // codec, ...) report the error instead of a bogus recordingId.
         await new Promise<void>((resolvePromise) => {
-          if (entry.finished) {
+          if (entry.state !== 'recording') {
             resolvePromise();
             return;
           }
           const timer = setTimeout(() => resolvePromise(), RECORD_READY_WAIT_MS);
           if (typeof timer.unref === 'function') timer.unref();
-          proc.once('close', () => {
-            clearTimeout(timer);
-            resolvePromise();
-          });
+          const ready = (): void => { clearTimeout(timer); resolvePromise(); };
+          proc.once('spawn', ready);
+          proc.once('close', ready);
         });
-        if (entry.finished && entry.finishReason?.startsWith('spawn-failed')) {
+        if (entry.state === 'failed' && entry.finishReason?.startsWith('spawn-failed')) {
           recordings.delete(recordingId);
           return errorResult(entry.finishReason.replace(/^spawn-failed: /, ''));
         }
-        if (entry.finished) {
+        if (entry.state !== 'recording') {
           recordings.delete(recordingId);
           return errorResult(`Recording failed to start: ${entry.finishReason ?? 'ffmpeg exited'}`);
         }
