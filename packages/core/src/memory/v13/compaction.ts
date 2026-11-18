@@ -101,6 +101,25 @@ export const V13_DEFAULT_TOP_FACTS_PER_SUBJECT = 10;
 export const V13_DEFAULT_STALE_AFTER_DAYS = 90;
 export const V13_DEFAULT_STALE_MAX_CONFIDENCE = 0.6;
 
+/**
+ * Total order for compaction ranking: confidence desc, then most
+ * recently updated first. The old comparator stopped there, so facts
+ * that share a confidence AND an updatedAt millisecond (common when
+ * a test seeds several facts in one tick) fell back to whatever
+ * order listFacts returned — the top-N pick was non-deterministic.
+ * The final keys (validFrom asc, then object text, then id) make the
+ * order content-defined and stable across runs.
+ */
+export function compareCompactionFacts(a: GraphFact, b: GraphFact): number {
+  return (
+    b.confidence - a.confidence ||
+    b.updatedAt.localeCompare(a.updatedAt) ||
+    a.validFrom.localeCompare(b.validFrom) ||
+    (a.objectText ?? '').localeCompare(b.objectText ?? '') ||
+    a.id.localeCompare(b.id)
+  );
+}
+
 /** Nhom fact active theo subject (ten entity). */
 export function groupFactsBySubject(
   store: TemporalGraphStore,
@@ -119,7 +138,7 @@ export function groupFactsBySubject(
     groups.set(name, list);
   }
   for (const list of groups.values()) {
-    list.sort((a, b) => b.confidence - a.confidence || b.updatedAt.localeCompare(a.updatedAt));
+    list.sort(compareCompactionFacts);
   }
   return groups;
 }
@@ -135,9 +154,7 @@ export function summarizeSubject(
     1,
     Math.min(50, Math.floor(opts.topFactsPerSubject ?? V13_DEFAULT_TOP_FACTS_PER_SUBJECT)),
   );
-  const sorted = [...facts].sort(
-    (a, b) => b.confidence - a.confidence || b.updatedAt.localeCompare(a.updatedAt),
-  );
+  const sorted = [...facts].sort(compareCompactionFacts);
   const topFacts = sorted.slice(0, topN);
   const lines: string[] = [`# ${subject}`, ''];
   for (const fact of topFacts) {

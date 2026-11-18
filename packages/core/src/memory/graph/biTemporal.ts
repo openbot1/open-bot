@@ -476,6 +476,12 @@ export function factVersionTimeline(
   steps.sort((a, b) => {
     const byAt = a.at.localeCompare(b.at);
     if (byAt !== 0) return byAt;
+    // Same recorded instant (common when a correction is applied in the
+    // same millisecond as the seed): order by event time, not by the
+    // random fact id — the old tiebreak made the timeline order a
+    // coin flip whenever two versions shared a createdAt millisecond.
+    const byValidFrom = a.validFrom.localeCompare(b.validFrom);
+    if (byValidFrom !== 0) return byValidFrom;
     return a.factId.localeCompare(b.factId);
   });
   return steps;
