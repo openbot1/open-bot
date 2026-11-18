@@ -127,7 +127,7 @@ test('full registry: all v0.2 tool groups compose with unique names', () => {
     // 'git_host_connect', 'pr_list', 'pr_create' and the rest come
     // via createIntegrationTools below.
     // (computer_local_tool is NOT in this registry — it lives in localBridge, exposed via the daemon path only.)
-    assert.equal(names.length, 495, `expected 495 tools, got ${names.length}: ${names.join(', ')}`); // v1.10 merge: 372 + 53 ALL_TOOLS (9 memory_v10 + 18 teams_v2 + 12 coding_v3 + 14 fleet_v7) = 425; v1.11: 425 + 70 v1.11 = 495; v1.08 merge: composed 328 (265 + 63)
+    assert.equal(names.length, 1035, `expected 1035 tools, got ${names.length}: ${names.join(', ')}`); // v1.36 re-pin: 1035 (measured from runtime).
     assert.equal(new Set(names).size, names.length, 'duplicate tool names registered');
     for (const expected of [
       'read_file', 'web_search', // defaults

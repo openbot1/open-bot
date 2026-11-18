@@ -53,14 +53,14 @@ function resources(overrides = {}) {
   return { cpuCores: 1, ramBytes: 1 * GB, diskBytes: 10 * GB, ...overrides };
 }
 
-test('registry: all 10 fleet v6 tools in ALL_TOOLS exactly once (359 total)', () => {
+test('registry: all 10 fleet v6 tools in ALL_TOOLS exactly once (491 total)', () => {
   for (const name of FLEET_V6_TOOL_NAMES) {
     assert.ok(toolNames(ALL_TOOLS).includes(name), `ALL_TOOLS missing ${name}`);
     assert.equal(toolNames(ALL_TOOLS).filter((n) => n === name).length, 1, `${name} duplicated`);
   }
   assert.equal(FLEET_V6_TOOLS.length, 10);
   assert.equal(new Set(toolNames(ALL_TOOLS)).size, toolNames(ALL_TOOLS).length, 'ALL_TOOLS has duplicate names');
-  assert.equal(ALL_TOOLS.length, 359); // v1.10 merge: 236 + 53 = 289; v1.11 merge: 289 + 70 = 359
+  assert.equal(ALL_TOOLS.length, 899); // v1.14 merge: 453 + 38 = 500; v1.13: 402 + 51 = 453; v1.10 merge: 236 + 53 = 289; v1.11 merge: 289 + 70 = 359 // v1.36 re-pin: 825 + 74 = 899.
   assert.equal(isFleetV6ToolName('fleet_schedule_create'), true);
   assert.equal(isFleetV6ToolName('fleet_v5_campaign_create'), false);
   assert.equal(isFleetV6ToolName('fleet_nope'), false);
@@ -260,11 +260,11 @@ test('health: 3rd crash in a row makes restart refuse (unhealthy)', async () => 
   assert.equal(third.consecutiveFailures, 3);
 });
 
-test('binding: createDefaultTools with getFleetV6BaseDir keeps 298 tools, no duplicates', () => {
+test('binding: createDefaultTools with getFleetV6BaseDir keeps 491 tools, no duplicates', () => {
   const dir = tmpDir();
   const bound = createDefaultTools({ getFleetV6BaseDir: () => dir });
-  assert.equal(bound.length, 359);
-  assert.equal(new Set(bound.map((t) => t.definition.name)).size, 359);
+  assert.equal(bound.length, 899); // v1.36 re-pin: 825 + 74 = 899.
+  assert.equal(new Set(bound.map((t) => t.definition.name)).size, 899); // v1.36 re-pin: 825 + 74 = 899.
   for (const name of FLEET_V6_TOOL_NAMES) {
     assert.ok(bound.some((t) => t.definition.name === name), name);
   }

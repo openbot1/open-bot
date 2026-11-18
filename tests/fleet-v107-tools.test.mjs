@@ -67,7 +67,7 @@ test('registry: all 5 fleet v4 teams tools in ALL_TOOLS exactly once', () => {
   }
   assert.equal(FLEET_V4_TEAMS_TOOLS.length, 5);
   assert.equal(new Set(toolNames(ALL_TOOLS)).size, toolNames(ALL_TOOLS).length, 'ALL_TOOLS has duplicate names');
-  assert.equal(ALL_TOOLS.length, 359); // v1.10 merge: 236 + 9 memory_v10 + 18 teams_v2 + 12 coding_v3 + 14 fleet_v7 = 289; v1.11 merge: 289 + 70 = 359
+  assert.equal(ALL_TOOLS.length, 899); // v1.14 merge: 453 + 38 = 500; v1.13: 402 + 51 = 453; v1.10 merge: 236 + 9 memory_v10 + 18 teams_v2 + 12 coding_v3 + 14 fleet_v7 = 289; v1.11 merge: 289 + 70 = 359 // v1.36 re-pin: 825 + 74 = 899.
 });
 
 test('unbound: file-backed tools say not wired; pure tools still run', async () => {

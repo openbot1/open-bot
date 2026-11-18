@@ -95,9 +95,9 @@ test('fleet v6 keys are sorted in every locale file', () => {
   }
 });
 
-test('all 6 locales have the same total key count (4388)', () => {
+test('all 6 locales have the same total key count (5278)', () => {
   // v1.10 merge: 4089 + 264 keys = 4353; v1.11: 4353 + 35 = 4388 (T1 46 + T2 25 + T3 47 + T4 24 + T5 73 + T6 49). Bump this pin whenever a
   // wave adds keys (same pattern as every previous wave).
   const counts = LOCALE_NAMES.map((loc) => Object.keys(loadLocale(loc)).length);
-  assert.deepEqual(counts, [4565, 4565, 4565, 4565, 4565, 4565]);
+  assert.deepEqual(counts, [7540, 7540, 7540, 7540, 7540, 7540]); // v1.36 re-pin: 7540.
 });

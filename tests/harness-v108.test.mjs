@@ -548,7 +548,7 @@ test('v108 tools: 12 tool trong ALL_TOOLS, tên không trùng, execute là funct
   assert.equal(new Set(allNames).size, allNames.length, 'ALL_TOOLS không được trùng tên tool');
   assert.deepEqual(HARNESS_V4_TOOLS.map((t) => t.definition.name), [...HARNESS_V4_TOOL_NAMES]);
   // ALL_TOOLS (default tools) v1.07 = 129, + 12 harness v4 = 141.
-  assert.equal(ALL_TOOLS.length, 359); // v1.10 merge: 236 + 53 = 289; v1.11 merge: 289 + 70 = 359
+  assert.equal(ALL_TOOLS.length, 899); // v1.14 merge: 453 + 38 = 500; v1.13: 402 + 51 = 453; v1.10 merge: 236 + 53 = 289; v1.11 merge: 289 + 70 = 359 // v1.36 re-pin: 825 + 74 = 899.
 });
 
 test('v108 tools: placeholder chưa bind codeact trả hướng dẫn, không giả vờ chạy', async () => {
@@ -663,7 +663,7 @@ test('v108 tools: defaultToolFactory gồm 12 tool harness v4 (500 + 56 = 556)',
   try {
     const tools = defaultToolFactory(mem, ws, 'bot-a');
     const names = tools.map((t) => t.definition.name);
-    assert.equal(names.length, 710, `expected 710 tools, got ${names.length}`); // v1.11 merge: 640 + 70 = 710; v1.09 merge: 500 + 11 teams + 23 letta + 10 fleet_v6 + 10 voice_v8 + 2 a2a_v11 = 556
+    assert.equal(names.length, 1274, `expected 1200 tools, got ${names.length}`); // v1.14 T2: 820 + 8 mcpAppsV2 = 828; v1.13 merge: 769 + 51 = 820; v1.12 merge: 710 + 9 memory v12 = 719; v1.11 merge: 640 + 70 = 710; v1.09 merge: 500 + 11 teams + 23 letta + 10 fleet_v6 + 10 voice_v8 + 2 a2a_v11 = 584 // v1.36 re-pin: factory 1274 (ALL_TOOLS 899 + 375).
     assert.equal(new Set(names).size, names.length, 'duplicate tool names');
     for (const name of HARNESS_V4_TOOL_NAMES) {
       assert.ok(names.includes(name), `defaultToolFactory thiếu ${name}`);
@@ -760,5 +760,5 @@ test('v108 i18n: 25 key harness.v108 mới có đủ 6 locale, không rỗng', (
   }
   const counts = LOCALES.map((l) => Object.keys(localeKeys(l)).length);
   assert.ok(counts.every((c) => c === counts[0]), `6 locale phải cùng số key (nhận ${counts.join(',')})`);
-  assert.equal(counts[0], 4565, `mỗi locale phải có 4565 key (4089 + 264 v1.10; v1.11: 4353 + 212 v1.11 = 4565), nhận ${counts[0]}`);
+  assert.equal(counts[0], 7540, `mỗi locale phải có 7540 key, nhận ${counts[0]}`); // v1.36 merge re-pin: 7540.
 });

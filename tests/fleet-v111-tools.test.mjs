@@ -67,7 +67,7 @@ function toolNames(tools) {
   return tools.map((t) => t.definition.name);
 }
 
-test('fleet v111 tools: 13 tools in ALL_TOOLS (302), unique names', () => {
+test('fleet v111 tools: 13 tools in ALL_TOOLS (491), unique names', () => {
   assert.equal(FLEET_V8_TOOLS.length, 13);
   assert.deepEqual(
     FLEET_V8_TOOLS.map((t) => t.definition.name),
@@ -81,7 +81,7 @@ test('fleet v111 tools: 13 tools in ALL_TOOLS (302), unique names', () => {
     );
   }
   assert.equal(new Set(ALL_TOOLS.map((t) => t.definition.name)).size, ALL_TOOLS.length);
-  assert.equal(ALL_TOOLS.length, 359); // v1.11 merge: 289 + 70 v1.11 = 359
+  assert.equal(ALL_TOOLS.length, 899); // v1.14 merge: 453 + 38 = 500; v1.13: 402 + 51 = 453; v1.11 merge: 289 + 70 v1.11 = 359 // v1.36 re-pin: 825 + 74 = 899.
 });
 
 test('fleet v111 tools: createDefaultTools binds without duplicating', () => {

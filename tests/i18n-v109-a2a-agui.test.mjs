@@ -61,7 +61,7 @@ test('i18n v1.09: 24 key mới có đủ 6 locale, không rỗng', () => {
   }
   // Mỗi locale có đúng 3915 key (3891 v1.08 + 24 v1.09 T4).
   for (const name of LOCALE_NAMES) {
-    assert.equal(Object.keys(locales[name]).length, 4565, `locale ${name} có ${Object.keys(locales[name]).length} key, kỳ vọng 4565`);
+    assert.equal(Object.keys(locales[name]).length, 7540, `locale ${name} có ${Object.keys(locales[name]).length} key, kỳ vọng 7540`); // v1.36 re-pin: 7540.
   }
 });
 

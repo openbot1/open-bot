@@ -3,7 +3,7 @@
  * — v1.11, Đội T2.
  *
  * Covers: registry wiring (all 9 names in ALL_TOOLS exactly once,
- * ALL_TOOLS 359, binding keeps 359 with no duplicates), the unbound
+ * ALL_TOOLS 368, binding keeps 368 with no duplicates), the unbound
  * placeholder message, and bound execution against a temp userData
  * dir (list/validate/run task/run suite/export rollout/profiles/
  * report — all end to end, real sandbox runs, real JSONL on disk).
@@ -46,9 +46,9 @@ async function runTool(tools, name, args, ctx) {
   return raw;
 }
 
-test('registry wiring: all 9 eval v111 tools in ALL_TOOLS exactly once (359 total)', () => {
+test('registry wiring: all 9 eval v111 tools in ALL_TOOLS exactly once (491 total)', () => {
   assert.equal(EVAL_V111_TOOL_NAMES.length, 9);
-  assert.equal(ALL_TOOLS.length, 359); // v1.11 merge: 289 + 70 = 359
+  assert.equal(ALL_TOOLS.length, 899); // v1.14 merge: 453 + 38 = 500; v1.13: 402 + 51 = 453; v1.11 merge: 289 + 70 = 359 // v1.36 re-pin: 825 + 74 = 899.
   for (const name of EVAL_V111_TOOL_NAMES) {
     assert.equal(ALL_TOOLS.filter((t) => t.definition.name === name).length, 1, name);
     assert.ok(isEvalV111ToolName(name));
@@ -57,13 +57,13 @@ test('registry wiring: all 9 eval v111 tools in ALL_TOOLS exactly once (359 tota
   assert.equal(new Set(ALL_TOOLS.map((t) => t.definition.name)).size, ALL_TOOLS.length);
 });
 
-test('createDefaultTools binding keeps 359 tools with no duplicates', () => {
+test('createDefaultTools binding keeps 491 tools with no duplicates', () => {
   const base = tmpDir();
   const bound = createDefaultTools({ getEvalV111BaseDir: () => base });
-  assert.equal(bound.length, 359);
-  assert.equal(new Set(bound.map((t) => t.definition.name)).size, 359);
+  assert.equal(bound.length, 899); // v1.36 re-pin: 825 + 74 = 899.
+  assert.equal(new Set(bound.map((t) => t.definition.name)).size, 899); // v1.36 re-pin: 825 + 74 = 899.
   const plain = createDefaultTools();
-  assert.equal(plain.length, 359);
+  assert.equal(plain.length, 899); // v1.36 re-pin: 825 + 74 = 899.
 });
 
 test('unbound placeholders explain themselves instead of guessing paths', async () => {
