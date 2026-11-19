@@ -1613,7 +1613,7 @@ export interface OpenBotApi {
   seedSampleAutomations: () => Promise<{ created: unknown[]; skipped: string[] }>;
   // v0.52 P0-5: webhook trigger keys + delivery + retry-run.
   // create/rotate return { keyId, secret } with the secret shown once only.
-  createAutomationWebhookKey: (id: string) => Promise<{ keyId: string; secret: string }>;
+  createAutomationWebhookKey: (id: string, opts?: { allowLocalFallback?: boolean }) => Promise<{ keyId: string; secret: string }>;
   // v0.97 (Team T5): harness v2 — routines, signed-webhook stats, health, NDJSON events.
   listHarnessRoutines: () => Promise<unknown[]>;
   getHarnessRoutine: (id: string) => Promise<unknown>;
@@ -1630,7 +1630,7 @@ export interface OpenBotApi {
   tailHarnessEvents: (threadId?: string, limit?: number) => Promise<unknown>;
   onHarnessRunsChanged: (cb: (event: { runId: string; routineId: string; status: string }) => void) => () => void;
   onHarnessHealthChanged: (cb: (health: unknown) => void) => () => void;
-  rotateAutomationWebhookKey: (id: string) => Promise<{ keyId: string; secret: string }>;
+  rotateAutomationWebhookKey: (id: string, opts?: { allowLocalFallback?: boolean }) => Promise<{ keyId: string; secret: string }>;
   deleteAutomationWebhookKey: (id: string) => Promise<boolean>;
   hasAutomationWebhookKey: (id: string) => Promise<boolean>;
   invokeAutomationWebhook: (id: string, body: string, signature?: string | null) => Promise<unknown>;
@@ -3216,7 +3216,6 @@ const openBot: OpenBotApi = {
   listServiceAccounts: () => ipcRenderer.invoke('team:service-accounts-list'),
   createServiceAccount: (payload) => ipcRenderer.invoke('team:service-account-create', payload),
   deleteServiceAccount: (id) => ipcRenderer.invoke('team:service-account-delete', id),
-  getVaultStorageStatus: () => ipcRenderer.invoke('vault:get-storage-status'),
   getVaultNoStorage: () => ipcRenderer.invoke('vault:get-nostorage'),
   setVaultNoStorage: (enabled, opts) =>
     ipcRenderer.invoke('vault:set-nostorage', {
