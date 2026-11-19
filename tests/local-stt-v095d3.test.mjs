@@ -88,7 +88,13 @@ test('local-stt: WhisperCliSttEngine with no whisper installed is unavailable wi
     assert.equal(status.available, false);
     assert.equal(engine.isAvailable(), false);
     assert.match(status.reason ?? '', /whisper/i);
-    await assert.rejects(engine.transcribe(SAMPLE), /local STT unavailable|No whisper/);
+    // The engine also probes the absolute /usr/local/bin/whisper-cli
+    // path, which withNoWhisperEnv cannot hide — so on a machine with
+    // a system-wide whisper binary but no ggml-*.bin model, the engine
+    // is in the "binary found, no model" state instead of "no whisper".
+    // Both are the same contract (unavailable with a clear reason),
+    // so the rejection must accept either real unavailability message.
+    await assert.rejects(engine.transcribe(SAMPLE), /local STT unavailable|No whisper|no model file/);
   });
 });
 

@@ -11,6 +11,8 @@
  * screenshot/recording capture the (empty) Xvfb screen.
  */
 import { test, afterEach } from 'node:test';
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -215,6 +217,126 @@ test('computer_type: types text, refuses control chars and token-like secrets', 
 
   const empty = await tool('computer_type').execute({ text: '' }, CTX(dir));
   assert.match(empty, /^Error: Nothing to type/);
+});
+
+// ---------------------------------------------------------------------------
+// Deterministic recording lifecycle tests (fake ffmpeg; no timing sleeps)
+// ---------------------------------------------------------------------------
+
+class FakeRecordingProcess extends EventEmitter {
+  constructor() {
+    super();
+    this.stdout = new PassThrough();
+    this.stderr = new PassThrough();
+    this.exitCode = null;
+    this.signals = [];
+  }
+  kill(signal) {
+    this.signals.push(signal);
+    return true;
+  }
+  close(code = 0) {
+    this.exitCode = code;
+    this.stdout.end();
+    this.stderr.end();
+    this.emit('close', code, null);
+  }
+}
+
+function makeRecordingHarness() {
+  const children = [];
+  const spawnProcess = (command, args) => {
+    const child = new FakeRecordingProcess();
+    children.push({ command, args, child });
+    if (command === 'xdotool') {
+      queueMicrotask(() => {
+        child.stdout.end('1920 1080');
+        child.emit('spawn');
+        child.close(0);
+      });
+    } else {
+      queueMicrotask(() => child.emit('spawn'));
+    }
+    return child;
+  };
+  const tools = createComputerUseTools({ spawnProcess });
+  const byName = (name) => tools.find((entry) => entry.definition.name === name);
+  return { children, byName };
+}
+
+test('computer_record_stop: waits for close before returning finalized output', async () => {
+  const previousDisplay = process.env.DISPLAY;
+  process.env.DISPLAY = ':99';
+  try {
+    const dir = makeTempWorkspace();
+    const harness = makeRecordingHarness();
+    const started = JSON.parse(await harness.byName('computer_record_start').execute({}, CTX(dir)));
+    const ffmpeg = harness.children.find((entry) => entry.command === 'ffmpeg');
+    assert.ok(ffmpeg, 'ffmpeg process was spawned');
+
+    let settled = false;
+    const stopping = harness.byName('computer_record_stop')
+      .execute({ recordingId: started.recordingId }, CTX(dir))
+      .then((value) => { settled = true; return value; });
+    await Promise.resolve();
+    assert.equal(settled, false, 'stop must remain pending until ChildProcess.close');
+    assert.deepEqual(ffmpeg.child.signals, ['SIGINT']);
+
+    fs.writeFileSync(ffmpeg.args.at(-1), Buffer.from('0000ftyp-finalized'));
+    ffmpeg.child.close(0);
+    const output = await stopping;
+    assert.doesNotMatch(output, /^Error:/, output);
+    const done = JSON.parse(output);
+    assert.equal(done.status, 'stopped');
+    assert.equal(done.sizeBytes, fs.statSync(ffmpeg.args.at(-1)).size);
+  } finally {
+    if (previousDisplay === undefined) delete process.env.DISPLAY;
+    else process.env.DISPLAY = previousDisplay;
+  }
+});
+
+test('computer_record_stop: concurrent callers share one stop and one close', async () => {
+  const previousDisplay = process.env.DISPLAY;
+  process.env.DISPLAY = ':99';
+  try {
+    const dir = makeTempWorkspace();
+    const harness = makeRecordingHarness();
+    const started = JSON.parse(await harness.byName('computer_record_start').execute({}, CTX(dir)));
+    const ffmpeg = harness.children.find((entry) => entry.command === 'ffmpeg');
+    const args = { recordingId: started.recordingId };
+    const first = harness.byName('computer_record_stop').execute(args, CTX(dir));
+    const second = harness.byName('computer_record_stop').execute(args, CTX(dir));
+    await Promise.resolve();
+    assert.deepEqual(ffmpeg.child.signals, ['SIGINT'], 'only one SIGINT is sent');
+    fs.writeFileSync(ffmpeg.args.at(-1), Buffer.from('0000ftyp-finalized'));
+    ffmpeg.child.close(0);
+    const [a, b] = await Promise.all([first, second]);
+    assert.equal(JSON.parse(a).status, 'stopped');
+    assert.equal(JSON.parse(b).status, 'stopped');
+    assert.equal(JSON.parse(a).sizeBytes, JSON.parse(b).sizeBytes);
+  } finally {
+    if (previousDisplay === undefined) delete process.env.DISPLAY;
+    else process.env.DISPLAY = previousDisplay;
+  }
+});
+
+test('computer_record_stop: unexpected process close remains a failure', async () => {
+  const previousDisplay = process.env.DISPLAY;
+  process.env.DISPLAY = ':99';
+  try {
+    const dir = makeTempWorkspace();
+    const harness = makeRecordingHarness();
+    const started = JSON.parse(await harness.byName('computer_record_start').execute({}, CTX(dir)));
+    const ffmpeg = harness.children.find((entry) => entry.command === 'ffmpeg');
+    ffmpeg.child.close(9);
+    const output = await harness.byName('computer_record_stop')
+      .execute({ recordingId: started.recordingId }, CTX(dir));
+    assert.match(output, /^Error: ffmpeg exited unexpectedly \(code 9\)/, output);
+    assert.deepEqual(ffmpeg.child.signals, [], 'a dead process is not signalled again');
+  } finally {
+    if (previousDisplay === undefined) delete process.env.DISPLAY;
+    else process.env.DISPLAY = previousDisplay;
+  }
 });
 
 test('computer_record_start/stop: records a real video for a few seconds', async () => {

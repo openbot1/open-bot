@@ -70,11 +70,21 @@ test('six new toolkits: pinned slugs, 54 tools, 15 write tools, no duplicates, v
     }
   }
   // Không trùng slug với toolkit cũ trong repo (đối chiếu trực tiếp file).
+  // Chỉ quét các file toolkit TỒN TẠI TRƯỚC khi v13 được thêm (toolkits.ts +
+  // V110/V111/V112/V114): các catalog mock ứng viên thêm sau (v118/v119/v120/
+  // v129) là registry riêng (vd COMPOSIO_V120_MOCK_TOOLKITS, mockOnly) và
+  // KHÔNG gộp chung với COMPOSIO_V13_TOOLKITS ở runtime — v120 tái dùng
+  // freshbooks/quickbooks làm slug ứng viên nên quét cả cây sẽ báo trùng giả.
   const here = path.dirname(fileURLToPath(import.meta.url));
   const root = path.join(here, '..');
   const oldSlugs = new Set();
-  for (const file of fs.readdirSync(path.join(root, 'packages/core/src/composio'))) {
-    if (!file.startsWith('toolkits')) continue;
+  for (const file of [
+    'toolkits.ts',
+    'toolkitsV110.ts',
+    'toolkitsV111.ts',
+    'toolkitsV112.ts',
+    'toolkitsV114.ts',
+  ]) {
     const src = fs.readFileSync(path.join(root, 'packages/core/src/composio', file), 'utf8');
     for (const m of src.matchAll(/slug: '([a-z0-9-]+)'/g)) oldSlugs.add(m[1]);
   }

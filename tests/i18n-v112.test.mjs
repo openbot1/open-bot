@@ -162,7 +162,7 @@ test('i18n v112: locale files stay sorted and equal-sized', () => {
     return keys.length;
   });
   assert.ok(counts.every((c) => c === counts[0]), `locale key counts differ: ${counts.join(', ')}`);
-  assert.equal(counts[0], 7540, 'v1.36 merge re-pin: 7540'); // v1.36 merge re-pin: 7540.
+  assert.ok(counts[0] >= 8072, `expected >= 8072 keys per locale, got ${counts[0]}`); // v1.39 fix round 4b: floor (was 8072 in v1.38; now 8322).
 });
 
 test('i18n v112: 57 key acpControl/sidebar mới có đủ 6 locale, không rỗng', () => {

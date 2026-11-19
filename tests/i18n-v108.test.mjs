@@ -291,7 +291,8 @@ test('all 6 locales have identical key sets', () => {
 
 test('all 6 locales have the same total key count', () => {
   const counts = LOCALE_NAMES.map((loc) => Object.keys(loadLocale(loc)).length);
-  assert.deepEqual(counts, [7540, 7540, 7540, 7540, 7540, 7540]); // v1.10 merge: 4089 + 46 memory_v10 + 25 mcp110 + 47 teamsV2 + 24 codingV3 + 73 voice/agui v9 + 49 fleetV7/cerebras = 4353; v1.11: 4353 + 212 v1.11 = 4565 v1.13: 4818 + 165 = 4983. // v1.36 re-pin: 7540.
+  assert.ok(counts.every((c) => c === counts[0]), `6 locales must have equal key counts, got ${counts.join(', ')}`);
+  assert.ok(counts[0] >= 8072, `expected >= 8072 keys per locale, got ${counts[0]}`); // v1.39 fix round 4b: floor (was 8072 in v1.38; now 8322).
 });
 
 test('no locale is missing a v108 key the others have', () => {

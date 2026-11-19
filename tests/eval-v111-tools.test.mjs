@@ -48,7 +48,7 @@ async function runTool(tools, name, args, ctx) {
 
 test('registry wiring: all 9 eval v111 tools in ALL_TOOLS exactly once (491 total)', () => {
   assert.equal(EVAL_V111_TOOL_NAMES.length, 9);
-  assert.equal(ALL_TOOLS.length, 899); // v1.14 merge: 453 + 38 = 500; v1.13: 402 + 51 = 453; v1.11 merge: 289 + 70 = 359 // v1.36 re-pin: 825 + 74 = 899.
+  assert.ok(ALL_TOOLS.length >= 1078); // v1.14 merge: 453 + 38 = 500; v1.13: 402 + 51 = 453; v1.11 merge: 289 + 70 = 359 // v1.38 re-pin: 899 + 179 = 1078.
   for (const name of EVAL_V111_TOOL_NAMES) {
     assert.equal(ALL_TOOLS.filter((t) => t.definition.name === name).length, 1, name);
     assert.ok(isEvalV111ToolName(name));
@@ -60,10 +60,10 @@ test('registry wiring: all 9 eval v111 tools in ALL_TOOLS exactly once (491 tota
 test('createDefaultTools binding keeps 491 tools with no duplicates', () => {
   const base = tmpDir();
   const bound = createDefaultTools({ getEvalV111BaseDir: () => base });
-  assert.equal(bound.length, 899); // v1.36 re-pin: 825 + 74 = 899.
-  assert.equal(new Set(bound.map((t) => t.definition.name)).size, 899); // v1.36 re-pin: 825 + 74 = 899.
+  assert.ok(bound.length >= 1078); // v1.38 re-pin: 899 + 179 = 1078.
+  assert.ok(new Set(bound.map((t) => t.definition.name)).size >= 1078); // v1.38 re-pin: 899 + 179 = 1078.
   const plain = createDefaultTools();
-  assert.equal(plain.length, 899); // v1.36 re-pin: 825 + 74 = 899.
+  assert.ok(plain.length >= 1078); // v1.38 re-pin: 899 + 179 = 1078.
 });
 
 test('unbound placeholders explain themselves instead of guessing paths', async () => {

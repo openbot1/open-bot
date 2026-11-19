@@ -248,6 +248,14 @@ async function main() {
       (await evalJs(`document.querySelector('.main h2')?.textContent ?? ''`)) === 'Nhật ký event', 30000);
     await waitFor('view load xong (hết "Đang tải")', async () =>
       !(await evalJs(`document.body.innerText.includes('Đang tải nhật ký')`)), 30000);
+    // Status line ("0 instance đang chạy…") được điền bất đồng bộ qua IPC
+    // sau khi view mount — snapshot v1 bên dưới từng đọc trúng lúc nó còn
+    // rỗng dưới tải full suite (r2d: step "status line harness hiển thị" fail
+    // trong khi 25/26 step còn lại pass). Chờ nó hiện rồi mới snapshot,
+    // giống như đã chờ h2 và "Đang tải" ở trên — assertion vẫn giữ nguyên
+    // (status line phải hiện trong 30s, step sau vẫn assert non-empty).
+    await waitFor('status line hiển thị (có "instance")', async () =>
+      (await evalJs(`[...document.querySelectorAll('p')].some((p) => (p.textContent || '').includes('instance'))`)), 30000);
     const view1 = await evalJs(`JSON.stringify({
       title: document.querySelector('.main h2')?.textContent ?? '',
       allH2: [...document.querySelectorAll('h2')].map((h) => h.textContent),
@@ -293,7 +301,11 @@ async function main() {
       })`);
       const o = JSON.parse(s);
       return o.taEnabled && o.speakBtns >= 1 && o.usage >= 1 ? 'ok' : '';
-    }, 180000, 1000);
+      // v1.44 fix round 8 (suite r8): lượt Ollama đo được 6,6s khi máy
+      // rảnh nhưng vượt 180s dưới tải full-suite + sóng khác (CPU 1,5
+      // + swap); 300s vẫn trong timeout toàn cục 540s của script.
+      // Lượt không bao giờ xong vẫn fail.
+    }, 300000, 1000);
     step('bot Ollama trả lời qua UI thật (có usage + nút Nghe)', true);
 
     // ---- 4. Đối chiếu NDJSON trên đĩa ----

@@ -20,7 +20,10 @@ async function runCli(args) {
   try {
     const { stdout, stderr } = await run(process.execPath, [cli, ...args], {
       cwd: repo,
-      timeout: 30_000,
+      // Cold start của CLI đo được ~30s khi máy rỗi, > 30s dưới tải suite
+      // (máy 1,5 CPU + sóng song song — r6 cả 5 test fail đúng mốc 30s
+      // vì execFile kill giữa chừng); 300s là headroom thật cho máy này.
+      timeout: 300_000,
     });
     return { code: 0, stdout, stderr };
   } catch (err) {

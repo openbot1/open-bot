@@ -1,0 +1,156 @@
+#!/usr/bin/env node
+/**
+ * i18n-audit — gate nhanh truoc suite (v1.44, Doi T1).
+ *
+ * Liet ke CHINH XAC key i18n thieu theo tung locale: so sanh
+ * cac file flat "a.b.c" trong
+ * apps/desktop/src/renderer/i18n/locales/*.json (en/vi/zh/ja/fr/es).
+ *
+ * Kiem tra:
+ *  1. Key thieu o 1 locale (co o locale khac nhung khong co o locale nay).
+ *  2. Gia tri rong hoac khong phai chuoi.
+ *  3. Key chi co o 1 locale duy nhat (canh bao — thuong la go sai ten key).
+ *
+ * Exit code: 0 khi khong thieu key nao va khong co gia tri rong;
+ * 1 khi co key thieu hoac gia tri rong (canh bao "chi 1 locale"
+ * khong lam fail — chi de soat).
+ *
+ * Su dung:
+ *   node scripts/i18n-audit            # bao cao doc duoc + exit code
+ *   node scripts/i18n-audit --json     # bao cao JSON cho CI/script
+ *   node scripts/i18n-audit memoryV28  # chi kiem tra key co prefix nay
+ *   node scripts/i18n-audit --locales-dir <dir>
+ *
+ * Phong ngua tai dien loi v1.40: key `fleet.v27.skipped` thieu
+ * 6 locale — script nay bat loi dang do truoc khi chay suite.
+ */
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const LOCALES = ['en', 'vi', 'zh', 'ja', 'fr', 'es'];
+
+function parseArgs(argv) {
+  const opts = { json: false, localesDir: null, prefix: null };
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === '--json') opts.json = true;
+    else if (arg.startsWith('--locales-dir=')) opts.localesDir = arg.slice('--locales-dir='.length);
+    else if (arg === '--locales-dir') {
+      i += 1; // Tieu thu gia tri dung ngay sau flag (khong de roi thanh prefix).
+      opts.localesDir = argv[i] ?? null;
+    } else if (!arg.startsWith('--')) opts.prefix = arg;
+  }
+  return opts;
+}
+
+function defaultLocalesDir() {
+  const here = dirname(fileURLToPath(import.meta.url));
+  return join(here, '..', 'apps', 'desktop', 'src', 'renderer', 'i18n', 'locales');
+}
+
+function loadLocale(dir, code) {
+  const text = readFileSync(join(dir, `${code}.json`), 'utf8');
+  const parsed = JSON.parse(text);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`${code}.json khong phai object JSON`);
+  }
+  return parsed;
+}
+
+function main() {
+  const opts = parseArgs(process.argv.slice(2));
+  const dir = opts.localesDir ?? defaultLocalesDir();
+  const dicts = {};
+  const loadErrors = [];
+  for (const code of LOCALES) {
+    try {
+      dicts[code] = loadLocale(dir, code);
+    } catch (error) {
+      loadErrors.push(`${code}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  if (loadErrors.length > 0) {
+    const report = { ok: false, error: 'khong doc duoc locale', loadErrors };
+    if (opts.json) console.log(JSON.stringify(report, null, 2));
+    else {
+      console.error('i18n-audit: KHONG DOC DUOC LOCALE');
+      for (const e of loadErrors) console.error(`  - ${e}`);
+    }
+    process.exit(1);
+  }
+
+  const allKeys = new Set();
+  for (const code of LOCALES) {
+    for (const key of Object.keys(dicts[code])) {
+      if (opts.prefix && !key.startsWith(opts.prefix)) continue;
+      allKeys.add(key);
+    }
+  }
+
+  const perLocale = {};
+  let totalMissing = 0;
+  let totalEmpty = 0;
+  const singleLocaleKeys = [];
+  for (const key of [...allKeys].sort()) {
+    const presentIn = LOCALES.filter((code) => Object.prototype.hasOwnProperty.call(dicts[code], key));
+    if (presentIn.length === 1) singleLocaleKeys.push({ key, onlyIn: presentIn[0] });
+  }
+  for (const code of LOCALES) {
+    const missing = [];
+    const empty = [];
+    for (const key of [...allKeys].sort()) {
+      if (!Object.prototype.hasOwnProperty.call(dicts[code], key)) {
+        missing.push(key);
+      } else {
+        const value = dicts[code][key];
+        if (typeof value !== 'string' || value.trim().length === 0) empty.push(key);
+      }
+    }
+    perLocale[code] = {
+      total: Object.keys(dicts[code]).length,
+      missing,
+      missingCount: missing.length,
+      empty,
+      emptyCount: empty.length,
+    };
+    totalMissing += missing.length;
+    totalEmpty += empty.length;
+  }
+
+  const totals = LOCALES.map((code) => perLocale[code].total);
+  const totalsEqual = new Set(totals).size === 1;
+  const ok = totalMissing === 0 && totalEmpty === 0 && loadErrors.length === 0;
+
+  if (opts.json) {
+    console.log(
+      JSON.stringify(
+        { ok, localesDir: dir, prefix: opts.prefix, totalKeys: allKeys.size, totalsEqual, perLocale, singleLocaleKeys },
+        null,
+        2,
+      ),
+    );
+  } else {
+    console.log(`i18n-audit: ${allKeys.size} key (union) x ${LOCALES.length} locale — thu muc ${dir}`);
+    if (opts.prefix) console.log(`  loc theo prefix: "${opts.prefix}"`);
+    console.log(`  tong key moi locale: ${LOCALES.map((c) => `${c}=${perLocale[c].total}`).join(', ')}${totalsEqual ? ' (bang nhau)' : ' (KHAC NHAU!)'}`);
+    for (const code of LOCALES) {
+      const entry = perLocale[code];
+      const status = entry.missingCount === 0 && entry.emptyCount === 0 ? 'OK' : 'THIEU';
+      console.log(`  [${status}] ${code}: thieu ${entry.missingCount} key, rong ${entry.emptyCount} key`);
+      for (const key of entry.missing) console.log(`      thieu: ${key}`);
+      for (const key of entry.empty) console.log(`      rong: ${key}`);
+    }
+    if (singleLocaleKeys.length > 0) {
+      console.log(`  canh bao: ${singleLocaleKeys.length} key chi co o 1 locale (co the go sai ten):`);
+      for (const { key, onlyIn } of singleLocaleKeys.slice(0, 50)) {
+        console.log(`      chi o ${onlyIn}: ${key}`);
+      }
+      if (singleLocaleKeys.length > 50) console.log(`      ... va ${singleLocaleKeys.length - 50} key nua`);
+    }
+    console.log(ok ? 'i18n-audit: PASS — khong thieu key, khong co gia tri rong' : `i18n-audit: FAIL — thieu ${totalMissing} key, rong ${totalEmpty} key`);
+  }
+  process.exit(ok ? 0 : 1);
+}
+
+main();

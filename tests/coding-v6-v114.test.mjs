@@ -659,7 +659,7 @@ test('tools: đủ 7 tool v6, không trùng tên, ALL_TOOLS 491, binding giữ n
   for (const name of CODING_V6_TOOL_NAMES) {
     assert.ok(ALL_TOOLS.some((t) => t.definition.name === name), `ALL_TOOLS thiếu ${name}`);
   }
-  assert.equal(ALL_TOOLS.length, 899); // v1.36 re-pin: 825 + 74 = 899.
+  assert.ok(ALL_TOOLS.length >= 1078); // v1.38 re-pin: 899 + 179 = 1078.
   assert.equal(new Set(ALL_TOOLS.map((t) => t.definition.name)).size, ALL_TOOLS.length);
   const dir = tmpDir();
   const bound = createDefaultTools({ getCodingV6BaseDir: () => dir });

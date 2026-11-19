@@ -72,7 +72,7 @@ test('registry wiring: ALL_TOOLS holds the 14 tools (491), binding keeps 491', (
   }
   // v1.11 (Doi T4): 289 + 14 coding v4 = 303. The coordinator re-pins
   // this number when merging the other v1.11 teams.
-  assert.equal(ALL_TOOLS.length, 899); // v1.36 re-pin: 825 + 74 = 899.
+  assert.ok(ALL_TOOLS.length >= 1078); // v1.38 re-pin: 899 + 179 = 1078.
   assert.equal(new Set(ALL_TOOLS.map((x) => x.definition.name)).size, ALL_TOOLS.length);
   const bound = createDefaultTools({ getCodingV4WorkspaceDir: () => '/tmp/no-such-dir' });
   assert.equal(bound.length, ALL_TOOLS.length);

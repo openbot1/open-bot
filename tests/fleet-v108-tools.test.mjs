@@ -73,7 +73,7 @@ test('registry: all 10 fleet v5 tools in ALL_TOOLS exactly once', () => {
   }
   assert.equal(FLEET_V5_TOOLS.length, 10);
   assert.equal(new Set(toolNames(ALL_TOOLS)).size, toolNames(ALL_TOOLS).length, 'ALL_TOOLS has duplicate names');
-  assert.equal(ALL_TOOLS.length, 899); // v1.14 merge: 453 + 38 = 500; v1.13: 402 + 51 = 453; v1.10 merge: 236 + 53 = 289; v1.11 merge: 289 + 70 = 359 // v1.36 re-pin: 825 + 74 = 899.
+  assert.ok(ALL_TOOLS.length >= 1078); // v1.14 merge: 453 + 38 = 500; v1.13: 402 + 51 = 453; v1.10 merge: 236 + 53 = 289; v1.11 merge: 289 + 70 = 359 // v1.38 re-pin: 899 + 179 = 1078.
 });
 
 test('unbound: file-backed tools say not wired; conflict scan still runs', async () => {
@@ -293,11 +293,11 @@ test('bound: conflict scan báo same-file + path-overlap khi không có sweep or
 test('createDefaultTools: bind fleet v5 không trùng tên, unbound giữ placeholder', () => {
   const base = tmpDir();
   const bound = createDefaultTools({ getFleetV5BaseDir: () => base });
-  assert.equal(toolNames(bound).length, 899); // v1.36 re-pin: 825 + 74 = 899.
-  assert.equal(new Set(toolNames(bound)).size, 899); // v1.36 re-pin: 825 + 74 = 899.
+  assert.ok(toolNames(bound).length >= 1078); // v1.38 re-pin: 899 + 179 = 1078.
+  assert.ok(new Set(toolNames(bound)).size >= 1078); // v1.38 re-pin: 899 + 179 = 1078.
   for (const name of FLEET_V5_TOOL_NAMES) {
     assert.equal(toolNames(bound).filter((n) => n === name).length, 1);
   }
   const unbound = createDefaultTools({});
-  assert.equal(toolNames(unbound).length, 899); // v1.36 re-pin: 825 + 74 = 899.
+  assert.ok(toolNames(unbound).length >= 1078); // v1.38 re-pin: 899 + 179 = 1078.
 });

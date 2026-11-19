@@ -264,7 +264,6 @@ export function searchFilesDeep(opts: SearchFilesDeepOptions): SearchFilesDeepRe
   const maxFiles = Math.max(1, Math.min(opts.maxFiles ?? FILE_SEARCH_DEFAULT_MAX_FILES, FILE_SEARCH_MAX_FILES_CAP));
   const contextLines = Math.max(0, Math.min(opts.contextLines ?? 0, FILE_SEARCH_MAX_CONTEXT_LINES));
   const timeoutMs = Math.max(1, Math.min(opts.timeoutMs ?? FILE_SEARCH_DEFAULT_TIMEOUT_MS, FILE_SEARCH_MAX_TIMEOUT_MS));
-  const deadline = Date.now() + timeoutMs;
   const include = opts.include ?? [];
   const exclude = opts.exclude ?? [];
   const respectGitignore = opts.respectGitignore ?? true;
@@ -294,6 +293,10 @@ export function searchFilesDeep(opts: SearchFilesDeepOptions): SearchFilesDeepRe
 
   const root = resolveWithin(opts.workspaceDir, opts.path ?? '.');
   const gitignoreRules = respectGitignore ? loadGitignoreRules(opts.workspaceDir) : [];
+  // The timeout budget covers the search itself, not the setup above:
+  // on a loaded machine the gitignore load alone can eat a 1ms budget,
+  // timing out before any file is scanned (0 partial results).
+  const deadline = Date.now() + timeoutMs;
 
   const matches: SearchMatch[] = [];
   const perFileCounts: Array<{ file: string; count: number }> = [];

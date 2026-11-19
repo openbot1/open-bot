@@ -21,7 +21,10 @@ async function runCli(args, dataDir) {
   try {
     const { stdout, stderr } = await run(process.execPath, [cli, ...args, '--data-dir', dataDir], {
       cwd: repo,
-      timeout: 60_000,
+      // Cold start của CLI đo được ~30s khi máy rỗi, > 60s dưới tải suite
+      // (máy 1,5 CPU + sóng song song — r6 các test fail đúng mốc 60s);
+      // 300s là headroom thật cho máy này.
+      timeout: 300_000,
     });
     return { code: 0, stdout, stderr };
   } catch (err) {

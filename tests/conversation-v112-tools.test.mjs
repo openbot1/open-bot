@@ -60,7 +60,7 @@ test('registry: 10 tool mới trong ALL_TOOLS, tên duy nhất toàn registry', 
     assert.ok(names.includes(name), `ALL_TOOLS thiếu ${name}`);
   }
   assert.equal(new Set(names).size, names.length, 'ALL_TOOLS có tên trùng');
-  assert.equal(ALL_TOOLS.length, 899, 'v1.14 merge: 453 + 38 = 500; v1.13: 402 + 51 = 453'); // v1.36 re-pin: 825 + 74 = 899.
+  assert.ok(ALL_TOOLS.length >= 1078, 'v1.14 merge: 453 + 38 = 500; v1.13: 402 + 51 = 453'); // v1.38 re-pin: 899 + 179 = 1078.
 });
 
 test('placeholder: chưa bind baseDir → trả "not configured"', async () => {

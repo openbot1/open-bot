@@ -419,6 +419,12 @@ export type { MemoryV18ToolOptions } from './memoryV18Tools';
 // --- v1.29 (Doi T1): memory v21 tools (portable memory OKF/MemFS/OpenHands: export/import/convert/validate/sync/tombstone/version/sleep/record/bundle-info) ---
 export { createMemoryV21Tools, MEMORY_V21_TOOLS, MEMORY_V21_TOOL_NAMES } from './memoryV21Tools';
 export type { MemoryV21ToolOptions } from './memoryV21Tools';
+// --- v1.37 (Doi T1): memory v22 tools (dreaming consolidation: dream/config/status/report/fact/wiki/budget/snapshot/rollback/audit) ---
+export { createMemoryV22Tools, MEMORY_V22_TOOLS, MEMORY_V22_TOOL_NAMES } from './memoryV22Tools';
+export type { MemoryV22ToolOptions } from './memoryV22Tools';
+// --- v1.38 (Doi T1): memory v23 tools (Mem0-style extract/consolidate local, fusion search 3 tin hieu, scope search, sleep v2, record CRUD, procedural skill, stats + eval) ---
+export { createMemoryV23Tools, MEMORY_V23_TOOLS, MEMORY_V23_TOOL_NAMES } from './memoryV23Tools';
+export type { MemoryV23ToolOptions } from './memoryV23Tools';
 export type { MemoryV9LettaToolOptions } from './memoryV9LettaTools';
 // --- v1.08 (Đội T2): coding agent v2 tools (repo map PageRank symbol-level, architect mode planner/editor, git-first commit/diff/revert/squash) ---
 export { createCodingV2Tools, CODING_V2_TOOLS, CODING_V2_TOOL_NAMES, isCodingV2ToolName } from './codingV2Tools';
@@ -472,7 +478,29 @@ export type { CodingV10ToolOptions, CodingV10ToolName } from './codingV10Tools';
 // stuck detection v2 + recovery + reasoning-block persistence + agent/resume) ---
 export { createCodingV14Tools, CODING_V14_TOOLS, CODING_V14_TOOL_NAMES, isCodingV14ToolName, codingV14DataDir, codingV14RunLogsDir, codingV14ReasoningDir, codingV14EnsureDataDir, codingV14EnsureBaseDir } from './codingV14Tools';
 export type { CodingV14ToolOptions, CodingV14ToolName } from './codingV14Tools';
-// --- v1.06 (Đội T4): voice realtime v5 tools (multi-model router,
+// --- v1.37 (Đội T4): coding agent v15 tools (agent profiles + report-only
+// budget meter + hooks dialog + verify scenarios + agent) ---
+export { createCodingV15Tools, CODING_V15_TOOLS, CODING_V15_TOOL_NAMES, isCodingV15ToolName, codingV15DataDir, codingV15EnsureDataDir, codingV15EnsureBaseDir } from './codingV15Tools';
+export type { CodingV15ToolOptions, CodingV15ToolName } from './codingV15Tools';
+// --- v1.38 (Đội T4): coding agent v16 tools (token budget + harness
+// cost + minimal harness + file window + lint-gated edit + history
+// trim + benchmark) ---
+export { createCodingV16Tools, CODING_V16_TOOLS, CODING_V16_TOOL_NAMES, isCodingV16ToolName, codingV16DataDir, codingV16EnsureDataDir, codingV16EnsureBaseDir } from './codingV16Tools';
+export type { CodingV16ToolOptions, CodingV16ToolName } from './codingV16Tools';
+// --- v1.39 (Đội T4): coding agent v17 tools (event-sourced trajectory
+// + repo-map PageRank v+1 + eval harness + critic/review + Plan Mode +
+// bwrap sandbox thật + agent + verification stack) ---
+export { createCodingV17Tools, CODING_V17_TOOLS, CODING_V17_TOOL_NAMES, isCodingV17ToolName, codingV17DataDir, codingV17EnsureDataDir, codingV17EnsureBaseDir, codingV17SandboxRootDir } from './codingV17Tools';
+export type { CodingV17ToolOptions, CodingV17ToolName } from './codingV17Tools';
+// --- v1.40 (Đội T4): coding agent v18 tools (critic chấm trajectory
+// trước push + review skill 16 rule + dependency map + zones +
+// eval 3 verifier + verify + agent + config) ---
+export { createCodingV18Tools, CODING_V18_TOOLS, CODING_V18_TOOL_NAMES, isCodingV18ToolName, codingV18DataDir, codingV18EnsureDataDir, codingV18EnsureBaseDir } from './codingV18Tools';
+export type { CodingV18ToolOptions, CodingV18ToolName } from './codingV18Tools';
+// --- v1.41 (Đội T4): coding agent v19 tools (event-backed conversation +
+// workspace tách bạch + plugins mcp.json + presets + marketplace + agent) ---
+export { createCodingV19Tools, CODING_V19_TOOLS, CODING_V19_TOOL_NAMES, isCodingV19ToolName, codingV19DataDir, codingV19EnsureDataDir, codingV19EnsureBaseDir } from './codingV19Tools';
+export type { CodingV19ToolOptions, CodingV19ToolName } from './codingV19Tools';// --- v1.06 (Đội T4): voice realtime v5 tools (multi-model router,
 // adaptive VAD config, diarized speakers + transcript, sessions) ---
 export { createVoiceV5Tools, VOICE_V5_TOOLS, VOICE_V5_TOOL_NAMES, isVoiceV5ToolName } from './voiceV5Tools';
 export type { VoiceV5ToolOptions, VoiceV5ManagerLike, VoiceV5SessionLike } from './voiceV5Tools';

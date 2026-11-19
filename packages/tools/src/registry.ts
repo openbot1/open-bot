@@ -43,6 +43,24 @@ import type { ProtocolV3ToolOptions } from './protocolV3Tools';
 // v1.29 (T2): protocols v5 tools — đăng ký qua registerProtocolV5Tools() dưới đây.
 import { createProtocolV5Tools } from './protocolV5Tools';
 import type { ProtocolV5ToolOptions } from './protocolV5Tools';
+// v1.37 (T2): protocols v6 tools — đăng ký qua registerProtocolV6Tools() dưới đây.
+import { createProtocolV6Tools } from './protocolV6Tools';
+import type { ProtocolV6ToolOptions } from './protocolV6Tools';
+// v1.38 (T2): protocols v7 tools — đăng ký qua registerProtocolV7Tools() dưới đây.
+import { createProtocolV7Tools } from './protocolV7Tools';
+import type { ProtocolV7ToolOptions } from './protocolV7Tools';
+// v1.39 (T2): protocols v8 tools — đăng ký qua registerProtocolV116Tools() dưới đây.
+import { createProtocolV116Tools } from './protocolV116Tools';
+import type { ProtocolV116ToolOptions } from './protocolV116Tools';
+// v1.40 (T2): protocols v9 tools — đăng ký qua registerProtocolV117Tools() dưới đây.
+import { createProtocolV117Tools } from './protocolV117Tools';
+import type { ProtocolV117ToolOptions } from './protocolV117Tools';
+// v1.41 (T2): protocols v10 tools — đăng ký qua registerProtocolV118Tools() dưới đây.
+import { createProtocolV118Tools } from './protocolV118Tools';
+import type { ProtocolV118ToolOptions } from './protocolV118Tools';
+// v1.42 (T2): protocols v11 tools — đăng ký qua registerProtocolV119Tools() dưới đây.
+import { createProtocolV119Tools } from './protocolsV11Tools';
+import type { ProtocolV119ToolOptions } from './protocolsV11Tools';
 // v1.29 (T4): Composio v6 tools — đăng ký qua registerComposioV129Tools() dưới đây.
 import { createComposioV129Tools } from './composioV129Tools';
 import type { ComposioV129ToolOptions } from './composioV129Tools';
@@ -55,6 +73,18 @@ export { PROTOCOL_V3_TOOLS, PROTOCOL_V3_TOOL_NAMES, createProtocolV3Tools, isPro
 export type { ProtocolV3ToolName, ProtocolV3ToolOptions } from './protocolV3Tools';
 export { PROTOCOL_V5_TOOLS, PROTOCOL_V5_TOOL_NAMES, createProtocolV5Tools, isProtocolV5ToolName } from './protocolV5Tools';
 export type { ProtocolV5ToolName, ProtocolV5ToolOptions } from './protocolV5Tools';
+export { PROTOCOL_V6_TOOLS, PROTOCOL_V6_TOOL_NAMES, createProtocolV6Tools, isProtocolV6ToolName } from './protocolV6Tools';
+export type { ProtocolV6ToolName, ProtocolV6ToolOptions } from './protocolV6Tools';
+export { PROTOCOL_V7_TOOLS, PROTOCOL_V7_TOOL_NAMES, createProtocolV7Tools, isProtocolV7ToolName } from './protocolV7Tools';
+export type { ProtocolV7ToolName, ProtocolV7ToolOptions } from './protocolV7Tools';
+export { PROTOCOL_V116_TOOLS, PROTOCOL_V116_TOOL_NAMES, createProtocolV116Tools, isProtocolV116ToolName } from './protocolV116Tools';
+export type { ProtocolV116ToolName, ProtocolV116ToolOptions } from './protocolV116Tools';
+export { PROTOCOL_V117_TOOLS, PROTOCOL_V117_TOOL_NAMES, createProtocolV117Tools, isProtocolV117ToolName } from './protocolV117Tools';
+export type { ProtocolV117ToolName, ProtocolV117ToolOptions } from './protocolV117Tools';
+export { PROTOCOL_V118_TOOLS, PROTOCOL_V118_TOOL_NAMES, createProtocolV118Tools, isProtocolV118ToolName } from './protocolV118Tools';
+export type { ProtocolV118ToolName, ProtocolV118ToolOptions } from './protocolV118Tools';
+export { PROTOCOL_V119_TOOLS, PROTOCOL_V119_TOOL_NAMES, createProtocolV119Tools, isProtocolV119ToolName } from './protocolsV11Tools';
+export type { ProtocolV119ToolName, ProtocolV119ToolOptions } from './protocolsV11Tools';
 export { COMPOSIO_V129_TOOLS, COMPOSIO_V129_TOOL_NAMES, createComposioV129Tools, isComposioV129ToolName } from './composioV129Tools';
 export type { ComposioV129ToolOptions } from './composioV129Tools';
 
@@ -240,6 +270,94 @@ export class ToolRegistry {
    */
   registerProtocolV5Tools(options: ProtocolV5ToolOptions = {}): void {
     this.registerMany(createProtocolV5Tools(options));
+  }
+
+  /**
+   * v1.37 (T2): protocols v6 tools — negotiate, versions, ACP v2
+   * sessions (message ids) + out-of-turn updates + structured
+   * file changes, stable elicitation (form / URL / modes), A2A 1.1
+   * two-way stream start/send/control, protocol registry (Poppy
+   * watch-only). The host binds the ACP v2 session engine / agent
+   * runner, file-change set, elicitation manager and registry via
+   * ProtocolV6ToolOptions; without them the tools fall back to
+   * fresh local instances (or a local echo simulation, for ACP
+   * prompts and the A2A agent side).
+   */
+  registerProtocolV6Tools(options: ProtocolV6ToolOptions = {}): void {
+    this.registerMany(createProtocolV6Tools(options));
+  }
+
+  /**
+   * v1.38 (T2): protocols v7 tools — negotiate, versions, A2A 1.0.1
+   * card (JWS + rotation + multi-tenant registry + trust) + long
+   * tasks + loopback client + JSON-RPC server, MCP stateless
+   * transport, UCP read-only catalog/order, governance delegation
+   * + human escalation + hash-chained audit log. The host binds
+   * the card issuer / registry / trust store, task store / engine,
+   * A2A server, MCP stateless server, UCP adapter, governance
+   * engine / escalation queue / audit log via ProtocolV7ToolOptions;
+   * without them the tools share fresh local in-memory instances.
+   */
+  registerProtocolV7Tools(options: ProtocolV7ToolOptions = {}): void {
+    this.registerMany(createProtocolV7Tools(options));
+  }
+
+  /**
+   * v1.39 (T2): protocols v8 tools — server/discover + extension
+   * negotiation, MCP Apps host (ui:// + CSP), Tasks extension
+   * (task handle + non-blocking poll + MRTR), OAuth 2.1 / OIDC
+   * (mandatory PKCE S256, exact-match redirect URIs), deprecation
+   * handling (SEP-2577, removal floor 2027-07-28), NANDA local
+   * sketch (registry + self-signed identity + trust store),
+   * Server Cards, Skills over MCP. The host binds the MCP
+   * transport / stateless server, app registry, task engine,
+   * deprecation tracker, NANDA registry / trust store and skill
+   * registry via ProtocolV116ToolOptions; without them the tools
+   * share fresh local in-memory instances.
+   */
+  registerProtocolV116Tools(options: ProtocolV116ToolOptions = {}): void {
+    this.registerMany(createProtocolV116Tools(options));
+  }
+
+  /**
+   * v1.40 (T2): protocols v9 tools — versions, MCP Apps + Apps v2
+   * lifecycle, ACP detect/sessions/prompt, A2A cards/tasks/messages/
+   * delegate, unified registry, combined snapshots. The host binds
+   * the app registry / lifecycle manager, ACP session manager, A2A
+   * card registry and task store via ProtocolV117ToolOptions;
+   * without them the tools share fresh local in-memory instances.
+   */
+  registerProtocolV117Tools(options: ProtocolV117ToolOptions = {}): void {
+    this.registerMany(createProtocolV117Tools(options));
+  }
+
+  /**
+   * v1.41 (T2): protocols v10 tools — versions, stateless v10
+   * (discover / list / call / subscribe / state handles),
+   * OAuth v10 (issuer validation, token binding, DCR gate),
+   * tool search (defer_loading + script), Tasks v10, Apps
+   * v10 (resource / CSP + postMessage bridge), multi
+   * round-trip, A2A v1.0 handshake, deprecation registry,
+   * unified registry counts. The host binds the stateless
+   * server, search registry, task engine, app bridge and
+   * deprecation registry via ProtocolV118ToolOptions;
+   * without them the tools share fresh local in-memory instances.
+   */
+  registerProtocolV118Tools(options: ProtocolV118ToolOptions = {}): void {
+    this.registerMany(createProtocolV118Tools(options));
+  }
+
+  /**
+   * v1.42 (T2): protocols v11 tools — MCP 2.0 stateless core,
+   * cacheable lists, MRTR, Tasks extension, mandatory iss
+   * validation, handshake fallback, Apps UI extension,
+   * deprecation registry, unified registry counts. The host binds
+   * the stateless server, task engine and list cache via
+   * ProtocolV119ToolOptions; without them the tools share fresh
+   * local in-memory instances.
+   */
+  registerProtocolV119Tools(options: ProtocolV119ToolOptions = {}): void {
+    this.registerMany(createProtocolV119Tools(options));
   }
 
   /**

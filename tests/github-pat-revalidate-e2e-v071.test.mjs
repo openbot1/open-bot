@@ -335,9 +335,13 @@ test('e2e: PAT GitHub được xác thực lại qua IPC thật — 401 thành e
 
   // `apps:set-token` xác thực PAT với mock (200 + login) rồi lưu
   // Vault + seed cache; UI lật sang connected, kèm nhãn tài khoản.
+  // v1.44 fix round 8 (suite r8): 20s không đủ dưới tải full-suite —
+  // các bước trước (onboarding, tạo bot mẫu, mở Connected Apps) đã
+  // ngốn ~40s, tới bước lật connected thì app vẫn đang bận validate +
+  // render. 60s là cửa sổ quan sát; lật không bao giờ xảy ra vẫn fail.
   await waitFor(
     `!document.querySelector('[data-testid="app-token-input-github"]') && document.body.textContent.includes(${JSON.stringify(MOCK_LOGIN)})`,
-    20_000,
+    60_000,
     'GitHub flips to connected with the mock account label after paste',
   );
   assert.ok(mockRequests >= 1, 'paste validated the PAT against the mock GitHub API');

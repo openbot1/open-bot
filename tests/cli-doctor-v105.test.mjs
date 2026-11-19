@@ -9,6 +9,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
+import http from 'node:http';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -27,6 +28,16 @@ function tmpDataDir() {
   return fs.mkdtempSync(path.join(repo, '.tmp-cli-v105-'));
 }
 
+// Hai check đo tải máy thật (cpu: load 1 phút/CPU ≥ 1,5 → fail;
+// memory: RAM trống < 256 MB → fail) — full suite tự làm máy quá tải
+// (load 4–11, RAM trống tụt < 256 MB) nên doctor fail ĐÚNG khi chạy
+// trong suite, không phải lỗi doctor. Hai test e2e dưới đây chỉ kiểm
+// doctor chạy thật + exit 0 + in đủ check, nên lọc đúng 2 check này
+// bằng --only; ngưỡng của chúng được kiểm xác định (env giả) trong
+// tests/doctor-v106.test.mjs, không nới ngưỡng product để test pass.
+const DOCTOR_E2E_ONLY =
+  'node-version,npm-version,os,disk,cli-engines,harness-loopback,harness-port,vault,data-dir,node,datadir,providers,ollama,mcp,headless-port';
+
 function cleanup(dir) {
   try {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -39,7 +50,11 @@ async function runCli(args, dataDir, extraEnv = {}) {
   try {
     const { stdout, stderr } = await run(process.execPath, [cli, ...args], {
       cwd: repo,
-      timeout: 60_000,
+      // Cold start của CLI đo được ~30s khi máy rỗi, > 90s dưới tải suite
+      // (máy 1,5 CPU + sóng song song — test models-refresh r5 mất 121s,
+      // doctor --json r6 mất 191s); 300s là headroom thật cho máy này,
+      // vẫn fail nếu CLI treo hẳn.
+      timeout: 300_000,
       env: { ...process.env, OPENBOT_DATA_DIR: dataDir, ...extraEnv },
     });
     return { code: 0, stdout, stderr };
@@ -72,7 +87,7 @@ bots:
 test('cli doctor: chạy thật, exit 0 khi không có fail, in đủ check', async (t) => {
   const dir = tmpDataDir();
   t.after(() => cleanup(dir));
-  const res = await runCli(['doctor'], dir);
+  const res = await runCli(['doctor', '--only', DOCTOR_E2E_ONLY], dir);
   assert.equal(res.code, 0, `stderr: ${res.stderr}`);
   assert.match(res.stdout, /Node\.js/);
   assert.match(res.stdout, /Ollama local/);
@@ -82,7 +97,7 @@ test('cli doctor: chạy thật, exit 0 khi không có fail, in đủ check', as
 test('cli doctor: --json trả JSON parse được, ok=true khi không fail', async (t) => {
   const dir = tmpDataDir();
   t.after(() => cleanup(dir));
-  const res = await runCli(['doctor', '--json'], dir);
+  const res = await runCli(['doctor', '--json', '--only', DOCTOR_E2E_ONLY], dir);
   assert.equal(res.code, 0, `stderr: ${res.stderr}`);
   const report = JSON.parse(res.stdout);
   assert.equal(report.ok, true);
@@ -207,6 +222,34 @@ test('cli headless: logs khi chưa chạy bao giờ -> exit 1 rõ', async (t) =>
   assert.match(res.stderr, /Chưa có log/);
 });
 
+// Hồi quy v1.44 fix round 6 (suite r5): server lạ đang giữ cổng thì
+// /health vẫn trả ok — start phải chờ đúng pid mình spawn, hết 60s thì
+// fail rõ, không báo thành công giả (rồi `logs` không thấy file log).
+test('cli headless: start không nhận nhầm server lạ đang giữ cổng (so pid)', async (t) => {
+  const dir = tmpDataDir();
+  t.after(() => cleanup(dir));
+  const fake = http.createServer((_req, res) => {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok', version: 'test', uptimeSeconds: 0, pid: 999999 }));
+  });
+  // v1.44 fix round 8 (suite r8): cổng tạm (port 0) thay vì cố định
+  // 18796 — sóng khác chạy cùng lúc trên máy này (worktree khác) cũng
+  // dùng 18796 cho test này, r8 fail EADDRINUSE vì fake server của
+  // sóng khác đang giữ cổng. Test vẫn kiểm đúng điều cần kiểm: start
+  // không được nhận nhầm server lạ đang giữ cổng.
+  const fakePort = await new Promise((resolve) => {
+    fake.listen(0, '127.0.0.1', () => resolve(fake.address().port));
+  });
+  try {
+    const started = await runCli(['headless', 'start', '--port', String(fakePort)], dir);
+    assert.notEqual(started.code, 0);
+    assert.match(started.stderr, /không trả \/health/);
+  } finally {
+    await new Promise((resolve) => fake.close(() => resolve()));
+    await runCli(['headless', 'stop'], dir);
+  }
+});
+
 test('cli team: diff liệt kê thêm/bớt/đổi, diff giống hệt báo không đổi', async (t) => {
   const dir = tmpDataDir();
   t.after(() => cleanup(dir));
@@ -235,7 +278,11 @@ test('cli team: diff liệt kê thêm/bớt/đổi, diff giống hệt báo khô
 test('cli models refresh: ollama không chạy -> lỗi rõ, exit 1', async (t) => {
   const dir = tmpDataDir();
   t.after(() => cleanup(dir));
-  const res = await runCli(['models', 'refresh', '--provider', 'ollama'], dir);
+  // Trỏ Ollama tới port đóng (127.0.0.1:1) để test không phụ thuộc vào
+  // việc máy chạy suite có đang chạy `ollama serve` hay không.
+  const res = await runCli(['models', 'refresh', '--provider', 'ollama'], dir, {
+    OLLAMA_HOST: 'http://127.0.0.1:1',
+  });
   assert.equal(res.code, 1);
   assert.match(res.stdout, /ollama/);
 });

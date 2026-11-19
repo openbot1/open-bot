@@ -203,7 +203,7 @@ after(() => {
 function runCli(args, dataDir) {
   return spawnSync(process.execPath, [cli, ...args, '--data-dir', dataDir], {
     encoding: 'utf8',
-    timeout: 30000,
+    timeout: 90000, // cold start ~30s on this machine; 30s killed the child mid-startup
     env: { ...process.env, OPENBOT_DATA_DIR: dataDir },
   });
 }
@@ -217,7 +217,7 @@ function writeCommands(dataDir, commands) {
 }
 
 test('cli hooks: --help mentions the hooks commands', () => {
-  const res = spawnSync(process.execPath, [cli, '--help'], { encoding: 'utf8', timeout: 10000 });
+  const res = spawnSync(process.execPath, [cli, '--help'], { encoding: 'utf8', timeout: 60000 });
   assert.equal(res.status, 0);
   assert.match(res.stdout, /hooks list/);
   assert.match(res.stdout, /hooks test/);

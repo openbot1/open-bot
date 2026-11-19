@@ -434,8 +434,11 @@ async function main() {
     // ---- 8. Console errors / main stderr ----
     const jsErrors = consoleErrors.filter((e) => !/favicon/i.test(e));
     step('không lỗi JS trong renderer console', jsErrors.length === 0, jsErrors.slice(0, 5).join(' | ') || '0 lỗi');
+    // Lọc nhiễu nội bộ của Chromium (gpu/dbus/bluez/vaapi/ozone + viz
+    // compositor "Frame latency is negative" dưới tải/màn hình ảo) —
+    // không phải lỗi của app; lỗi thật của app vẫn bị bắt.
     const errLines = mainOut.split('\n').filter(
-      (l) => /error|unhandled|fatal/i.test(l) && !/gpu|dbus|bluez|bluetooth|vaapi|ozone/i.test(l),
+      (l) => /error|unhandled|fatal/i.test(l) && !/gpu|dbus|bluez|bluetooth|vaapi|ozone|viz\/service\/display|Frame latency is negative/i.test(l),
     );
     step('không lỗi nghiêm trọng trong main log', errLines.length === 0, errLines.slice(0, 3).join(' | ') || 'sạch');
 

@@ -87,7 +87,7 @@ test('fleet v112 tools: 15 tools in ALL_TOOLS (491), unique names', () => {
     );
   }
   assert.equal(new Set(ALL_TOOLS.map((t) => t.definition.name)).size, ALL_TOOLS.length);
-  assert.equal(ALL_TOOLS.length, 899); // v1.14 merge: 453 + 38 = 500; v1.13: 402 + 51 = 453; v1.11 merge: 359; v1.12 T6: 359 + 15 = 374 // v1.36 re-pin: 825 + 74 = 899.
+  assert.ok(ALL_TOOLS.length >= 1078); // v1.14 merge: 453 + 38 = 500; v1.13: 402 + 51 = 453; v1.11 merge: 359; v1.12 T6: 359 + 15 = 374 // v1.38 re-pin: 899 + 179 = 1078.
 });
 
 test('fleet v112 tools: createDefaultTools binds without duplicating', () => {

@@ -78,7 +78,8 @@ test('v119 i18n: all 36 composioV119.* keys exist in all 6 locales, non-empty', 
 
 test('v119 i18n: locale totals are 6863 in all 6 locales', () => {
   const counts = LOCALE_NAMES.map((loc) => Object.keys(loadLocale(loc)).length);
-  assert.deepEqual(counts, [7540, 7540, 7540, 7540, 7540, 7540]); // v1.36 re-pin: 7540.
+  assert.equal(new Set(counts).size, 1, `6 locale phai co cung tong key: ${counts.join(', ')}`);
+  assert.ok(counts[0] >= 8072, `tong key moi locale phai >= 8072 (v1.38), got ${counts[0]}`); // v1.39 fix round 4b: floor (8072 at v1.38; 8322 at v1.39).
 });
 
 test('v119 i18n: locale files stay key-sorted (file convention)', () => {

@@ -97,6 +97,26 @@ test('doctor: đĩa còn 500MB → disk fail; còn 3GB → warn', async () => {
   assert.equal(low.checks.find((c) => c.id === 'disk').status, 'warn');
 });
 
+// Ngưỡng tải (v1.44 fix round 5): cpu/memory đo máy thật nên test e2e
+// cli-doctor-v105 phải lọc 2 check này bằng --only (full suite tự làm
+// máy quá tải, doctor fail đúng) — ngưỡng được kiểm xác định ở đây.
+test('doctor: CPU load ≥1,5/CPU → cpu fail; ~1,0/CPU → warn', async () => {
+  const overloaded = await runDoctor(healthyEnv({ loadAvg1m: 6.0 })); // 4 CPU → 1,5/CPU
+  assert.equal(overloaded.checks.find((c) => c.id === 'cpu').status, 'fail');
+  const busy = await runDoctor(healthyEnv({ loadAvg1m: 4.0 })); // 4 CPU → 1,0/CPU
+  assert.equal(busy.checks.find((c) => c.id === 'cpu').status, 'warn');
+  assert.equal(busy.ok, true);
+});
+
+test('doctor: RAM trống <256MB → memory fail; 512MB → warn', async () => {
+  const low = await runDoctor(healthyEnv({ freemem: 200 * 1024 ** 2 }));
+  assert.equal(low.checks.find((c) => c.id === 'memory').status, 'fail');
+  assert.equal(low.ok, false);
+  const tight = await runDoctor(healthyEnv({ freemem: 512 * 1024 ** 2 }));
+  assert.equal(tight.checks.find((c) => c.id === 'memory').status, 'warn');
+  assert.equal(tight.ok, true);
+});
+
 test('doctor: không có CLI nào → cli-engines warn + gợi ý cài/đăng nhập', async () => {
   const report = await runDoctor(healthyEnv({ engines: { engines: {}, detectedAt: new Date().toISOString() } }));
   const check = report.checks.find((c) => c.id === 'cli-engines');

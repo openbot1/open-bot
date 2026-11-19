@@ -118,9 +118,11 @@ after(() => {
 });
 
 function runCli(args, dataDir) {
+  // v1.44 fix round 8 (suite r8): như risk-budget — CLI cold start
+  // 2,7s khi rảnh, vượt 30s dưới tải full-suite → spawnSync ETIMEDOUT.
   return spawnSync(process.execPath, [cli, ...args, '--data-dir', dataDir], {
     encoding: 'utf8',
-    timeout: 30000,
+    timeout: 120000,
     env: { ...process.env, OPENBOT_DATA_DIR: dataDir },
   });
 }

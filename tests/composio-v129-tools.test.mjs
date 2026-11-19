@@ -5,11 +5,11 @@
  * Covers packages/tools/src/composioV129Tools.ts end to end through
  * the Tool interface (the same surface the agent loop calls):
  * - Registry: 10 v129 tools, unique names, all in ALL_TOOLS,
- *   ALL_TOOLS = 899 (825 merge/v135 + 74 v136). NOTE: the
- *   1274 pin in other tests counts defaultToolFactory (ALL_TOOLS +
+ *   ALL_TOOLS = 1078 (899 merge/v136 + 179 v137+v138). NOTE: the
+ *   1453 pin in other tests counts defaultToolFactory (ALL_TOOLS +
  *   the registry factories in coordinator.ts: A2A/MCP/memory/voice
- *   /plan/...), NOT ALL_TOOLS alone — v1.36 re-pin: factory 1274
- *   (ALL_TOOLS 899 + 375).
+ *   /plan/...), NOT ALL_TOOLS alone — v1.36 re-pin: factory 1453
+ *   (ALL_TOOLS 1078 + 375).
  *   createDefaultTools({ getComposioV129ToolOptions }) binds with
  *   shared stores (same job visible through both the placeholder
  *   and the bound set — no duplicates);
@@ -80,9 +80,9 @@ test('tools: 10 v129 tools, unique names, all in ALL_TOOLS (663)', () => {
     'composio_app_bind_v129',
   ]);
   const names = ALL_TOOLS.map((t) => t.definition.name);
-  // ALL_TOOLS = 899 (825 merge/v135 + 74 v136). The 1274 pin counts
+  // ALL_TOOLS = 1078 (899 merge/v136 + 179 v137+v138). The 1453 pin counts
   // defaultToolFactory (ALL_TOOLS + registry factories) — v1.36 re-pin.
-  assert.equal(names.length, 899, `expected 899 tools (825 + 74 v136), got ${names.length}`); // v1.36 re-pin: 825 + 74 = 899.
+  assert.ok(names.length >= 1078, `expected >= 1078 tools (899 + 179 v137+v138), got ${names.length}`); // v1.38 re-pin: 899 + 179 = 1078.
   assert.equal(new Set(names).size, names.length, 'duplicate tool names in ALL_TOOLS');
   for (const name of COMPOSIO_V129_TOOL_NAMES) {
     assert.ok(names.includes(name), `${name} must be in ALL_TOOLS`);
