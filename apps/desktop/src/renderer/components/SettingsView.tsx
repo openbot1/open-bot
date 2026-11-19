@@ -153,6 +153,7 @@ export default function SettingsView({ onBack, botId = null, onOpenConnectedApps
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
   // v0.4: Vault + usage + limits + dream + performance.
   const [vaultSecrets, setVaultSecrets] = useState<Record<string, string[]>>({});
+  const [vaultStorageStatus, setVaultStorageStatus] = useState<{ status: 'available' | 'degraded' | 'unavailable'; backend: 'os-keychain' | 'local-fallback' | 'unavailable'; canWrite: boolean; canWriteWithConsent: boolean; consentRequired: boolean } | null>(null);
   const [usage, setUsage] = useState<SpendStatusData | null>(null);
   const [limits, setLimits] = useState<{ dailyUsd?: number; monthlyUsd?: number }>({});
   const [dream, setDream] = useState<{ enabled: boolean; idleMinutes: number }>({ enabled: false, idleMinutes: 15 });
@@ -1831,7 +1832,12 @@ export default function SettingsView({ onBack, botId = null, onOpenConnectedApps
       setVaultError('');
     }
     try {
-      setVaultSecrets(await window.openBot.listVaultSecrets());
+      const [secrets, storageStatus] = await Promise.all([
+        window.openBot.listVaultSecrets(),
+        window.openBot.getVaultStorageStatus(),
+      ]);
+      setVaultSecrets(secrets);
+      setVaultStorageStatus(storageStatus);
       setVaultError('');
       vaultLoadedOnce.current = true;
     } catch {
@@ -2034,7 +2040,7 @@ export default function SettingsView({ onBack, botId = null, onOpenConnectedApps
     connectorMessage, connectorBusy, startConnector,
     updateInfo, checkingUpdate, checkUpdate, openUpdateDownload, updateStatus, updateTrack,
     changeUpdateTrack, updateStatusError, updateStatusLoading, reloadUpdateStatus: loadUpdateStatus,
-    vaultSecrets, deleteVaultKey, noStorage, changeNoStorage,
+    vaultSecrets, vaultStorageStatus, deleteVaultKey, noStorage, changeNoStorage,
     noStorageLoading, noStorageError, reloadNoStorage: loadNoStorage,
     vaultLoading, vaultError, reloadVault: loadVault,
     onePasswordStatus, onePasswordBusy, onePasswordChecking, onePasswordError,
