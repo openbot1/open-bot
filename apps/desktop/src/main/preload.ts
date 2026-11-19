@@ -2894,6 +2894,7 @@ const openBot: OpenBotApi = {
   // v0.4: Vault + Usage.
   listVaultSecrets: () => ipcRenderer.invoke('vault:list'),
   getVaultStorageStatus: () => ipcRenderer.invoke('vault:get-storage-status'),
+  'vault:get-storage-status': () => ipcRenderer.invoke('vault:get-storage-status'),
   setVaultSecret: (namespace, key, value, opts) => ipcRenderer.invoke('vault:set', {
     namespace, key, value, allowLocalFallback: opts?.allowLocalFallback === true,
   }),
