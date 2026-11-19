@@ -2143,7 +2143,6 @@ export interface OpenBotApi {
   listServiceAccounts: () => Promise<unknown[]>;
   createServiceAccount: (payload: { name: string; scope: string; allowLocalFallback?: boolean }) => Promise<unknown>;
   deleteServiceAccount: (id: string) => Promise<boolean>;
-  getVaultStorageStatus: () => Promise<{ status: 'available' | 'degraded' | 'unavailable'; backend: 'os-keychain' | 'local-fallback' | 'unavailable'; canWrite: boolean; canWriteWithConsent: boolean; consentRequired: boolean }>;
   getVaultNoStorage: () => Promise<{ enabled: boolean; pendingSecrets: number }>;
   setVaultNoStorage: (
     enabled: boolean,
