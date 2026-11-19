@@ -982,7 +982,7 @@ export function unwrapBingRedirect(href: string): string {
  * `<li class="b_algo"><h2><a href=...>title</a></h2><p>snippet</p>`.
  * Returns [] when Bing blocks the request or its layout changed.
  */
-export async function searchBing(
+async function searchBingWithPolicy(
   query: string,
   getEgressPolicy?: () => EgressPolicy | null | undefined,
 ): Promise<Array<{ href: string; title: string; snippet: string }>> {
@@ -1008,6 +1008,13 @@ export async function searchBing(
   return out;
 }
 
+/** Public legacy helper retained with its original signature. */
+export async function searchBing(
+  query: string,
+): Promise<Array<{ href: string; title: string; snippet: string }>> {
+  return searchBingWithPolicy(query);
+}
+
 export function formatSearchResults(
   query: string,
   source: string,
@@ -1026,7 +1033,7 @@ export function formatSearchResults(
  * fallback. Returns null when neither engine yields usable results.
  * Used by `web_search` and by `x_search` (with a `site:x.com` prefix).
  */
-export async function searchWeb(
+async function searchWebWithPolicy(
   query: string,
   getEgressPolicy?: () => EgressPolicy | null | undefined,
 ): Promise<{ source: string; results: Array<{ href: string; title: string; snippet: string }> } | null> {
@@ -1045,9 +1052,16 @@ export async function searchWeb(
   } catch {
     // Fall through to the Bing fallback below.
   }
-  const bingResults = await searchBing(query, getEgressPolicy);
+  const bingResults = await searchBingWithPolicy(query, getEgressPolicy);
   if (bingResults.length > 0) return { source: 'Bing', results: bingResults };
   return null;
+}
+
+/** Public legacy helper retained with its original signature. */
+export async function searchWeb(
+  query: string,
+): Promise<{ source: string; results: Array<{ href: string; title: string; snippet: string }> } | null> {
+  return searchWebWithPolicy(query);
 }
 
 function createWebSearchTool(
@@ -1071,7 +1085,7 @@ function createWebSearchTool(
     async execute(args) {
       try {
         const query = getStringArg(args, 'query');
-        const found = await searchWeb(query, getEgressPolicy);
+        const found = await searchWebWithPolicy(query, getEgressPolicy);
         if (!found) {
           return errorResult(
             'Web search failed: DuckDuckGo returned no usable results (blocked or layout changed) ' +
