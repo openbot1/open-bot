@@ -82,7 +82,8 @@ import {
   createPluginTemplate,
   createProvider,
   createRolePolicyChecker,
-  createSafeStorageEncryptor,
+  openVaultWithSafeStorage,
+  WEBHOOK_KEYS_FILE,
   clearComposioApiKey,
   clearComposioUserId,
   createServiceAccount,
@@ -964,27 +965,23 @@ function settingsForRenderer(): {
 const VAULT_FILE = 'vault.json';
 const USAGE_FILE = 'usage.json';
 let vault: Vault;
-/** Encryptor của Vault chính — WebhookKeyStore dùng chung backend này (v0.59). */
+/** Encryptor OS-backed — sibling secret stores use their own safe opener/migration. */
 let vaultEncryptor: Encryptor | undefined;
+let vaultStorageStatus: 'available' | 'degraded' | 'unavailable' = 'unavailable';
 let usageTracker: UsageTracker;
 
 function initVaultAndUsage(userDataDir: string): void {
-  // safeStorage là backend chính; khi OS không có keychain/DPAPI thì
-  // createSafeStorageEncryptor throw -> fallback LocalEncryptor
-  // (key file vault.json.key, mode 0600) + log cảnh báo MỘT dòng.
-  try {
-    vaultEncryptor = createSafeStorageEncryptor(safeStorage);
-    vault = new Vault({
-      storePath: path.join(userDataDir, VAULT_FILE),
-      encryptor: vaultEncryptor,
-    });
-  } catch (err) {
-    vaultEncryptor = undefined;
-    console.error(
-      '[open-bot] safeStorage không khả dụng, dùng LocalEncryptor fallback:',
-      (err as Error).message,
-    );
-    vault = new Vault({ storePath: path.join(userDataDir, VAULT_FILE) });
+  const opened = openVaultWithSafeStorage({
+    storePath: path.join(userDataDir, VAULT_FILE),
+    safeStorage,
+  });
+  vault = opened.vault;
+  vaultEncryptor = opened.encryptor;
+  vaultStorageStatus = opened.status;
+  if (opened.status === 'degraded') {
+    console.error('[open-bot] Vault đang ở degraded mode: LocalEncryptor fallback; persistent secret writes require user confirmation.');
+  } else if (opened.status === 'unavailable') {
+    console.error('[open-bot] Vault unavailable: existing encrypted entries could not all be decrypted; persistent writes are disabled and ciphertext is preserved.');
   }
   usageTracker = new UsageTracker({ storePath: path.join(userDataDir, USAGE_FILE) });
 }
@@ -1128,10 +1125,15 @@ function notifyBotEvent(
 let webhookKeyStore: WebhookKeyStore | null = null;
 function getWebhookKeyStore(): WebhookKeyStore {
   if (!webhookKeyStore) {
-    webhookKeyStore = new WebhookKeyStore({
-      dir: app.getPath('userData'),
-      ...(vaultEncryptor ? { encryptor: vaultEncryptor } : {}),
+    const dir = app.getPath('userData');
+    const opened = openVaultWithSafeStorage({
+      storePath: path.join(dir, WEBHOOK_KEYS_FILE),
+      safeStorage,
     });
+    webhookKeyStore = new WebhookKeyStore({ dir, vault: opened.vault });
+    if (opened.status === 'unavailable') {
+      console.error('[open-bot] Webhook key store unavailable; existing encrypted keys were preserved and writes are disabled.');
+    }
   }
   return webhookKeyStore;
 }
@@ -1168,7 +1170,18 @@ function migrateApiKeysToVault(): void {
     const key = p.apiKey?.trim();
     if (!key) continue;
     if (!vault.hasSecret('provider', id)) {
-      vault.setSecret('provider', id, key);
+      try {
+        // Legacy plaintext migration is not treated as user consent to the
+        // weaker LocalEncryptor fallback. Keep the source value intact if
+        // persistence is refused so no credential is silently discarded.
+        vault.setSecret('provider', id, key);
+      } catch (err) {
+        console.error(
+          '[open-bot] Deferred legacy API-key migration; Vault requires OS storage or an explicit user-approved save:',
+          (err as Error).message,
+        );
+        continue;
+      }
     }
     p.apiKey = '';
     moved = true;
@@ -4185,6 +4198,7 @@ async function startOAuthLogin(
   clientId?: string,
   clientSecret?: string,
   connectorId?: string,
+  allowLocalFallback = false,
 ): Promise<{ ok: boolean; providerId: string; displayName?: string; error?: string }> {
   if (!isOAuthSupported(providerId)) {
     return {
@@ -4238,16 +4252,17 @@ async function startOAuthLogin(
   // dưới key provider và (khi khác) key connector, để coordinator
   // refresh token connector được (connectorClientConfigs đọc theo key
   // connector).
+  const vaultWriteOptions = allowLocalFallback ? { allowLocalFallback: true } : undefined;
   if (typeof clientId === 'string' && clientId.trim()) {
-    vault.setSecret('oauth-client', providerId, clientId.trim());
+    vault.setSecret('oauth-client', providerId, clientId.trim(), vaultWriteOptions);
     if (resolvedConnectorId !== null && resolvedConnectorId !== providerId) {
-      vault.setSecret('oauth-client', resolvedConnectorId, clientId.trim());
+      vault.setSecret('oauth-client', resolvedConnectorId, clientId.trim(), vaultWriteOptions);
     }
   }
   if (typeof clientSecret === 'string' && clientSecret.trim()) {
-    vault.setSecret('oauth-client', `${providerId}-secret`, clientSecret.trim());
+    vault.setSecret('oauth-client', `${providerId}-secret`, clientSecret.trim(), vaultWriteOptions);
     if (resolvedConnectorId !== null && resolvedConnectorId !== providerId) {
-      vault.setSecret('oauth-client', `${resolvedConnectorId}-secret`, clientSecret.trim());
+      vault.setSecret('oauth-client', `${resolvedConnectorId}-secret`, clientSecret.trim(), vaultWriteOptions);
     }
   }
   oauthLoginInFlight = true;
@@ -4274,7 +4289,7 @@ async function startOAuthLogin(
       clientSecret: resolvedClientSecret,
     });
     if (tokens.refreshToken) {
-      vault.setSecret('oauth-refresh', providerId, tokens.refreshToken);
+      vault.setSecret('oauth-refresh', providerId, tokens.refreshToken, vaultWriteOptions);
     }
     // Connector wiring (W11b): persist the full TokenSet where the
     // connector tools read it — Vault 'connector'/<connectorId>.
@@ -4293,7 +4308,7 @@ async function startOAuthLogin(
         ...(tokens.tokenType ? { tokenType: tokens.tokenType } : {}),
         scope: (scopesOverride ?? provider.scopes).join(' '),
       };
-      vault.setSecret('connector', resolvedConnectorId, JSON.stringify(tokenSet));
+      vault.setSecret('connector', resolvedConnectorId, JSON.stringify(tokenSet), vaultWriteOptions);
     }
     // Best-effort: lấy tên/email hiển thị cho identity.
     let displayName: string | undefined;
@@ -7712,6 +7727,8 @@ function registerIpc(): void {
         locale?: string;
         /** v0.86 (P2-7): bật/tắt crash reporting (opt-in, mặc định tắt). */
         crashReportingEnabled?: boolean;
+        /** One-save confirmation from Settings when LocalEncryptor is active. */
+        allowLocalFallback?: boolean;
         /** v0.87c: OS notifications theo từng loại (mặc định cả 3 bật). */
         notifications?: Partial<NotificationSettings>;
       },
@@ -7719,6 +7736,9 @@ function registerIpc(): void {
       // v0.7: validate patch — provider lạ / baseUrl sai / key quá dài đều bị từ chối.
       if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) {
         throw new Error('Tham số settings:set phải là object.');
+      }
+      if (patch.allowLocalFallback !== undefined && typeof patch.allowLocalFallback !== 'boolean') {
+        throw new Error('"allowLocalFallback" phải là boolean.');
       }
       if (isAppLocale(patch.locale)) {
         settings.locale = patch.locale;
@@ -7777,7 +7797,9 @@ function registerIpc(): void {
           realtimeUrl: p.realtimeUrl ?? prev.realtimeUrl,
         };
         if (p.apiKey && p.apiKey.length > 0) {
-          vault.setSecret('provider', id, p.apiKey);
+          vault.setSecret('provider', id, p.apiKey, {
+            allowLocalFallback: patch.allowLocalFallback === true,
+          });
           // v0.98: seed lại key cho router (best-effort).
           void syncRouterApiKeyToCoordinator(id).catch(() => undefined);
         }
@@ -8325,6 +8347,17 @@ function registerIpc(): void {
   );
 
   // --- v0.4: Vault (secret KHÔNG BAO GIỜ rời main process) ---
+  ipcMain.handle('vault:get-storage-status', () => ({
+    status: vaultStorageStatus,
+    backend:
+      vaultStorageStatus === 'available'
+        ? 'os-keychain'
+        : vaultStorageStatus === 'degraded'
+          ? 'local-fallback'
+          : 'unavailable',
+    canWrite: vaultStorageStatus !== 'unavailable',
+  }));
+
   ipcMain.handle('vault:list', () => {
     // Trả về tên key theo namespace — KHÔNG trả value.
     const out: Record<string, string[]> = {};
@@ -8332,14 +8365,21 @@ function registerIpc(): void {
     return out;
   });
 
-  ipcMain.handle('vault:set', (_event: unknown, payload: { namespace: string; key: string; value: string }) => {
+  ipcMain.handle(
+    'vault:set',
+    (
+      _event: unknown,
+      payload: { namespace: string; key: string; value: string; allowLocalFallback?: boolean },
+    ) => {
     // v0.7: namespace/key theo đúng 3 loại credential — session /
     // oauth-refresh / provider (cộng api, service-account, mcp,
     // plugin, identity). Giá trị rỗng hoặc quá dài bị từ chối.
     const namespace = requireId(payload?.namespace, 'namespace');
     const key = requireId(payload?.key, 'key');
     const value = requireString(payload?.value, 'value', 8192);
-    vault.setSecret(namespace, key, value);
+    vault.setSecret(namespace, key, value, {
+      allowLocalFallback: payload?.allowLocalFallback === true,
+    });
     // Key provider đổi -> runtime cũ dùng key cũ phải bỏ.
     if (namespace === 'provider') {
       for (const bot of settings.bots.filter((b) => b.providerId === key)) {
@@ -11610,8 +11650,15 @@ function registerIpc(): void {
       payload !== null &&
       typeof payload === 'object' &&
       (payload as { discardTemporarySecrets?: unknown }).discardTemporarySecrets === true;
+    const allowLocalFallback =
+      payload !== null &&
+      typeof payload === 'object' &&
+      (payload as { allowLocalFallback?: unknown }).allowLocalFallback === true;
     const pendingSecrets = vault.countNoStoragePendingSecrets();
-    vault.setNoStorage(enabled, { discardTemporarySecrets: discard });
+    vault.setNoStorage(enabled, {
+      discardTemporarySecrets: discard,
+      allowLocalFallback,
+    });
     // Lưu lựa chọn để lần mở sau áp lại (Vault không tự nhớ chế độ này).
     settings.vaultNoStorage = enabled;
     saveSettings();
@@ -11694,7 +11741,13 @@ function registerIpc(): void {
     'auth:oauth-start',
     async (
       _event: unknown,
-      payload: { providerId: string; clientId?: string; clientSecret?: string; connectorId?: string },
+      payload: {
+        providerId: string;
+        clientId?: string;
+        clientSecret?: string;
+        connectorId?: string;
+        allowLocalFallback?: boolean;
+      },
     ) => {
       const providerId = requireId(payload?.providerId, 'providerId');
       const clientId = optionalString(payload?.clientId, 'clientId', 512);
@@ -11709,7 +11762,13 @@ function registerIpc(): void {
       ) {
         throw new Error(`Connector "${connectorId}" không hợp lệ.`);
       }
-      const result = await startOAuthLogin(providerId, clientId, clientSecret, connectorId);
+      const result = await startOAuthLogin(
+        providerId,
+        clientId,
+        clientSecret,
+        connectorId,
+        payload?.allowLocalFallback === true,
+      );
       // M7: login connector thành công thì đẩy TokenSet vào kho dùng
       // chung của coordinator đang chạy ngay — bot đã tạo trước lúc
       // kết nối cũng dùng được token mới, không cần tạo lại bot
