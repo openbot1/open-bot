@@ -14,6 +14,7 @@ import { randomUUID } from 'node:crypto';
 
 import {
   Vault,
+  LocalEncryptor,
   openVaultWithSafeStorage,
 } from '../packages/core/dist/vault/index.js';
 
@@ -118,6 +119,33 @@ test('safeStorage ciphertext without its OS keychain is unavailable and left byt
     /writes are disabled|unavailable/i,
   );
   assert.deepEqual(fs.readFileSync(storePathIn(dir)), before);
+});
+
+test('unavailable mixed-key store preserves .new recovery material when no key decrypts every entry', () => {
+  const dir = makeTempDir();
+  const storePath = storePathIn(dir);
+  const keyPath = keyPathIn(dir);
+  const original = new Vault({ storePath, keyFilePath: keyPath });
+  original.setSecret('provider', 'openai', 'readable-by-current-key');
+  const currentKey = fs.readFileSync(keyPath);
+
+  const recoveryKey = Buffer.alloc(32, 0x5a);
+  const recoveryEncryptor = new LocalEncryptor(recoveryKey);
+  const raw = JSON.parse(fs.readFileSync(storePath, 'utf8'));
+  raw.secrets['connector:gmail'] = recoveryEncryptor
+    .encrypt(Buffer.from('readable-only-by-staged-key', 'utf8'))
+    .toString('base64');
+  fs.writeFileSync(storePath, JSON.stringify(raw, null, 2));
+  fs.writeFileSync(`${keyPath}.new`, recoveryKey, { mode: 0o600 });
+
+  const beforeStore = fs.readFileSync(storePath);
+  const safeStorage = fakeSafeStorage(false);
+  const opened = openVaultWithSafeStorage({ storePath, keyFilePath: keyPath, safeStorage });
+
+  assert.equal(opened.status, 'unavailable');
+  assert.ok(fs.readFileSync(keyPath).equals(currentKey), 'the current key is not overwritten by a partial candidate');
+  assert.ok(fs.readFileSync(`${keyPath}.new`).equals(recoveryKey), 'the staged recovery key remains available');
+  assert.deepEqual(fs.readFileSync(storePath), beforeStore, 'unreadable mixed ciphertext is untouched');
 });
 
 test('legacy LocalEncryptor ciphertext migrates to safeStorage without losing secrets', () => {
