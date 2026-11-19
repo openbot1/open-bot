@@ -1372,8 +1372,8 @@ function getWebhookDispatcher(): WebhookDispatcher {
 /**
  * LocalEncryptor fallback is weaker than OS safeStorage. No durable write
  * gets implicit consent, including generated tokens and OAuth refreshes.
- * A supplied true flag represents a one-operation confirmation already
- * performed by the Settings UI; internal/event-driven writes prompt here.
+ * Every degraded-mode write requires a fresh native main-process prompt;
+ * a renderer boolean is only a request hint and never proof of consent.
  */
 async function requestLocalFallbackConsent(
   suppliedConsent: boolean | undefined,
