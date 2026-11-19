@@ -1380,12 +1380,15 @@ async function requestLocalFallbackConsent(
   purpose: string,
 ): Promise<boolean> {
   if (vaultStorageStatus !== 'degraded') return false;
-  if (suppliedConsent === true) return true;
+  // A renderer flag is a request, not proof of a user gesture. Keep the
+  // native main-process confirmation authoritative for every degraded write.
+  const requestedBySettings = suppliedConsent === true;
   const options = {
     type: 'warning' as const,
     title: 'Vault đang dùng mã hoá dự phòng',
     message: 'Secret này sẽ không được bảo vệ bởi OS keychain.',
     detail:
+      (requestedBySettings ? 'Settings đang yêu cầu lưu bằng fallback. ' : '') +
       `Open Bot đang dùng LocalEncryptor cho ${purpose}. Khóa mã hoá nằm trong file cạnh Vault; ` +
       'người đọc được cả hai file có thể giải mã secret. Chỉ tiếp tục cho lần lưu này nếu bạn chấp nhận rủi ro.',
     buttons: ['Huỷ', 'Lưu bằng fallback yếu hơn'],
