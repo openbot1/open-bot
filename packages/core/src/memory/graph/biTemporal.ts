@@ -473,6 +473,12 @@ export function factVersionTimeline(
       });
     }
   }
+  // v1.30 fix: tie-break by validFrom before factId. Two versions of one
+  // edge are often recorded in the same millisecond (seed + correction
+  // in one fast test), so `at` ties; the old factId tie-break is random
+  // (UUIDs) and could put the superseded version AFTER the new one —
+  // the v18 correctionTimeline test then saw 'Hà Nội' as the last step.
+  // The newer version (later validFrom) sorts later deterministically.
   steps.sort((a, b) => {
     const byAt = a.at.localeCompare(b.at);
     if (byAt !== 0) return byAt;

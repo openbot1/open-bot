@@ -10,6 +10,7 @@
     "dev": "npm run dev --workspace=apps/desktop",
     "dist": "npm run dist --workspace=@open-bot/desktop",
     "test": "node --test",
+    "i18n:audit": "node scripts/i18n-audit",
     "typecheck": "npm run typecheck --workspace=@open-bot/core && npm run typecheck --workspace=@open-bot/tools && npm run typecheck --workspace=@open-bot/desktop && npm run typecheck --workspace=@open-bot/cli"
   },
   "version": "0.2.0",

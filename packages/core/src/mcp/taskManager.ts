@@ -219,6 +219,13 @@ export class McpTaskManager {
         timeoutMs,
         signal: entry.controller.signal,
         onStatusChange: (status, data) => {
+          // Không ghi snapshot 'completed' khi chưa có result: với spec
+          // 2025-11-25, waitForCompletion còn gọi tasks/result SAU khi poll
+          // báo completed, nên update này sẽ tạo trạng thái rách
+          // (completed mà result undefined) mà test/UI poll có thể đọc
+          // được. Trạng thái + result cuối do runLoop ghi nguyên tử sau
+          // khi waitForCompletion resolve.
+          if (status === 'completed' && data.result === undefined) return;
           this.update(entry, {
             status,
             pollIntervalMs: data.pollInterval ?? handle.pollIntervalMs,

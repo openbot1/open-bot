@@ -123,14 +123,17 @@ async function runTests(
   task: EvalHarnessV2Task,
   workDir: string,
   baseResults: Map<string, boolean> | null,
-): Promise<{ tests: EvalHarnessV2TestResult[]; sandboxWarning?: string }> {
+): Promise<{ tests: EvalHarnessV2TestResult[]; sandboxWarning?: string; sandboxed: boolean }> {
   const tests: EvalHarnessV2TestResult[] = [];
   let sandboxWarning: string | undefined;
+  // true chỉ khi MỌI lệnh test chạy qua bwrap (không fallback local).
+  let sandboxed = true;
   for (const test of task.tests) {
     const testStarted = Date.now();
     const timeoutMs = Math.min(test.timeoutMs ?? task.timeoutMs, task.timeoutMs);
     const group = test.group ?? (task.kind === 'issue-patch' ? 'fail-to-pass' : 'state-check');
     const res = await runInEvalSandbox(test.command, workDir, timeoutMs);
+    if (!res.sandboxed) sandboxed = false;
     if (res.sandboxWarning !== undefined) sandboxWarning = res.sandboxWarning;
     const basePassed = baseResults?.get(test.id) ?? null;
     const expectationMet =
@@ -149,7 +152,7 @@ async function runTests(
       ...(res.timedOut ? { timedOut: true } : {}),
     });
   }
-  return { tests, sandboxWarning };
+  return { tests, sandboxWarning, sandboxed };
 }
 
 /**
@@ -178,7 +181,11 @@ export async function runEvalHarnessV2Trial(
   let steps = 0;
   let inputTokens = 0;
   let outputTokens = 0;
-  let sandboxed = false;
+  // sandboxed thật: true chỉ khi có ít nhất một lần chạy sandbox VÀ mọi
+  // lần đều qua bwrap (không fallback local). Trước đây nhánh thành công
+  // gán cứng true nên máy không có bwrap vẫn báo đã cách ly (sai).
+  let sandboxed = true;
+  let sawSandboxRun = false;
   let sandboxWarning: string | undefined;
 
   try {
@@ -204,6 +211,8 @@ export async function runEvalHarnessV2Trial(
             workDir,
             Math.min(test.timeoutMs ?? task.timeoutMs, task.timeoutMs),
           );
+          sawSandboxRun = true;
+          if (!res.sandboxed) sandboxed = false;
           if (res.sandboxWarning !== undefined) sandboxWarning = res.sandboxWarning;
           baseResults.set(test.id, res.passed);
         }
@@ -267,6 +276,8 @@ export async function runEvalHarnessV2Trial(
         let commandFailed: string | null = null;
         for (const command of agent.commands ?? []) {
           const res = await runInEvalSandbox(command, workDir, timeoutMs);
+          sawSandboxRun = true;
+          if (!res.sandboxed) sandboxed = false;
           if (res.sandboxWarning !== undefined) sandboxWarning = res.sandboxWarning;
           if (!res.passed) {
             commandFailed = `Lệnh agent fail (exit ${String(res.exitCode)}): "${command.slice(0, 120)}"`;
@@ -278,13 +289,20 @@ export async function runEvalHarnessV2Trial(
           reason = commandFailed;
           const judged = await runTests(task, workDir, baseResults);
           tests = judged.tests;
+          if (judged.tests.length > 0) {
+            sawSandboxRun = true;
+            if (!judged.sandboxed) sandboxed = false;
+          }
           if (judged.sandboxWarning !== undefined) sandboxWarning = judged.sandboxWarning;
         } else {
           // 5. Chấm bằng test xác định.
           const judged = await runTests(task, workDir, baseResults);
           tests = judged.tests;
+          if (judged.tests.length > 0) {
+            sawSandboxRun = true;
+            if (!judged.sandboxed) sandboxed = false;
+          }
           if (judged.sandboxWarning !== undefined) sandboxWarning = judged.sandboxWarning;
-          sandboxed = true;
           const passedCount = tests.filter((t) => t.expectationMet).length;
           const score = weightedScore(tests);
           if (score === 1) {
@@ -325,7 +343,7 @@ export async function runEvalHarnessV2Trial(
     inputTokens,
     outputTokens,
     estimatedCostUsd: estimateEvalCostUsd(inputTokens, outputTokens, options.model),
-    sandboxed,
+    sandboxed: sawSandboxRun && sandboxed,
     ...(sandboxWarning !== undefined ? { sandboxWarning } : {}),
     reason,
     startedAt,

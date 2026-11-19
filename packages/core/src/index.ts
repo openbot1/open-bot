@@ -1851,6 +1851,148 @@ export type {
   CachedPrefetch,
   DeclaredAppTemplate,
 } from './mcp/appsV2';
+// v1.44 (Đội T3): MCP Apps render v2, _meta/discover mở rộng,
+// Tasks v2, memory KG JSONL, agent tools v2.
+export {
+  AppRenderRegistry,
+  AppRenderSession,
+  AppRenderV2Error,
+  describeRenderSession,
+  flattenDescriptor,
+  validateAppUiDescriptor,
+  APP_RENDER_V2_MAX_DEPTH,
+  APP_RENDER_V2_MAX_HISTORY,
+  APP_RENDER_V2_MAX_ITEMS,
+  APP_RENDER_V2_MAX_NODES,
+  APP_RENDER_V2_MAX_OPTIONS,
+  APP_RENDER_V2_MAX_TEXT,
+  APP_UI_NODE_KINDS,
+  APP_UI_TONES,
+} from './mcp/appsRenderV2';
+export type {
+  AppActionDispatch,
+  AppRenderActionRecord,
+  AppRenderSessionOptions,
+  AppRenderSessionSnapshot,
+  AppRenderSessionState,
+  AppRenderSessionStats,
+  AppRenderUiAction,
+  AppUiDescriptor,
+  AppUiDescriptorValidation,
+  AppUiNode,
+  AppUiNodeKind,
+  AppUiTone,
+} from './mcp/appsRenderV2';
+export {
+  buildCapabilityInventory,
+  checkHostCompatibility,
+  describeDiscoveryDiff,
+  describeInventory,
+  diffDiscoveries,
+  fingerprintDiscover,
+  mergeMeta,
+  metaToPlain,
+  parseRequestMeta,
+  parseResultMeta,
+  MetaDiscoverV2Error,
+  INVENTORY_MAX_SCHEMA_BYTES,
+} from './mcp/metaDiscoverV2';
+export type {
+  CapabilityChange,
+  CapabilityEntry,
+  CapabilityInventory,
+  CompatibilityReport,
+  CompatibilityVerdict,
+  DiscoveryDiff,
+  HostCapabilitySet,
+  InventoryFinding,
+  RequestMeta,
+  ResultMeta,
+} from './mcp/metaDiscoverV2';
+export {
+  TaskV2Orchestrator,
+  TasksV2Error,
+  describeTaskV2Job,
+  describeTaskV2Node,
+  isTaskV2Terminal,
+  transportExecutor,
+  TASK_V2_DEFAULT_CONCURRENCY,
+  TASK_V2_DEFAULT_MAX_ARTIFACT_BYTES,
+  TASK_V2_MAX_NODES,
+  TASK_V2_TERMINAL,
+} from './mcp/tasksV2';
+export {
+  TaskV2JobStore,
+  TasksV2StoreError,
+  isTaskV2JobSnapshot,
+  parseTaskV2Snapshot,
+  stringifyTaskV2Snapshot,
+  summarizeTaskV2Snapshot,
+} from './mcp/tasksV2Store';
+export type { TaskV2StoreEntry } from './mcp/tasksV2Store';
+export type {
+  TaskV2Artifact,
+  TaskV2Attempt,
+  TaskV2Definition,
+  TaskV2Event,
+  TaskV2Executor,
+  TaskV2JobProgress,
+  TaskV2JobSnapshot,
+  TaskV2JobStatus,
+  TaskV2Node,
+  TaskV2OrchestratorOptions,
+  TaskV2Status,
+} from './mcp/tasksV2';
+export {
+  MemoryKgJsonl,
+  MemoryKgError,
+  applyEvent,
+  describeMemoryKgStats,
+  diffTimerange,
+  emptyState,
+  eventToJsonl,
+  exportEventsToJson,
+  hashEvent,
+  parseExportedEvents,
+  parseJsonlLine,
+  recallFromState,
+  replayEvents,
+  scoreMatch,
+  signEvent,
+  statsFromState,
+  validateEvent,
+  MEMORY_KG_EVENT_TYPES,
+  MEMORY_KG_MAX_LABEL,
+  MEMORY_KG_MAX_TEXT,
+  MEMORY_KG_MAX_EVENTS_PER_FILE,
+} from './mcp/memoryKgJsonl';
+export type {
+  MemoryKgDiff,
+  MemoryKgEntity,
+  MemoryKgEvent,
+  MemoryKgEventType,
+  MemoryKgExport,
+  MemoryKgNote,
+  MemoryKgRecallHit,
+  MemoryKgRelation,
+  MemoryKgState,
+  MemoryKgStats,
+  RecallOptions,
+  RememberInput,
+  RememberResult,
+} from './mcp/memoryKgJsonl';
+export {
+  McpAppsV2ToolHost,
+  getMcpAppsV2ToolDefinitions,
+  isMcpAppsV2ToolName,
+  MCP_APPS_V2_TOOL_DEFINITIONS,
+  MCP_APPS_V2_TOOL_NAMES,
+} from './mcp/mcpAppsV2Tools';
+export type {
+  McpAppsV2ToolHostOptions,
+  McpAppsV2ToolName,
+  McpAppsV2ToolResult,
+} from './mcp/mcpAppsV2Tools';
 // v1.12 (Đội T6): MCP Apps catalogue v2 — catalogue + tương thích +
 // cài/gỡ app.
 export {
@@ -3122,6 +3264,11 @@ export type {
   A2aTaskState,
   A2aTaskStatus,
 } from './a2a/types';
+// --- v1.42 (Đội T1): A2A v1.0 generation (spec 1.0.0/1.0.1) — signed
+// cards, ListTasks cursor pagination, input-required, peer registry +
+// allowlist, multi-turn injection guard, delegation gate. New folder
+// packages/core/src/a2a/v11/; all names carry the V11 prefix.
+export * from './a2a/v11/index';
 export type {
   McpClient,
   McpConfig,
@@ -6933,6 +7080,48 @@ export * from './voiceV22/index';
 // adaptive streaming + endpointing v2, interruption policy v2,
 // session manager v2, calibration + per-device profiles, monitor ---
 export * from './voiceV23/index';
+// --- v1.37 (Đội T5): voice realtime v24 — per-tool-call timers,
+// dynamic provider/model catalogue + health, mid-session model
+// switching with transcript preservation, session + panel ---
+export * from './voiceV24/index';
+// --- v1.38 (Đội T5): voice realtime v25 — turn-level barge-in /
+// interruption handling, turn-taking + silence detection, real
+// per-provider voice latency + latency-threshold fallback, and
+// per-voice-turn timers (v24 tool-call timers extended to turns) ---
+export * from './voiceV25/index';
+// --- v1.39 (Đội T5): voice realtime v26 — frame-level barge-in
+// detection (suspect -> duck -> confirm -> stop, spoken prefix +
+// resume context), guarded turn-taking (anti-overlap queue,
+// per-phase timeouts), end-to-end latency budget + degraded mode,
+// expanded TTS/STT provider registry (local + API-key via Vault
+// refs, deterministic mocks), session, live status panel + ui://
+export * from './voiceV26/index';
+// --- v1.40 (Đội T5): voice realtime v27 — barge-in v2 (interrupt
+// policy + event log), turn-taking v2 + VAD tuning (presets,
+// calibration, short-noise rejection, turn history), multi-voice
+// personas (per-bot memory, mid-session switch, mock preview,
+// fallback), durable session state (JSON per session, state
+// confirmation, crash recovery) ---
+export * from './voiceV27/index';
+// --- v1.41 (Đội T5): voice v28 — mock realtime transport, VAD
+// hook, realtime session, memory-block voice style, voice
+// command routing, transcript + summary, multi-voice casting ---
+export * from './voiceV28/index';
+// --- v1.42 (Đội T4): voice full-duplex v29 — audio turn detector,
+// barge-in engine (server-driven responses), append-only context,
+// delegated async tool calling, proactive audio, cascaded pipeline
+// with latency budgets, per-minute cost accounting, full-duplex session ---
+export * from './voiceV29/index';
+// --- v1.44 (Đội T4): voice full-duplex v30 — turn detector v2
+// (dual-threshold hysteresis, confirmation buffer, adaptive silence,
+// spike rejection, confidence, echo guard), full-duplex v2 (two lanes,
+// jitter buffer, backpressure, degraded half-duplex, latency SLOs),
+// barge-in v2 (soft/hard, sentence-boundary resume, cooldown,
+// false-positive learning), proactive audio v2 (priority queue,
+// token-bucket rate limiting, dedupe, TTL, presence gating, text
+// fallback), cost ledger v2 (minute + token hybrid, day/week/month
+// rollups, budget envelopes, forecasts, itemised statements) ---
+export * from './voiceV30/index';
 export type {
   S2SProviderKindV15,
   S2SStateV15,
@@ -8645,6 +8834,17 @@ export * from './codingV6/index';
 // --- v1.15 (Doi T3): local model router — registry Ollama/llama.cpp,
 // LRU theo RAM, policy cost/latency/quality, budget + gateway, mock server ---
 export * from './router/local/index';
+// --- v1.42 (Doi T5): router + provider v29 — refresh model catalog
+// (Gemini 3.x live, gpt-realtime-2.1, GPT-Live, Gemini 3.8 Live — chi
+// metadata/config), routing latency/cost/capability, per-model cost
+// ledger, fallback chain, mock health probe tung provider ---
+export * from './routerV29/index';
+// --- v1.44 (Doi T5): router + provider v30 — catalog co version +
+// refresh thu cong/auto co kiem soat, routing theo latency DO DUOC +
+// chi phi + policy user, fallback chain phan loai loi + decision log,
+// health probe cache TTL, auto-detect CLI agent v2 (dong y qua UI,
+// khong doc credential) ---
+export * from './routerV30/index';
 // --- v1.16 (Doi T3): local-model router v2 — discovery GGUF/preset,
 // LRU + TTL theo RAM/VRAM that, crash isolation + restart backoff,
 // swap-groups, picker v2, CLI probe sau, fallback chain + circuit breaker ---
@@ -8702,6 +8902,36 @@ export * from './codingV12/index';
 // (loop signature, oscillation, edit journal rollback), reasoning-block
 // persistence (sidecar JSONL hash-chained + digest event trong run log).
 export * from './codingV14/index';
+// --- v1.37 (Đội T4): coding agent v15 — agent profiles (persona +
+// tool set + model, nhãn ACP), budget meter chỉ-báo-cáo (token +
+// cost ước tính, ngưỡng 80%/100%, vượt cap vẫn chạy), hooks dialog
+// (stop-hook feedback ngoài chat), verify scenarios vượt happy path
+// (9 scenario, kỳ vọng rõ ràng, pass/fail từng scenario), agent
+// pipeline nối 4 lớp trên + v14.
+export * from './codingV15/index';
+// --- v1.38 (Đội T4): coding agent v16 — harness mua token, không mua
+// điểm: token-budget meter + harness-cost estimator (cost/accuracy
+// trade-off), minimal harness (bash-only, preamble gọn), file-window
+// viewer (100 dòng), edit linter gate, history trimmer tự động,
+// benchmark nội bộ đo cost/accuracy.
+export * from './codingV16/index';
+// --- v1.39 (Đội T4): coding agent v17 — event-sourced trajectory log
+// (replay/recovery), repo-map PageRank v+1 (personalized + cập nhật
+// tăng dần), eval harness mở rộng (oracle + test xác định + gate),
+// verification stack (critic + review skill + Plan Mode), sandbox
+// bwrap DÙNG THẬT qua BotBoxManager (OB-005).
+export * from './codingV17/index';
+// --- v1.40 (Đội T4): coding agent v18 — critic chấm trajectory trước
+// khi push (ngưỡng cấu hình được, chặn push, lịch sử chấm), review
+// skill 16 rule trên PR/diff, dependency map toàn repo (topo order +
+// vùng sở hữu + xung đột), eval harness 3 verifier trên cùng task.
+export * from './codingV18/index';
+// --- v1.41 (Đội T4): coding agent v19 — conversation event-backed
+// (event log append-only + hash-chain + replay), workspace tách bạch
+// theo conversation (path containment, snapshot/checkpoint + rollback,
+// diff viewer), Agent Plugins mcp.json (validate/load/unload/config
+// thực thi + marketplace nội bộ), preset theo agent profile.
+export * from './codingV19/index';
 // --- v1.02 (rescue port of v0.99/v1.00): ACP agent side, context engineering,
 // durable execution, orchestration, gateway, substrate, deep dream, observability ---
 // NOTE: `AcpClient` (providers/cli) and `Supervisor` (agent/supervisor) already
@@ -9503,6 +9733,17 @@ export * from './sandboxV3/index';
 // secret-request flow (single-use, never logged), dependency
 // map for the coding agent ---
 export * from './sandboxV4/index';
+export * from './sandboxV6/index';
+
+// --- v1.37 (Đội T3): Sandbox v5 — per-bot runtime choice (tier +
+// profile, stored per bot), safe tier switch (quiesce → snapshot
+// → stop → start → restore → verify, rollback on failure), idle
+// runtime archiving (hash-verified restore, secrets excluded),
+// disk budget (cache reclaim oldest / least-used first +
+// gitignored-dir shed, headroom never spent), profile-scoped
+// secrets (one bot/run/profile, memory-only values, hash-chained
+// audit, revoked at run end) ---
+export * from './sandboxV5/index';
 
 // --- v1.03 (Đội T2): Memory v4 — shared blocks, judge, scored dream, validity, scoped retrieval ---
 export {
@@ -9931,6 +10172,10 @@ export * from './evalHarnessV2/index';
 // guardrails (input/output/tool + tripwire) + decision tracing +
 // eval registry + regression gate 6 ngưỡng + scorer pass@k/flake-adjusted ---
 export * from './evalHarnessV3/index';
+// --- v1.44 (Đội T2): Eval Harness v4 — Harbor-native: task set +
+// chạy suite trong sandbox riêng từng task + lịch sử chạy + phát
+// hiện hồi quy + dashboard + CLI ---
+export * from './evalHarnessV4/index';
 // --- v1.06 (Đội T6): fleet bot scheduling v2 + fleet status v4 (re-export qua fleet/index) ---
 export {
   BOT_PRIORITIES,
@@ -13647,10 +13892,81 @@ export * from './memory/v20/index';
 // rong xuyen session (noi tiep v20).
 // Re-export từ memory/v21/index.
 export * from './memory/v21/index';
+// v1.37 (Đội T1): memory v22 — dreaming consolidation chay nen:
+// gop trung lap, supersede fact mau thuan, het han fact co thoi
+// han, tong hop pattern lap lai thanh fact ben, wiki
+// representation, always-loaded duoi ngan sach ky tu, snapshot +
+// audit log + rollback (revert duoc moi thay doi).
+// Re-export từ memory/v22/index.
+export * from './memory/v22/index';
+// v1.38 (Đội T1): memory v23 — Mem0-style extract/consolidate chay
+// local (embedder local), retrieval fusion 3 tin hieu (semantic +
+// BM25 + entity), sleep-time consolidation v2 (don block luc idle),
+// procedural memory (workflow thanh cong -> skill co version +
+// danh gia), multi-scope retrieval (user/agent/run), pipeline +
+// migration tu v21/legacy/v20.
+// Re-export từ memory/v23/index.
+export * from './memory/v23/index';
+// v1.39 (Đội T1): memory v24 — MemFS-style Markdown memory co
+// version (cay file + snapshot system prompt), ADD-only extraction
+// mem0-v3-style, admission policy + scope/expiry luc ghi, conflict
+// resolution kieu Graphiti co provenance + valid-time, WikiTrace-
+// style evidence cho moi lesson, decay/forgetting, shared memory
+// blocks lien-bot co khoa + version, sleep-time consolidation,
+// fused retrieval (semantic + BM25 + entity + time-aware).
+// Re-export từ memory/v24/index.
+export * from './memory/v24/index';
+// v1.40 (Đội T1): memory v25 — sleep-time consolidation agent
+// (chay nen sau N buoc, cap nhat block ngoai vong lap chinh,
+// model + budget cau hinh duoc), memory block chia se giua cac
+// bot (label/mo ta/gia tri, attach/detach, read-only: bot khac
+// chi doc), fact edge bi-temporal (valid_at/invalid_at/
+// created_at/expired_at, supersede dong khoang hieu luc thay vi
+// xoa, query as-of + current), LLM judge ADD/UPDATE/DELETE/NOISE
+// kieu Mem0 (DELETE la dong hieu luc, khong xoa vat ly).
+// Re-export từ memory/v25/index.
+export * from './memory/v25/index';
+// v1.41 (Đội T1): memory v26 — shared memory blocks da bot
+// (registry + audit log ai/khi nao/cu/moi + conflict khi 2 agent
+// sua cung block), budget token + curate trich xuat, archival
+// search theo ngay/noi dung + recall theo ngay, block chuan
+// human/persona + custom task/project + template, quota moi bot,
+// import/export block.
+// Re-export từ memory/v26/index.
+export * from './memory/v26/index';
+// v1.42 (Đội T3): memory v27 — add-only single-pass extraction
+// (Mem0 v3-style, khong UPDATE/DELETE), entity linking luc ghi
+// + boosting luc search, fact graph bi-temporal (Graphiti-style:
+// valid_at/invalid_at/created_at/expired_at, dong edge cu thay
+// vi xoa), episode provenance, time-travel chat (valid time +
+// transaction time), shared block bi-temporal tren nen v26
+// (Letta-style, cap nhat dong bo cho moi agent attach).
+// Re-export từ memory/v27/index.
+export * from './memory/v27/index';
+// v1.44 (Đội T1): memory v28 — git-backed shared blocks
+// (MemFS-style), shared block ACL giua cac bot (Conversations
+// API-style), sleep-time consolidation dang subagent phia
+// client, time-travel get_state_at/diff_timerange
+// (mnemograph-style), fact bi-temporal vo hieu thay vi xoa
+// (Mem0 v3 / Graphiti-style).
+// Re-export từ memory/v28/index.
+export * from './memory/v28/index';
 // v1.20 (T2): protocols v4 — version matrix, Poppy 1.0 profile exchange, A2A v1.1 RC SendLiveMessage live session, MCP sampling cleanup, AG-UI 1.0 conformance, IETF agentproto watch-track.
 export * from './protocolsV4/index';
 // v1.29 (T2): protocols v5 — version matrix (ACP v2 draft + A2A 1.1 final, Linux Foundation), background MCP tasks (SDK-style task id / placeholder / task_notification), per-tool permission_policy, MCP OAuth elicitation/reconnect, ACP v2 client adapter + agent registry/discovery + BYOA adapter with A2A alignment.
 export * from './protocolsV5/index';
+// v1.37 (T2): protocols v6 — version matrix (ACP v2 draft + A2A 1.1 + stable elicitation), ACP v2 structured file changes + sessions with message ids + out-of-turn updates running parallel to v1, stable elicitation (form + URL mode, client advertises modes), A2A 1.1 two-way streaming for running tasks, protocol registry (Poppy watch-only, IETF ACP-WG tracked, dated tested-with table).
+export * from './protocolsV6/index';
+// v1.38 (T2): protocols v7 — version matrix (A2A 1.0.1 complete + MCP 2026-07-28 stateless + UCP 2026-08-25 read-only + ACP merged + gov 1.0), JWS-signed Agent Card with key rotation + multi-tenant registry + trust store, long-running async task lifecycle with push notifications, A2A v1.0.1 JSON-RPC server + client (loopback + fetch), MCP stateless HTTP transport, UCP read-only adapter (checkout/payment refused), governance layer (delegation with revocation + escalation to the user, constraints, hash-chained audit log).
+export * from './protocolsV7/index';
+// v1.39 (T2): protocols v8 — MCP spec 2026-07-28 extension framework (server/discover + per-request extension negotiation), MCP Apps host (ui:// + CSP), Tasks extension (task handle + non-blocking poll + MRTR), OAuth 2.1 / OIDC alignment (mandatory PKCE S256, exact-match redirect URIs, Client Credentials, Enterprise Managed Authorization), deprecation handling (SEP-2577, removal floor 2027-07-28, Streamable HTTP preferred), NANDA-style local-first discovery + Ed25519 self-signed identity, Skills over MCP (skill:// resources, progressive disclosure).
+export * from './protocolsV8/index';
+// v1.40 (T2): protocols v9 — MCP Apps v2 lifecycle (open/close/reopen/suspend/resume/focus, panel slots, durable snapshots), ACP (Agent Client Protocol) agent sessions over the CLI agents already on the machine (Claude Code / Codex / Gemini CLI via the user's existing login, credentials never copied), A2A v1.1 delegation (Agent Card discovery, capability-matched delegation, message + artifact exchange, task lifecycle, loopback-only).
+export * from './protocolsV9/index';
+// v1.41 (T2): protocols v10 — MCP stateless v10 (OTel trace in _meta, deterministic tool listing, subscriptions/listen, state handles), OAuth v10 (issuer validation RFC 9207, token binding, DCR deprecated), tool search (defer_loading + search index + programmatic tool calling), Tasks extension v10 (priorities, dependencies, retries, progress events, snapshots), MCP Apps v10 postMessage bridge (ui/initialize + tools/call, host arbitrates, CSP from declared domains), multi round-trip v10 (input_required, schema-checked answers), A2A v10 minimal 1.0 handshake (loopback-only), deprecation policy registry (12-month floor, 90-day security floor).
+export * from './protocolsV10/index';
+// v1.42 (T2): protocols v11 — MCP 2.0 stateless core (2026-07-28): _meta on every request, server/discover, routing headers, cacheable lists; MRTR (input_required, >= 2 rounds, journaled); Tasks extension (io.modelcontextprotocol/tasks, tasks/get polling); MCP Apps UI extension (io.modelcontextprotocol/ui, sandboxed iframe, host arbitrates); mandatory OAuth iss validation; handshake fallback for servers 2025-11-25 and older; roots/sampling/logging deprecated (earliest removal 2027-07-28), no new dependency on them.
+export * from './protocols/v11/index';
 // v1.34 (Đội T6): fleet v21 — sandbox-tier-aware scheduling, multi-node
 // placement (bin-packing + affinity/anti-affinity + rebalance + audit
 // log), panels + dashboard tổng hợp, tool defs thuần (18 tool).
@@ -13670,3 +13986,55 @@ export * from './fleetV22/index';
 // rebalance v2 (đo lệch tải + kế hoạch + dry-run + thực thi có xác
 // minh/rollback), panels + dashboard tổng hợp, tool defs thuần (24 tool).
 export * from './fleetV23/index';
+// v1.37 (Đội T6): fleet v24 — automation dashboard (gom theo tag, lọc
+// theo owner, thống kê tag/owner, bật/tắt/pause theo nhóm tag), run
+// ledger, stop hook feedback (lý do dừng + ai kích hoạt + hành động tiếp
+// theo đề xuất), CIDR sandbox rules trong router UI (allow/deny theo
+// dải CIDR, validate, rule theo route, audit), panels + dashboard tổng
+// hợp, tool defs thuần (26 tool).
+export * from './fleetV24/index';
+// fleet v25 (v1.38, Đội T6): multi-user roles (admin/operator/viewer)
+// + phân quyền theo vai trò + scope tài nguyên, audit log hash-chain
+// (ai, làm gì, khi nào, trên tài nguyên nào), scheduled automations v2
+// (cron/interval/one-shot, điều kiện chạy, retry backoff, lịch sử chạy
+// theo retry-chain), engine tick + dry-run, panels + dashboard tổng
+// hợp, tool defs thuần (28 tool).
+export * from './fleetV25/index';
+// fleet v26 (v1.39, Đội T6): platform/fleet v26 — resource quotas
+// that never promise what the host cannot spare, bot lifecycle +
+// health, shared memory blocks, fleet skill pack (progressive
+// disclosure), deterministic hooks, plugin bundles, MCP Apps host
+// (ui:// + CSP), admission policy + settings, panels + dashboard
+// tổng hợp, tool defs thuần (34 tool).
+export * from './fleetV26/index';
+// fleet v27 (v1.40, Đội T6): platform/fleet v27 — async run campaigns
+// (one task across many bots, per-bot progress, cancel, retry-failed,
+// finished-run history), scheduled automation templates (8-template
+// catalog, cron, suggestions for the repo/bot context), fleet quota v2
+// (fleet-level caps, warn/critical alerts, admit/queue/defer/reject
+// policy, waiting queue, decision ledger), panels + dashboard tổng
+// hợp, tool defs thuần (30 tool).
+export * from './fleetV27/index';
+// fleet v28 (v1.41, Đội T6): platform/fleet v28 — per-conversation
+// sandbox runtime (limits, lifecycle, idle eviction with saved state,
+// concurrency cap + queue, health probe + auto-restart), profile-scoped
+// secrets (isolation, log redaction, rotation, audit), conversation
+// budget meter (token/$ per session, warn + hard cap, daily/weekly
+// reports, forecast + burn rate), sandbox policy (cgroup limits,
+// workspace containment, command allowlist, watchdog), conversation
+// adapter (attach/message/toolcall/idle/end), presets per profile,
+// panels + dashboard tổng hợp, tool defs thuần (40 tool).
+export * from './fleetV28/index';
+// fleet v29 (v1.42, Đội T6): A2A task board — peer registry, card
+// gate, allowlist, task board, audit log, sensitive confirmations,
+// health + dashboard, tool defs thuần (33 tool).
+export * from './fleetV29/index';
+// fleet v30 (v1.44, Đội T6): per-conversation runtime isolation
+// (bwrap/Docker/local drivers, bind/suspend/resume/end with
+// scratch cleanup, orphan sweep), A2A task board v2 (saved views,
+// reassignment, dependencies, deadlines + SLA + escalation, retry
+// policy, bulk ops, timeline, kanban), peer groups + capability
+// routing (scoring, pick, failover, discovery probes), allowlist
+// admin v2 (roles, policy rules, approvals, pre-flight check),
+// panels + dashboard, tool defs thuần (60 tool).
+export * from './fleetV30/index';
