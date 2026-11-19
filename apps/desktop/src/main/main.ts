@@ -13,6 +13,7 @@ import { app, BrowserWindow, dialog, ipcMain, Notification, safeStorage, shell }
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { randomBytes, randomUUID } from 'node:crypto';
 import {
   AutomationScheduler,
@@ -4357,10 +4358,44 @@ function getTraceStore(): TraceStore {
 // IPC handlers
 // ---------------------------------------------------------------------------
 
-function registerIpc(): void {
-  ipcMain.handle('bots:list', () => settings.bots);
 
-  ipcMain.handle('bots:create', (_event: unknown, config: Partial<BotConfig>) => {
+/**
+ * Renderer-to-main IPC is privileged. The splash window has no preload;
+ * the primary application window is the only legitimate IPC caller.
+ * Keep this check at the registration boundary so new handlers inherit it.
+ */
+function expectedMainRendererUrl(): string {
+  return process.env.OPEN_BOT_DEV === '1'
+    ? 'http://localhost:5173/'
+    : pathToFileURL(path.join(__dirname, '..', 'renderer', 'index.html')).href;
+}
+
+function registerMainWindowIpcHandler(
+  channel: string,
+  handler: (...args: any[]) => any,
+): void {
+  ipcMain.handle(channel, (event, ...args) => {
+    assertTrustedMainWindowIpcSender(event, mainWindow, expectedMainRendererUrl(), channel);
+    return handler(event, ...args);
+  });
+}
+
+function registerMainWindowIpcListener(
+  channel: string,
+  listener: (...args: any[]) => void,
+): void {
+  ipcMain.on(channel, (event, ...args) => {
+    // Event-style IPC has no response channel: reject an untrusted sender
+    // by dropping the message rather than throwing into the main event loop.
+    if (!isTrustedMainWindowIpcSender(event, mainWindow, expectedMainRendererUrl())) return;
+    listener(event, ...args);
+  });
+}
+
+function registerIpc(): void {
+  registerMainWindowIpcHandler('bots:list', () => settings.bots);
+
+  registerMainWindowIpcHandler('bots:create', (_event: unknown, config: Partial<BotConfig>) => {
     // v0.7: validate đầu vào — tên/model/workspace đều có giới hạn,
     // workspaceDir phải nằm trong thư mục cho phép (resolveWithin).
     if (config === null || typeof config !== 'object' || Array.isArray(config)) {
@@ -4438,7 +4473,7 @@ function registerIpc(): void {
     return bot;
   });
 
-  ipcMain.handle('bots:update', (_event: unknown, config: BotConfig) => {
+  registerMainWindowIpcHandler('bots:update', (_event: unknown, config: BotConfig) => {
     if (config === null || typeof config !== 'object') throw new Error('Tham số bots:update phải là object.');
     const id = requireId(config.id, 'id');
     if (config.name !== undefined) requireString(config.name, 'name');
@@ -4510,7 +4545,7 @@ function registerIpc(): void {
   // mới lưu settings. Bot chưa từng chạy (chưa có runtime) thì chỉ
   // lưu settings, lần chạy sau dùng model mới. Lịch sử chat, task,
   // plan, checkpoint nằm trong BotMemory nên không mất.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'bots:switch-model',
     async (
       _event: unknown,
@@ -4568,7 +4603,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('bots:delete', async (_event: unknown, botId: string) => {
+  registerMainWindowIpcHandler('bots:delete', async (_event: unknown, botId: string) => {
     const id = requireId(botId, 'botId');
     if (!teamAllowsEdit(id)) {
       throw new Error('Bạn không có quyền xoá bot này theo phân quyền team.');
@@ -4615,7 +4650,7 @@ function registerIpc(): void {
   // policy (xem coordinator `createBot` / `createAgentBot`).
   // Không tạo cơ chế bật/tắt song song; không invalidate runtime (đổi
   // policy có hiệu lực ngay cho turn sau, không cần tạo lại bot).
-  ipcMain.handle('tools:list', async (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('tools:list', async (_event: unknown, payload: { botId: string }) => {
     const botId = requireId(payload?.botId, 'botId');
     const bot = settings.bots.find((b) => b.id === botId);
     if (!bot) throw new Error('Không tìm thấy bot.');
@@ -4648,11 +4683,11 @@ function registerIpc(): void {
     return url.toString();
   }
 
-  ipcMain.handle('internet-data:get', () => {
+  registerMainWindowIpcHandler('internet-data:get', () => {
     return getInternetDataStore().snapshot();
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'internet-data:subscribe',
     async (_event: unknown, payload: { url?: unknown; title?: unknown }) => {
       const url = requireHttpUrl(payload?.url, 'url');
@@ -4668,7 +4703,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'internet-data:unsubscribe',
     (_event: unknown, payload: { feed?: unknown }) => {
       const key = requireString(payload?.feed, 'feed');
@@ -4678,7 +4713,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'internet-data:feed-read',
     async (_event: unknown, payload: { feed?: unknown; limit?: unknown }) => {
       const key = requireString(payload?.feed, 'feed');
@@ -4695,7 +4730,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'internet-data:watch-add',
     (_event: unknown, payload: { url?: unknown; intervalMinutes?: unknown }) => {
       const url = requireHttpUrl(payload?.url, 'url');
@@ -4709,7 +4744,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'internet-data:watch-remove',
     (_event: unknown, payload: { watch?: unknown }) => {
       const key = requireString(payload?.watch, 'watch');
@@ -4719,7 +4754,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'internet-data:check',
     async (_event: unknown, payload: { watch?: unknown }) => {
       const store = getInternetDataStore();
@@ -4760,7 +4795,7 @@ function registerIpc(): void {
   // từng chạy thì `getOrCreateRuntime` tạo runtime trước — giống
   // `tools:list`. Trả mảng rỗng khi bot không có lệnh nào; bot lạ thì
   // lỗi (renderer bắt lỗi và hiện hint "chưa có lệnh slash").
-  ipcMain.handle('slash:list', async (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('slash:list', async (_event: unknown, payload: { botId: string }) => {
     const botId = requireId(payload?.botId, 'botId');
     const bot = settings.bots.find((b) => b.id === botId);
     if (!bot) throw new Error('Không tìm thấy bot.');
@@ -4768,7 +4803,7 @@ function registerIpc(): void {
     return getCoordinator().listSlashCommands(botId);
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'tools:toggle',
     async (
       _event: unknown,
@@ -4816,7 +4851,7 @@ function registerIpc(): void {
   // lực ngay cho turn sau, không cần tạo lại bot). Khác
   // `skills:toggle` toàn cục (Settings → Skills): toggle này chỉ ảnh
   // hưởng đúng bot này, registry dùng chung không đổi.
-  ipcMain.handle('bot-skills:list', async (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('bot-skills:list', async (_event: unknown, payload: { botId: string }) => {
     const botId = requireId(payload?.botId, 'botId');
     const bot = settings.bots.find((b) => b.id === botId);
     if (!bot) throw new Error('Không tìm thấy bot.');
@@ -4824,7 +4859,7 @@ function registerIpc(): void {
     return getCoordinator().listBotSkills(botId);
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'bot-skills:toggle',
     async (
       _event: unknown,
@@ -4862,7 +4897,7 @@ function registerIpc(): void {
   // Clone tạo bot mới với id + workspace riêng nên runtime của bot gốc
   // không bị ảnh hưởng; publish không sửa bot nên cũng không cần invalidate.
 
-  ipcMain.handle('agents:clone', (_event: unknown, payload: { botId: string; name?: string }) => {
+  registerMainWindowIpcHandler('agents:clone', (_event: unknown, payload: { botId: string; name?: string }) => {
     const botId = requireId(payload?.botId, 'botId');
     const bot = settings.bots.find((b) => b.id === botId);
     if (!bot) throw new Error('Không tìm thấy bot.');
@@ -4873,7 +4908,7 @@ function registerIpc(): void {
     return cloned;
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'agents:publish',
     (_event: unknown, payload: { botId: string; description?: string; author?: string }) => {
       const botId = requireId(payload?.botId, 'botId');
@@ -4886,11 +4921,11 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('templates:list', () => listBuiltInTemplates());
+  registerMainWindowIpcHandler('templates:list', () => listBuiltInTemplates());
 
-  ipcMain.handle('marketplace:list', () => listPublished(app.getPath('userData')));
+  registerMainWindowIpcHandler('marketplace:list', () => listPublished(app.getPath('userData')));
 
-  ipcMain.handle('marketplace:install', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('marketplace:install', (_event: unknown, payload: { id: string }) => {
     const id = requireId(payload?.id, 'id');
     const bot = installPublished(app.getPath('userData'), id);
     settings.bots.push(bot);
@@ -4899,16 +4934,16 @@ function registerIpc(): void {
     return bot;
   });
 
-  ipcMain.handle('marketplace:uninstall', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('marketplace:uninstall', (_event: unknown, payload: { id: string }) => {
     return uninstallPublished(app.getPath('userData'), requireId(payload?.id, 'id'));
   });
 
   // v1.02 (Team T6): bot marketplace v2 — searchable catalog + ratings +
   // one-click install (local only, same BotConfig -> settings.bots flow
   // as marketplace:install).
-  ipcMain.handle('marketplace-v2:catalog', () => buildMarketplaceV2Catalog(app.getPath('userData')));
+  registerMainWindowIpcHandler('marketplace-v2:catalog', () => buildMarketplaceV2Catalog(app.getPath('userData')));
 
-  ipcMain.handle('marketplace-v2:install', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('marketplace-v2:install', (_event: unknown, payload: { id: string }) => {
     const installed = installMarketplaceV2Entry(app.getPath('userData'), requireId(payload?.id, 'id'));
     settings.bots.push(installed.config);
     saveSettings();
@@ -4916,13 +4951,13 @@ function registerIpc(): void {
     return installed.config;
   });
 
-  ipcMain.handle('marketplace-v2:rate', (_event: unknown, payload: { id: string; stars: number }) => {
+  registerMainWindowIpcHandler('marketplace-v2:rate', (_event: unknown, payload: { id: string; stars: number }) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     const stars = typeof rec.stars === 'number' ? rec.stars : NaN;
     return rateMarketplaceV2Entry(app.getPath('userData'), requireId(payload?.id, 'id'), fleetActor(), stars);
   });
 
-  ipcMain.handle('marketplace-v2:search', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('marketplace-v2:search', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     const catalog = buildMarketplaceV2Catalog(app.getPath('userData'));
     const sort = rec.sort;
@@ -4937,7 +4972,7 @@ function registerIpc(): void {
   // --- v0.3: MCP marketplace (local catalogue -> workspace mcp.json) ---
   // Install/uninstall đổi tool của bot nên runtime cũ phải bỏ để lần
   // chạy sau nạp lại tool MCP mới.
-  ipcMain.handle('mcp-marketplace:list', () => listMcpAvailable(app.getPath('userData')));
+  registerMainWindowIpcHandler('mcp-marketplace:list', () => listMcpAvailable(app.getPath('userData')));
 
   // --- v0.98 (T6): MCP Apps / MCP Tasks ---
   // Listener nối tools layer -> AppManager: chỉ đăng ký một lần ở đây
@@ -4957,11 +4992,11 @@ function registerIpc(): void {
     broadcastMcpTasks();
   });
 
-  ipcMain.handle('mcp-apps:list', () => mcpAppManager.list());
-  ipcMain.handle('mcp-apps:get', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('mcp-apps:list', () => mcpAppManager.list());
+  registerMainWindowIpcHandler('mcp-apps:get', (_event: unknown, payload: { id: string }) => {
     return mcpAppManager.get(requireId(payload?.id, 'id')) ?? null;
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'mcp-apps:open',
     (
       _event: unknown,
@@ -5002,13 +5037,13 @@ function registerIpc(): void {
       };
     },
   );
-  ipcMain.handle('mcp-apps:close', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('mcp-apps:close', (_event: unknown, payload: { id: string }) => {
     const removed = mcpAppManager.close(requireId(payload?.id, 'id'));
     if (removed) broadcastMcpApps();
     return removed;
   });
-  ipcMain.handle('mcp-tasks:list', () => listAllMcpTasks());
-  ipcMain.handle(
+  registerMainWindowIpcHandler('mcp-tasks:list', () => listAllMcpTasks());
+  registerMainWindowIpcHandler(
     'mcp-tasks:cancel',
     async (_event: unknown, payload: { workspaceDir: string; key: string }) => {
       const workspaceDir = requireId(payload?.workspaceDir, 'workspaceDir');
@@ -5032,7 +5067,7 @@ function registerIpc(): void {
   // never the whole catalogue at once.
   const mcpMarketplaceToolsCache = new MarketplaceProbeCache();
 
-  ipcMain.handle('mcp-marketplace:tools', async (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('mcp-marketplace:tools', async (_event: unknown, payload: { id: string }) => {
     const id = requireId(payload?.id, 'id');
     const fingerprint = getMarketplaceRegistryFingerprint(app.getPath('userData'));
     if (fingerprint !== null) {
@@ -5044,14 +5079,14 @@ function registerIpc(): void {
     return result;
   });
 
-  ipcMain.handle('mcp-marketplace:installed', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('mcp-marketplace:installed', (_event: unknown, payload: { botId: string }) => {
     const botId = requireId(payload?.botId, 'botId');
     const bot = settings.bots.find((b) => b.id === botId);
     if (!bot) throw new Error('Không tìm thấy bot.');
     return listMcpInstalled(workspaceDirFor(bot));
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'mcp-marketplace:install',
     (
       _event: unknown,
@@ -5099,7 +5134,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'mcp-marketplace:uninstall',
     (_event: unknown, payload: { id: string; botId: string }) => {
       const id = requireId(payload?.id, 'id');
@@ -5116,7 +5151,7 @@ function registerIpc(): void {
   // catalog / approvals (MCP) + plugin marketplace. Install/update đều
   // cần approval đã ghi (xem `mcp-marketplace:approve`): handler nào
   // thiếu approval sẽ throw trước khi ghi bất cứ thứ gì.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'mcp-marketplace:search',
     (_event: unknown, payload: { query?: unknown; tag?: unknown }) => {
       const query = optionalString(payload?.query, 'query') ?? '';
@@ -5129,7 +5164,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'mcp-marketplace:check-updates',
     (_event: unknown, payload: { botId: string }) => {
       const botId = requireId(payload?.botId, 'botId');
@@ -5142,7 +5177,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'mcp-marketplace:update',
     (_event: unknown, payload: { id: string; botId: string; version?: unknown }) => {
       const id = requireId(payload?.id, 'id');
@@ -5161,7 +5196,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'mcp-marketplace:remote-catalog',
     async (_event: unknown, payload: { url: string }) => {
       const url = requireString(payload?.url, 'url');
@@ -5171,7 +5206,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'mcp-marketplace:approve',
     (
       _event: unknown,
@@ -5195,7 +5230,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('mcp-marketplace:approvals', () =>
+  registerMainWindowIpcHandler('mcp-marketplace:approvals', () =>
     listMarketplaceApprovals(app.getPath('userData')),
   );
 
@@ -5227,7 +5262,7 @@ function registerIpc(): void {
     return path.join(app.getPath('userData'), 'plugins');
   }
 
-  ipcMain.handle('plugin-marketplace:list', () => {
+  registerMainWindowIpcHandler('plugin-marketplace:list', () => {
     return listMarketplacePlugins(pluginsDirForMarketplace()).map((p) => ({
       id: p.manifest.id,
       name: p.manifest.name,
@@ -5250,21 +5285,21 @@ function registerIpc(): void {
   // v1.02 (Team T6): plugin marketplace catalog — installed plugins +
   // templates merged (installed wins), and the pre-install permission
   // review (unknown permission = high risk, never silently dropped).
-  ipcMain.handle('plugin-marketplace:catalog', () => {
+  registerMainWindowIpcHandler('plugin-marketplace:catalog', () => {
     return mergePluginCatalog(
       scanInstalledPlugins(pluginsDirForMarketplace()),
       scanPluginTemplatesAsCatalog(path.join(app.getPath('userData'), PLUGIN_TEMPLATES_DIR)),
     );
   });
 
-  ipcMain.handle('plugin-marketplace:review', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('plugin-marketplace:review', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     const permissions = Array.isArray(rec.permissions) ? rec.permissions : [];
     const reviews = reviewPluginPermissions(permissions);
     return { reviews, risk: summarizePluginRisk(reviews) };
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'plugin-marketplace:search',
     (_event: unknown, payload: { query?: unknown }) => {
       const query = optionalString(payload?.query, 'query') ?? '';
@@ -5289,7 +5324,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'plugin-marketplace:prepare',
     async (_event: unknown, payload: { source: unknown; allowUnsigned?: unknown }) => {
       const source = requirePluginMarketplaceSource(payload?.source);
@@ -5316,7 +5351,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'plugin-marketplace:install',
     (_event: unknown, payload: { stagingId: string; allowUnsigned?: unknown }) => {
       const stagingId = requireString(payload?.stagingId, 'stagingId');
@@ -5345,7 +5380,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'plugin-marketplace:update',
     (_event: unknown, payload: { stagingId: string; allowUnsigned?: unknown }) => {
       const stagingId = requireString(payload?.stagingId, 'stagingId');
@@ -5377,7 +5412,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'plugin-marketplace:uninstall',
     (_event: unknown, payload: { id: string }) => {
       const id = requireId(payload?.id, 'id');
@@ -5385,7 +5420,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'plugin-marketplace:check-updates',
     (_event: unknown, payload: { entries: unknown }) => {
       if (!Array.isArray(payload?.entries)) {
@@ -5402,7 +5437,7 @@ function registerIpc(): void {
   // docs/plugin-marketplace-signing.md). Downgrade khôi phục bản
   // trước đã snapshot lúc cập nhật; đổi key tin cậy làm plugin ký
   // bằng key đó fail-closed ở lần load sau (trừ khi đã rollback).
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'plugin-marketplace:downgrade-info',
     (_event: unknown, payload: { id: string }) => {
       const id = requireId(payload?.id, 'id');
@@ -5412,7 +5447,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'plugin-marketplace:downgrade',
     (_event: unknown, payload: { id: string }) => {
       const id = requireId(payload?.id, 'id');
@@ -5422,11 +5457,11 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('plugin-marketplace:trusted-keys', () => {
+  registerMainWindowIpcHandler('plugin-marketplace:trusted-keys', () => {
     return listTrustedMarketplaceKeys(app.getPath('userData'));
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'plugin-marketplace:add-trusted-key',
     (_event: unknown, payload: { publicKey: string; label?: unknown }) => {
       const publicKey = requireString(payload?.publicKey, 'publicKey');
@@ -5439,7 +5474,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'plugin-marketplace:remove-trusted-key',
     (_event: unknown, payload: { keyId: string }) => {
       const keyId = requireString(payload?.keyId, 'keyId');
@@ -5448,7 +5483,7 @@ function registerIpc(): void {
   );
 
   // --- v0.3: team (local config file team.json, chưa có server trung tâm) ---
-  ipcMain.handle('team:get', () => loadTeamConfig(app.getPath('userData')));
+  registerMainWindowIpcHandler('team:get', () => loadTeamConfig(app.getPath('userData')));
 
   // v0.95d4 (Đội D4): user profile + long-term memory — tất cả local,
   // không cloud. Profile ở `<userData>/profile.json`; memories ở
@@ -5502,8 +5537,8 @@ function registerIpc(): void {
     }
   };
 
-  ipcMain.handle('profile:get', () => loadLocalProfile(app.getPath('userData')));
-  ipcMain.handle(
+  registerMainWindowIpcHandler('profile:get', () => loadLocalProfile(app.getPath('userData')));
+  registerMainWindowIpcHandler(
     'profile:update',
     (
       _event: unknown,
@@ -5516,7 +5551,7 @@ function registerIpc(): void {
       },
     ) => updateLocalProfile(app.getPath('userData'), patch ?? {}),
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory:list',
     (_event: unknown, payload: { botId: string; query?: string; tag?: string; limit?: number }) => {
       const store = memoryStoreForBot(payload?.botId);
@@ -5532,7 +5567,7 @@ function registerIpc(): void {
       return entries.map(stripMemoryEmbedding);
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory:update',
     (
       _event: unknown,
@@ -5548,11 +5583,11 @@ function registerIpc(): void {
       return stripMemoryEmbedding(updated);
     },
   );
-  ipcMain.handle('memory:delete', (_event: unknown, payload: { botId: string; id: string }) => {
+  registerMainWindowIpcHandler('memory:delete', (_event: unknown, payload: { botId: string; id: string }) => {
     const store = memoryStoreForBot(payload?.botId);
     return { deleted: store.forgetById(requireId(payload?.id, 'id')) };
   });
-  ipcMain.handle('memory:export', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('memory:export', (_event: unknown, payload: { botId: string }) => {
     const store = memoryStoreForBot(payload?.botId);
     const userId = currentUserId();
     return store.exportMemories({
@@ -5561,7 +5596,7 @@ function registerIpc(): void {
       ...(userId !== undefined ? { userId } : {}),
     });
   });
-  ipcMain.handle('memory:status', async (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('memory:status', async (_event: unknown, payload: { botId: string }) => {
     const store = memoryStoreForBot(payload?.botId);
     const entries = store.recall({ limit: 200 });
     const ollamaAvailable = await new OllamaEmbeddings().isAvailable();
@@ -5611,7 +5646,7 @@ function registerIpc(): void {
       ...(userId !== undefined ? { userId } : {}),
     };
   };
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'verbatim-memory:list',
     async (_event: unknown, payload: { botId: string; wing?: string; room?: string; tags?: string[]; limit?: number; offset?: number }) => {
       const store = verbatimStoreForBot(payload?.botId);
@@ -5622,7 +5657,7 @@ function registerIpc(): void {
       });
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'verbatim-memory:search',
     async (_event: unknown, payload: { botId: string; query: string; wing?: string; room?: string; tags?: string[]; limit?: number }) => {
       const store = verbatimStoreForBot(payload?.botId);
@@ -5653,17 +5688,17 @@ function registerIpc(): void {
       };
     },
   );
-  ipcMain.handle('verbatim-memory:delete', async (_event: unknown, payload: { botId: string; id: string }) => {
+  registerMainWindowIpcHandler('verbatim-memory:delete', async (_event: unknown, payload: { botId: string; id: string }) => {
     const store = verbatimStoreForBot(payload?.botId);
     return { deleted: await store.delete(requireId(payload?.id, 'id')) };
   });
-  ipcMain.handle('verbatim-memory:stats', async (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('verbatim-memory:stats', async (_event: unknown, payload: { botId: string }) => {
     const store = verbatimStoreForBot(payload?.botId);
     const stats = await store.stats();
     const ollamaAvailable = await new OllamaEmbeddings().isAvailable();
     return { ...stats, ollamaAvailable };
   });
-  ipcMain.handle('verbatim-memory:export', async (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('verbatim-memory:export', async (_event: unknown, payload: { botId: string }) => {
     const store = verbatimStoreForBot(payload?.botId);
     const userId = currentUserId();
     const { records, total } = await store.list({
@@ -5679,7 +5714,7 @@ function registerIpc(): void {
       2,
     );
   });
-  ipcMain.handle('verbatim-memory:backfill', async (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('verbatim-memory:backfill', async (_event: unknown, payload: { botId: string }) => {
     const store = verbatimStoreForBot(payload?.botId);
     const embedder = new OllamaEmbeddings();
     if (!(await embedder.isAvailable())) {
@@ -5687,7 +5722,7 @@ function registerIpc(): void {
     }
     return store.backfillEmbeddings(embedder);
   });
-  ipcMain.handle('verbatim-memory:consolidate', async (_event: unknown, payload: { botId: string; wing?: string }) => {
+  registerMainWindowIpcHandler('verbatim-memory:consolidate', async (_event: unknown, payload: { botId: string; wing?: string }) => {
     const store = verbatimStoreForBot(payload?.botId);
     const report = await consolidateVerbatim(store, {
       ...(payload?.wing ? { wing: payload.wing } : {}),
@@ -5708,7 +5743,7 @@ function registerIpc(): void {
       })),
     };
   });
-  ipcMain.handle('verbatim-memory:apply-dedup', async (_event: unknown, payload: { botId: string; wing?: string }) => {
+  registerMainWindowIpcHandler('verbatim-memory:apply-dedup', async (_event: unknown, payload: { botId: string; wing?: string }) => {
     const store = verbatimStoreForBot(payload?.botId);
     const report = await consolidateVerbatim(store, {
       ...(payload?.wing ? { wing: payload.wing } : {}),
@@ -5721,7 +5756,7 @@ function registerIpc(): void {
   // read-only + MemFS export/import + consolidate. Mọi thao tác ghi đều
   // qua MemoryBlockStore (validate + audit actor `user`), không có
   // secret nào đi qua IPC này.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-blocks:list',
     (_event: unknown, payload: { botId: string; includeDetached?: boolean }) => {
       const store = blocksStoreForBot(payload?.botId);
@@ -5735,7 +5770,7 @@ function registerIpc(): void {
   // v1.08 (Đội T5): lịch sử phiên bản của một block — editor đọc
   // qua đây để vẽ version + diff (đọc từ
   // `.open-bot/memory-blocks-history.jsonl`, không secret).
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-blocks:history',
     (_event: unknown, payload: { botId: string; blockId: string; limit?: number }) => {
       const id = requireId(payload?.botId, 'botId');
@@ -5749,7 +5784,7 @@ function registerIpc(): void {
       return readBlockHistory(workspaceDirFor(bot), blockId, limit);
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-blocks:create',
     (
       _event: unknown,
@@ -5773,7 +5808,7 @@ function registerIpc(): void {
       return publicBlockView(store, block);
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-blocks:update',
     (
       _event: unknown,
@@ -5788,7 +5823,7 @@ function registerIpc(): void {
       return publicBlockView(store, updated);
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-blocks:append',
     (_event: unknown, payload: { botId: string; id: string; text: string }) => {
       const store = blocksStoreForBot(payload?.botId);
@@ -5800,11 +5835,11 @@ function registerIpc(): void {
       return publicBlockView(store, updated);
     },
   );
-  ipcMain.handle('memory-blocks:delete', (_event: unknown, payload: { botId: string; id: string }) => {
+  registerMainWindowIpcHandler('memory-blocks:delete', (_event: unknown, payload: { botId: string; id: string }) => {
     const store = blocksStoreForBot(payload?.botId);
     return { deleted: store.delete(requireId(payload?.id, 'id'), 'user') };
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-blocks:attach',
     (_event: unknown, payload: { botId: string; blockId: string; targetBotId?: string }) => {
       const store = blocksStoreForBot(payload?.botId);
@@ -5813,7 +5848,7 @@ function registerIpc(): void {
       return publicBlockView(store, block);
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-blocks:detach',
     (_event: unknown, payload: { botId: string; blockId: string; targetBotId?: string }) => {
       const store = blocksStoreForBot(payload?.botId);
@@ -5822,7 +5857,7 @@ function registerIpc(): void {
       return publicBlockView(store, block);
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-blocks:share',
     (
       _event: unknown,
@@ -5840,7 +5875,7 @@ function registerIpc(): void {
       return { shared: true, botId: target, block: publicBlockView(store, block) };
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-blocks:read-only',
     (_event: unknown, payload: { botId: string; id: string; readOnly: boolean }) => {
       const store = blocksStoreForBot(payload?.botId);
@@ -5848,14 +5883,14 @@ function registerIpc(): void {
       return publicBlockView(store, block);
     },
   );
-  ipcMain.handle('memory-blocks:export', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('memory-blocks:export', (_event: unknown, payload: { botId: string }) => {
     const store = blocksStoreForBot(payload?.botId);
     const longTerm = memoryStoreForBot(payload?.botId);
     const dir = memFsDirForUser();
     const result = exportBlocksToMemFs(store, dir, { longTerm });
     return { dir: result.dir, files: result.blockFiles, factCount: result.factCount, exportedAt: result.exportedAt };
   });
-  ipcMain.handle('memory-blocks:import', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('memory-blocks:import', (_event: unknown, payload: { botId: string }) => {
     const store = blocksStoreForBot(payload?.botId);
     const longTerm = memoryStoreForBot(payload?.botId);
     const dir = memFsDirForUser();
@@ -5863,7 +5898,7 @@ function registerIpc(): void {
     const factsResult = importFactsFromMemFs(longTerm, dir);
     return { dir, blocks: blocksResult, facts: factsResult };
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-blocks:consolidate',
     (
       _event: unknown,
@@ -5913,7 +5948,7 @@ function registerIpc(): void {
     if (!bot) throw new Error('Không tìm thấy bot.');
     return workspaceDirFor(bot);
   };
-  ipcMain.handle('memory-letta:status', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('memory-letta:status', (_event: unknown, payload: { botId: string }) => {
     const entity = lettaEntityForBot(payload?.botId);
     const workspaceDir = lettaWorkspaceForBot(payload?.botId);
     const proposals = new SleepProposalStore(workspaceDir);
@@ -5926,7 +5961,7 @@ function registerIpc(): void {
   });
   // Append kiểu Letta: vượt giới hạn thì tự cô đọng nội dung cũ rồi
   // mới append (khác `memory-blocks:append` vốn throw khi đầy).
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-letta:block-append',
     (_event: unknown, payload: { botId: string; idOrLabel: string; text: string }) => {
       const workspaceDir = lettaWorkspaceForBot(payload?.botId);
@@ -5946,7 +5981,7 @@ function registerIpc(): void {
       };
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-letta:recall-search',
     (_event: unknown, payload: { botId: string; query?: string; limit?: number }) => {
       const workspaceDir = lettaWorkspaceForBot(payload?.botId);
@@ -5970,7 +6005,7 @@ function registerIpc(): void {
         }));
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-letta:archival-search',
     async (_event: unknown, payload: { botId: string; query: string; limit?: number; offset?: number }) => {
       const workspaceDir = lettaWorkspaceForBot(payload?.botId);
@@ -5987,7 +6022,7 @@ function registerIpc(): void {
       return archival.search({ query: requireString(payload?.query, 'query'), limit, offset });
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-letta:proposals',
     (_event: unknown, payload: { botId: string; status?: string; limit?: number }) => {
       const workspaceDir = lettaWorkspaceForBot(payload?.botId);
@@ -6010,7 +6045,7 @@ function registerIpc(): void {
       });
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-letta:proposal-decide',
     (
       _event: unknown,
@@ -6029,7 +6064,7 @@ function registerIpc(): void {
       });
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-letta:sleep-run',
     (_event: unknown, payload: { botId: string; dryRun?: boolean }) => {
       const workspaceDir = lettaWorkspaceForBot(payload?.botId);
@@ -6038,7 +6073,7 @@ function registerIpc(): void {
       });
     },
   );
-  ipcMain.handle('memory-letta:sleep-log', (_event: unknown, payload: { botId: string; limit?: number }) => {
+  registerMainWindowIpcHandler('memory-letta:sleep-log', (_event: unknown, payload: { botId: string; limit?: number }) => {
     const workspaceDir = lettaWorkspaceForBot(payload?.botId);
     const limit =
       typeof payload?.limit === 'number' && Number.isFinite(payload.limit)
@@ -6046,7 +6081,7 @@ function registerIpc(): void {
         : 20;
     return readLettaSleepLog(workspaceDir, limit);
   });
-  ipcMain.handle('memory-letta:entity-export', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('memory-letta:entity-export', (_event: unknown, payload: { botId: string }) => {
     const entity = lettaEntityForBot(payload?.botId);
     const workspaceDir = lettaWorkspaceForBot(payload?.botId);
     const safeBot = entity.botId.replace(/[^a-z0-9_-]+/gi, '-');
@@ -6062,10 +6097,10 @@ function registerIpc(): void {
   // Tất cả local; embedding KHÔNG bao giờ trả về renderer (chỉ điểm
   // xếp hạng + lý do chọn).
   const v10ManagerForBot = (botId: string) => getMemoryV10Manager(lettaWorkspaceForBot(botId));
-  ipcMain.handle('memory-v10:stats', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('memory-v10:stats', (_event: unknown, payload: { botId: string }) => {
     return v10ManagerForBot(payload?.botId).stats();
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-v10:query',
     async (_event: unknown, payload: { botId: string; query: string; topK?: number; asOf?: string }) => {
       const manager = v10ManagerForBot(payload?.botId);
@@ -6084,7 +6119,7 @@ function registerIpc(): void {
       };
     },
   );
-  ipcMain.handle('memory-v10:timeline', (_event: unknown, payload: { botId: string; subject: string }) => {
+  registerMainWindowIpcHandler('memory-v10:timeline', (_event: unknown, payload: { botId: string; subject: string }) => {
     const manager = v10ManagerForBot(payload?.botId);
     const subject = requireString(payload?.subject, 'subject');
     return manager.timeline(subject).map((e) => ({
@@ -6098,7 +6133,7 @@ function registerIpc(): void {
         : null,
     }));
   });
-  ipcMain.handle('memory-v10:blocks', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('memory-v10:blocks', (_event: unknown, payload: { botId: string }) => {
     const manager = v10ManagerForBot(payload?.botId);
     return manager.blocks.listBlocks().map((b) => ({
       id: b.id,
@@ -6116,7 +6151,7 @@ function registerIpc(): void {
       })),
     }));
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-v10:rollback',
     (_event: unknown, payload: { botId: string; blockId: string; toVersion: number }) => {
       const manager = v10ManagerForBot(payload?.botId);
@@ -6130,7 +6165,7 @@ function registerIpc(): void {
       return report;
     },
   );
-  ipcMain.handle('memory-v10:quarantine-list', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('memory-v10:quarantine-list', (_event: unknown, payload: { botId: string }) => {
     const manager = v10ManagerForBot(payload?.botId);
     return manager.listQuarantine(true).map((q) => ({
       id: q.id,
@@ -6140,7 +6175,7 @@ function registerIpc(): void {
       createdAt: q.createdAt,
     }));
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-v10:quarantine-decide',
     async (_event: unknown, payload: { botId: string; id: string; approve: boolean }) => {
       const manager = v10ManagerForBot(payload?.botId);
@@ -6164,7 +6199,7 @@ function registerIpc(): void {
     new SharedSupervisor(lettaWorkspaceForBot(botId));
   const v11SleepAgentForBot = (botId: string) =>
     new V11SleepConsolidationAgent(lettaWorkspaceForBot(botId));
-  ipcMain.handle('memory-v11:shared', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('memory-v11:shared', (_event: unknown, payload: { botId: string }) => {
     const supervisor = v11SupervisorForBot(payload?.botId);
     return supervisor.listSharedBlocks().map((v) => ({
       label: v.block.label,
@@ -6177,7 +6212,7 @@ function registerIpc(): void {
       usage: v.usage,
     }));
   });
-  ipcMain.handle('memory-v11:render', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('memory-v11:render', (_event: unknown, payload: { botId: string }) => {
     const workspaceDir = lettaWorkspaceForBot(payload?.botId);
     const botId = requireId(payload?.botId, 'botId');
     const store = new MemoryBlockStore(workspaceDir);
@@ -6192,7 +6227,7 @@ function registerIpc(): void {
       xml: renderMemoryBlocksXml(botId, store),
     };
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-v11:history',
     (_event: unknown, payload: { botId: string; blockId: string; limit?: number }) => {
       const workspaceDir = lettaWorkspaceForBot(payload?.botId);
@@ -6212,7 +6247,7 @@ function registerIpc(): void {
       }));
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-v11:diff',
     (_event: unknown, payload: { botId: string; blockId: string; fromVersion: number; toVersion: number }) => {
       const workspaceDir = lettaWorkspaceForBot(payload?.botId);
@@ -6233,7 +6268,7 @@ function registerIpc(): void {
       };
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-v11:rollback',
     (_event: unknown, payload: { botId: string; blockId: string; toVersion: number }) => {
       const workspaceDir = lettaWorkspaceForBot(payload?.botId);
@@ -6245,7 +6280,7 @@ function registerIpc(): void {
       return rollbackBlockToVersion(workspaceDir, blockId, toVersion, 'user');
     },
   );
-  ipcMain.handle('memory-v11:sleep-status', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('memory-v11:sleep-status', (_event: unknown, payload: { botId: string }) => {
     const workspaceDir = lettaWorkspaceForBot(payload?.botId);
     const botId = requireId(payload?.botId, 'botId');
     const last = readV11SleepLog(workspaceDir, 1)[0] ?? null;
@@ -6265,7 +6300,7 @@ function registerIpc(): void {
         : null,
     };
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-v11:sleep-run',
     (_event: unknown, payload: { botId: string; dryRun?: boolean; force?: boolean }) => {
       const botId = requireId(payload?.botId, 'botId');
@@ -6295,7 +6330,7 @@ function registerIpc(): void {
   // v0.97 (Team T4): memory v2 IPC — graph + hybrid search + sleep
   // agent + provenance/quota. Tất cả local, không rời máy; embedding
   // không bao giờ trả về renderer (chỉ số lượng + điểm xếp hạng).
-  ipcMain.handle('memory-v2:graph', (_event: unknown, payload: { botId: string; at?: string }) => {
+  registerMainWindowIpcHandler('memory-v2:graph', (_event: unknown, payload: { botId: string; at?: string }) => {
     const graph = graphStoreForBot(payload?.botId);
     const toEntityView = (e: { id: string; name: string; type: string; description: string; aliases: string[]; validFrom: string | null; validTo: string | null; recordedAt: string; updatedAt: string; provenance: { trust: number; quarantined: boolean } }) => ({
       id: e.id, name: e.name, type: e.type, description: e.description, aliases: e.aliases,
@@ -6313,7 +6348,7 @@ function registerIpc(): void {
       relations: graph.listRelations({ ...(payload?.at ? { at: payload.at } : {}), limit: 200 }).map(toRelationView),
     };
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-v2:search',
     async (_event: unknown, payload: { botId: string; query: string; topK?: number }) => {
       const query = requireString(payload?.query, 'query');
@@ -6389,7 +6424,7 @@ function registerIpc(): void {
     botId,
     runId: '',
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-graph:search',
     async (_event: unknown, payload: { botId: string; query: string; topK?: number }) => {
       const store = temporalGraphStoreForBot(payload?.botId);
@@ -6409,7 +6444,7 @@ function registerIpc(): void {
       };
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-v2:sleep',
     async (_event: unknown, payload: { botId: string; action: string; enabled?: boolean; stepsThreshold?: number }) => {
       const agent = sleepAgentForBot(payload?.botId);
@@ -6441,7 +6476,7 @@ function registerIpc(): void {
       throw new Error('action phải là "run", "status" hoặc "configure".');
     },
   );
-  ipcMain.handle('memory-v2:provenance', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('memory-v2:provenance', (_event: unknown, payload: { botId: string }) => {
     const longTerm = memoryStoreForBot(payload?.botId);
     const graph = graphStoreForBot(payload?.botId);
     const userId = currentUserId();
@@ -6454,7 +6489,7 @@ function registerIpc(): void {
     };
     return { quota: DEFAULT_MEMORY_QUOTA, usage, quotaOk: checkQuota(usage, { items: 0, chars: 0 }).allowed, graph: graph.stats() };
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-graph:ingest',
     async (_event: unknown, payload: { botId: string; text: string; turnId?: string; role?: string }) => {
       const store = temporalGraphStoreForBot(payload?.botId);
@@ -6485,7 +6520,7 @@ function registerIpc(): void {
       return { ingested: true, episodeId, ...result, actions: result.actions.map((a) => ({ ...a, candidate: a.candidate })) };
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-graph:list',
     (_event: unknown, payload: { botId: string; status?: string; predicate?: string; limit?: number }) => {
       const store = temporalGraphStoreForBot(payload?.botId);
@@ -6499,14 +6534,14 @@ function registerIpc(): void {
       return facts.map((f) => stripFactEmbedding(store, f));
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-graph:entities',
     (_event: unknown, payload: { botId: string; limit?: number }) => {
       const store = temporalGraphStoreForBot(payload?.botId);
       return store.listEntities().slice(0, payload?.limit ?? 200);
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-graph:history',
     (_event: unknown, payload: { botId: string; factId: string }) => {
       const store = temporalGraphStoreForBot(payload?.botId);
@@ -6515,11 +6550,11 @@ function registerIpc(): void {
       return history.map((f) => stripFactEmbedding(store, f));
     },
   );
-  ipcMain.handle('memory-graph:stats', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('memory-graph:stats', (_event: unknown, payload: { botId: string }) => {
     const store = temporalGraphStoreForBot(payload?.botId);
     return store.stats(graphScope(payload?.botId));
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-graph:delete',
     (_event: unknown, payload: { botId: string; factId: string }) => {
       const store = temporalGraphStoreForBot(payload?.botId);
@@ -6527,7 +6562,7 @@ function registerIpc(): void {
       return { deleted: true, fact: stripFactEmbedding(store, fact) };
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-graph:quarantine',
     (_event: unknown, payload: { botId: string; action: string; id?: string }) => {
       const store = temporalGraphStoreForBot(payload?.botId);
@@ -6546,7 +6581,7 @@ function registerIpc(): void {
       throw new Error('action phải là "list", "approve" hoặc "reject".');
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-graph:share',
     (_event: unknown, payload: { botId: string; action: string; targetBotId?: string; readOnly?: boolean }) => {
       const store = temporalGraphStoreForBot(payload?.botId);
@@ -6576,7 +6611,7 @@ function registerIpc(): void {
     botId,
     runId: '',
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-notes:list',
     (_event: unknown, payload: { botId: string; status?: string; kind?: string; tag?: string; orphans?: boolean; limit?: number }) => {
       const store = notesStoreForBot(payload?.botId);
@@ -6593,7 +6628,7 @@ function registerIpc(): void {
       return { notes, stats: store.stats(notesScope(payload?.botId)) };
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-notes:search',
     (_event: unknown, payload: { botId: string; query: string; topK?: number }) => {
       const store = notesStoreForBot(payload?.botId);
@@ -6606,7 +6641,7 @@ function registerIpc(): void {
       };
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-notes:get',
     (_event: unknown, payload: { botId: string; noteId: string; includeVersions?: boolean }) => {
       const store = notesStoreForBot(payload?.botId);
@@ -6619,7 +6654,7 @@ function registerIpc(): void {
       };
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-notes:create',
     (_event: unknown, payload: { botId: string; title: string; body: string; kind?: string; tags?: string[]; autoLink?: boolean }) => {
       const store = notesStoreForBot(payload?.botId);
@@ -6644,7 +6679,7 @@ function registerIpc(): void {
       return { note: publicNote(note, { includeBody: true }), autoLinksApplied: applied, linkSuggestions: suggested };
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-notes:update',
     (_event: unknown, payload: { botId: string; noteId: string; title?: string; body?: string; tags?: string[]; reason?: string }) => {
       const store = notesStoreForBot(payload?.botId);
@@ -6658,21 +6693,21 @@ function registerIpc(): void {
       return { note: publicNote(updated, { includeBody: true }) };
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-notes:delete',
     (_event: unknown, payload: { botId: string; noteId: string }) => {
       const store = notesStoreForBot(payload?.botId);
       return { deleted: true, note: publicNote(store.deleteNote(requireId(payload?.noteId, 'noteId')), { includeBody: false }) };
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-notes:restore',
     (_event: unknown, payload: { botId: string; noteId: string }) => {
       const store = notesStoreForBot(payload?.botId);
       return { restored: true, note: publicNote(store.restoreNote(requireId(payload?.noteId, 'noteId')), { includeBody: false }) };
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-notes:link',
     (_event: unknown, payload: { botId: string; noteId: string; targetId: string; kind: string; action?: string }) => {
       const store = notesStoreForBot(payload?.botId);
@@ -6685,7 +6720,7 @@ function registerIpc(): void {
       return { note: publicNote(store.addLink(noteId, targetId, kind, { weight: 1, auto: false }), { includeBody: false }) };
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-notes:suggest-links',
     (_event: unknown, payload: { botId: string; noteId: string }) => {
       const store = notesStoreForBot(payload?.botId);
@@ -6694,7 +6729,7 @@ function registerIpc(): void {
       return { suggestions: new AutoLinkEngine(store).suggestLinksFor(note) };
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-notes:graph',
     (_event: unknown, payload: { botId: string; centerNoteId?: string; depth?: number }) => {
       const store = notesStoreForBot(payload?.botId);
@@ -6705,15 +6740,15 @@ function registerIpc(): void {
       });
     },
   );
-  ipcMain.handle('memory-notes:timeline', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('memory-notes:timeline', (_event: unknown, payload: { botId: string }) => {
     const store = notesStoreForBot(payload?.botId);
     return { events: exportNotesTimeline(store, { scope: notesScope(payload?.botId) }) };
   });
-  ipcMain.handle('memory-notes:stats', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('memory-notes:stats', (_event: unknown, payload: { botId: string }) => {
     const store = notesStoreForBot(payload?.botId);
     return store.stats(notesScope(payload?.botId));
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-notes:revisit',
     (_event: unknown, payload: { botId: string; noteId: string; newText: string; mode?: string }) => {
       const store = notesStoreForBot(payload?.botId);
@@ -6732,7 +6767,7 @@ function registerIpc(): void {
       };
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-notes:conflicts',
     (_event: unknown, payload: { botId: string; action: string; id?: string; resolution?: string }) => {
       const store = notesStoreForBot(payload?.botId);
@@ -6758,7 +6793,7 @@ function registerIpc(): void {
       throw new Error('action phải là "list", "resolve" hoặc "dismiss".');
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-notes:benchmark',
     async (_event: unknown, payload: { seed?: number; personas?: number; topK?: number; format?: string }) => {
       const suite = generateBenchmarkSuite({
@@ -6773,7 +6808,7 @@ function registerIpc(): void {
       return buildBenchmarkReportJson(result, suite);
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-notes:import',
     (_event: unknown, payload: { botId: string; source?: string }) => {
       const store = notesStoreForBot(payload?.botId);
@@ -6789,7 +6824,7 @@ function registerIpc(): void {
       return results;
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-graph:shared-search',
     async (_event: unknown, payload: { botId: string; sourceBotId: string; query: string; topK?: number }) => {
       const resolver = {
@@ -6822,7 +6857,7 @@ function registerIpc(): void {
       };
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-graph:sleep',
     async (_event: unknown, payload: { botId: string; action: string; enabled?: boolean; afterTurns?: number; maxSteps?: number; batchSize?: number }) => {
       const bot = settings.bots.find((b) => b.id === requireId(payload?.botId, 'botId'));
@@ -6857,7 +6892,7 @@ function registerIpc(): void {
   // temporal contradictions between two windows, block version
   // history (list/restore). Ghi (resolve/restore) chỉ đổi file của
   // bot đó; embedding không bao giờ trả về renderer.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-v3:conflicts',
     (_event: unknown, payload: { botId: string; action: string; conflictId?: string; resolution?: string; resolvedText?: string; blockId?: string }) => {
       const bot = settings.bots.find((b) => b.id === requireId(payload?.botId, 'botId'));
@@ -6884,7 +6919,7 @@ function registerIpc(): void {
       throw new Error('action phải là "list" hoặc "resolve".');
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-v3:contradictions',
     (_event: unknown, payload: { botId: string; windowAFrom: string; windowATo: string; windowBFrom: string; windowBTo: string }) => {
       const store = temporalGraphStoreForBot(payload?.botId);
@@ -6903,7 +6938,7 @@ function registerIpc(): void {
       }));
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-v3:block-history',
     (_event: unknown, payload: { botId: string; action: string; block?: string; version?: number }) => {
       const blocks = blocksStoreForBot(payload?.botId);
@@ -6926,7 +6961,7 @@ function registerIpc(): void {
   // consolidation v2 (write: dedupe + ranking supersession + sweep +
   // dream). Không fact/embedding nào trả về renderer ngoài điểm số
   // và text đã tổng hợp.
-  ipcMain.handle('memory-v5:health', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('memory-v5:health', (_event: unknown, payload: { botId: string }) => {
     const bot = settings.bots.find((b) => b.id === requireId(payload?.botId, 'botId'));
     if (!bot) throw new Error('Không tìm thấy bot.');
     const store = temporalGraphStoreForBot(payload?.botId);
@@ -6937,7 +6972,7 @@ function registerIpc(): void {
       recentConsolidationRuns: readConsolidationV2Log(workspaceDirFor(bot), 5),
     };
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-v5:consolidate',
     async (_event: unknown, payload: { botId: string; skipDream?: boolean }) => {
       const bot = settings.bots.find((b) => b.id === requireId(payload?.botId, 'botId'));
@@ -6964,7 +6999,7 @@ function registerIpc(): void {
       };
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'memory-v5:bitemporal',
     (_event: unknown, payload: { botId: string; at: string; recordedAt?: string }) => {
       const store = temporalGraphStoreForBot(payload?.botId);
@@ -6985,7 +7020,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'team:add-member',
     (_event: unknown, payload: { userId: string; name: string; role: TeamRole }) => {
       const userId = requireId(payload?.userId, 'userId');
@@ -7001,7 +7036,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('team:remove-member', (_event: unknown, payload: { userId: string }) => {
+  registerMainWindowIpcHandler('team:remove-member', (_event: unknown, payload: { userId: string }) => {
     const userId = requireId(payload?.userId, 'userId');
     const team = loadTeamConfig(app.getPath('userData'));
     const next = removeMember(team, userId);
@@ -7009,7 +7044,7 @@ function registerIpc(): void {
     return next;
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'team:set-role',
     (_event: unknown, payload: { userId: string; role: TeamRole }) => {
       const userId = requireId(payload?.userId, 'userId');
@@ -7024,7 +7059,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'team:share-bot',
     (_event: unknown, payload: { botId: string; sharedBy?: string }) => {
       const botId = requireId(payload?.botId, 'botId');
@@ -7038,7 +7073,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('team:unshare-bot', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('team:unshare-bot', (_event: unknown, payload: { botId: string }) => {
     const botId = requireId(payload?.botId, 'botId');
     const team = loadTeamConfig(app.getPath('userData'));
     const next = unshareBot(team, botId);
@@ -7046,7 +7081,7 @@ function registerIpc(): void {
     return next;
   });
 
-  ipcMain.handle('team:shared-bots', () => {
+  registerMainWindowIpcHandler('team:shared-bots', () => {
     const team = loadTeamConfig(app.getPath('userData'));
     return listSharedBots(team);
   });
@@ -7072,7 +7107,7 @@ function registerIpc(): void {
     }
   }
 
-  ipcMain.handle('team:export', async () => {
+  registerMainWindowIpcHandler('team:export', async () => {
     const userData = app.getPath('userData');
     const team = loadTeamConfig(userData);
     const sharedIds = new Set(listSharedBots(team));
@@ -7124,7 +7159,7 @@ function registerIpc(): void {
     };
   });
 
-  ipcMain.handle('team:import', async () => {
+  registerMainWindowIpcHandler('team:import', async () => {
     const picked = await dialog.showOpenDialog({
       properties: ['openFile'],
       filters: [{ name: 'Open Bot team bundle', extensions: ['json'] }],
@@ -7160,7 +7195,7 @@ function registerIpc(): void {
     };
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'team:import-apply',
     async (_event: unknown, payload: { bundle: TeamBundle; overwrite: boolean }) => {
       if (!payload || typeof payload !== 'object' || !payload.bundle) {
@@ -7260,19 +7295,19 @@ function registerIpc(): void {
 
   // v0.50 (M8): group chat bot-bot — chuyển tiếp vào coordinator con
   // (nơi GroupChatStore sống). Validate id/text ở main trước khi gửi.
-  ipcMain.handle('group:create', (_event: unknown, payload: { name: string; botIds?: string[] }) => {
+  registerMainWindowIpcHandler('group:create', (_event: unknown, payload: { name: string; botIds?: string[] }) => {
     const name = requireText(payload?.name, 'name').trim();
     if (!name) throw new Error('Tạo nhóm chat cần tên không rỗng.');
     return getCoordinator().createGroupChat({ name, botIds: payload?.botIds });
   });
-  ipcMain.handle('group:list', async () => (await getCoordinator().listGroupChats()).groups);
-  ipcMain.handle('group:add-bot', (_event: unknown, payload: { groupId: string; botId: string }) => {
+  registerMainWindowIpcHandler('group:list', async () => (await getCoordinator().listGroupChats()).groups);
+  registerMainWindowIpcHandler('group:add-bot', (_event: unknown, payload: { groupId: string; botId: string }) => {
     const groupId = requireId(payload?.groupId, 'groupId');
     const botId = requireId(payload?.botId, 'botId');
     if (!settings.bots.some((b) => b.id === botId)) throw new Error('Không tìm thấy bot.');
     return getCoordinator().addBotToGroupChat({ groupId, botId });
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'group:remove-bot',
     (_event: unknown, payload: { groupId: string; botId: string }) => {
       const groupId = requireId(payload?.groupId, 'groupId');
@@ -7280,11 +7315,11 @@ function registerIpc(): void {
       return getCoordinator().removeBotFromGroupChat({ groupId, botId });
     },
   );
-  ipcMain.handle('group:delete', (_event: unknown, payload: { groupId: string }) => {
+  registerMainWindowIpcHandler('group:delete', (_event: unknown, payload: { groupId: string }) => {
     const groupId = requireId(payload?.groupId, 'groupId');
     return getCoordinator().deleteGroupChat({ groupId });
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'group:post-message',
     (
       _event: unknown,
@@ -7310,7 +7345,7 @@ function registerIpc(): void {
       });
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'group:get-attachment',
     (
       _event: unknown,
@@ -7322,7 +7357,7 @@ function registerIpc(): void {
       return getCoordinator().getGroupAttachment({ groupId, messageId, attachmentId });
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'group:list-messages',
     async (_event: unknown, payload: { groupId: string; limit?: number }) => {
       const groupId = requireId(payload?.groupId, 'groupId');
@@ -7330,12 +7365,12 @@ function registerIpc(): void {
     },
   );
   // v0.79a: trạng thái chạy của bot trong nhóm (GroupView poll).
-  ipcMain.handle('group:status', (_event: unknown, payload: { groupId: string }) => {
+  registerMainWindowIpcHandler('group:status', (_event: unknown, payload: { groupId: string }) => {
     const groupId = requireId(payload?.groupId, 'groupId');
     return getCoordinator().getGroupBotStatus({ groupId });
   });
   // v0.82: bỏ qua ghi nhận "chạy dở thì app dừng" của một bot trong nhóm.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'group:dismiss-interrupted',
     (_event: unknown, payload: { groupId: string; botId: string }) => {
       const groupId = requireId(payload?.groupId, 'groupId');
@@ -7348,7 +7383,7 @@ function registerIpc(): void {
   // ChannelStore sống). Validate id/text ở main trước khi gửi; giới
   // hạn độ dài (tên 80, instructions 20.000, folder 500 ký tự) được
   // core validate lại fail-closed trong coordinator.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'channel:create',
     (
       _event: unknown,
@@ -7367,8 +7402,8 @@ function registerIpc(): void {
       });
     },
   );
-  ipcMain.handle('channel:list', async () => (await getCoordinator().listChannels()).channels);
-  ipcMain.handle(
+  registerMainWindowIpcHandler('channel:list', async () => (await getCoordinator().listChannels()).channels);
+  registerMainWindowIpcHandler(
     'channel:update',
     (
       _event: unknown,
@@ -7386,17 +7421,17 @@ function registerIpc(): void {
       });
     },
   );
-  ipcMain.handle('channel:delete', (_event: unknown, payload: { channelId: string }) => {
+  registerMainWindowIpcHandler('channel:delete', (_event: unknown, payload: { channelId: string }) => {
     const channelId = requireId(payload?.channelId, 'channelId');
     return getCoordinator().deleteChannel({ channelId });
   });
-  ipcMain.handle('channel:add-bot', (_event: unknown, payload: { channelId: string; botId: string }) => {
+  registerMainWindowIpcHandler('channel:add-bot', (_event: unknown, payload: { channelId: string; botId: string }) => {
     const channelId = requireId(payload?.channelId, 'channelId');
     const botId = requireId(payload?.botId, 'botId');
     if (!settings.bots.some((b) => b.id === botId)) throw new Error('Không tìm thấy bot.');
     return getCoordinator().addBotToChannel({ channelId, botId });
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'channel:remove-bot',
     (_event: unknown, payload: { channelId: string; botId: string }) => {
       const channelId = requireId(payload?.channelId, 'channelId');
@@ -7404,7 +7439,7 @@ function registerIpc(): void {
       return getCoordinator().removeBotFromChannel({ channelId, botId });
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'channel:move-bot',
     (_event: unknown, payload: { fromChannelId: string; toChannelId: string; botId: string }) => {
       const fromChannelId = requireId(payload?.fromChannelId, 'fromChannelId');
@@ -7414,7 +7449,7 @@ function registerIpc(): void {
       return getCoordinator().moveBotBetweenChannels({ fromChannelId, toChannelId, botId });
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'channel:post-message',
     (_event: unknown, payload: { channelId: string; text: string }) => {
       const channelId = requireId(payload?.channelId, 'channelId');
@@ -7423,7 +7458,7 @@ function registerIpc(): void {
       return getCoordinator().postChannelMessage({ channelId, text });
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'channel:list-messages',
     async (_event: unknown, payload: { channelId: string; limit?: number }) => {
       const channelId = requireId(payload?.channelId, 'channelId');
@@ -7431,7 +7466,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'chat:send',
     async (
       _event: unknown,
@@ -7579,7 +7614,7 @@ function registerIpc(): void {
   // executeRun aborts the run as soon as it starts. A failed creation
   // leaves nothing running to stop, so stopBot below still reports
   // honestly in that case.
-  ipcMain.handle('chat:stop', async (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('chat:stop', async (_event: unknown, payload: { botId: string }) => {
     const botId = requireId(payload?.botId, 'botId');
     const bot = settings.bots.find((b) => b.id === botId);
     if (!bot) throw new Error('Không tìm thấy bot.');
@@ -7593,7 +7628,7 @@ function registerIpc(): void {
     return getCoordinator().stopBot(botId);
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'chat:history',
     async (_event: unknown, payload: { botId: string; limit?: number; threadId?: string }) => {
       const botId = requireId(payload?.botId, 'botId');
@@ -7616,7 +7651,7 @@ function registerIpc(): void {
   // + migrate history cũ ở lần gọi đầu). Fix v0.59 leftover (a): truyền
   // `settings.locale` để thread mặc định đặt tên theo locale của UI
   // ('en' → 'New conversation') thay vì luôn tiếng Việt.
-  ipcMain.handle('threads:list', async (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('threads:list', async (_event: unknown, payload: { botId: string }) => {
     const botId = requireId(payload?.botId, 'botId');
     const bot = settings.bots.find((b) => b.id === botId);
     if (!bot) throw new Error('Không tìm thấy bot.');
@@ -7624,7 +7659,7 @@ function registerIpc(): void {
     return (await getCoordinator().listThreads(bot.id, settings.locale)).threads;
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'threads:create',
     async (_event: unknown, payload: { botId: string; title?: string }) => {
       const botId = requireId(payload?.botId, 'botId');
@@ -7636,7 +7671,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'threads:rename',
     async (_event: unknown, payload: { threadId: string; title: string }) => {
       const threadId = requireId(payload?.threadId, 'threadId');
@@ -7646,12 +7681,12 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('threads:delete', async (_event: unknown, payload: { threadId: string }) => {
+  registerMainWindowIpcHandler('threads:delete', async (_event: unknown, payload: { threadId: string }) => {
     const threadId = requireId(payload?.threadId, 'threadId');
     return getCoordinator().deleteThread(threadId);
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'threads:search',
     async (_event: unknown, payload: { botId?: string; query: string }) => {
       const query = requireText(payload?.query, 'query').trim();
@@ -7669,14 +7704,14 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('settings:get', () => settingsForRenderer());
+  registerMainWindowIpcHandler('settings:get', () => settingsForRenderer());
 
   // v0.87c: OS notifications — renderer / coordinator chỉ gửi request
   // qua IPC này; main validate qua core rồi bắn popup (renderer không
   // bao giờ gọi Electron Notification trực tiếp). Trả outcome để UI
   // báo được khi không hiện (tắt / trùng / quá giới hạn / máy không
   // hỗ trợ). Không throw với request xấu — trả { shown: false }.
-  ipcMain.handle('notifications:send', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('notifications:send', (_event: unknown, payload: unknown) => {
     const validated = validateNotificationRequest(payload);
     if (!validated.ok) return { shown: false, reason: 'invalid', detail: validated.error };
     return getNotificationService().notify(validated.request);
@@ -7686,7 +7721,7 @@ function registerIpc(): void {
   // run-complete cho chính app (không cần bot nào). Trên máy headless
   // không daemon thì trả { shown: false, reason: 'unsupported' } —
   // chỉ kiểm chứng được logic, không phải popup thật.
-  ipcMain.handle('notifications:test', (_event: unknown, payload: { kind?: string } | undefined) => {
+  registerMainWindowIpcHandler('notifications:test', (_event: unknown, payload: { kind?: string } | undefined) => {
     const kind: NotificationKind =
       payload?.kind === 'approval' || payload?.kind === 'run-error' ? payload.kind : 'run-complete';
     const text = formatNotificationText(settings.locale, kind, { botName: 'open-bot' });
@@ -7695,7 +7730,7 @@ function registerIpc(): void {
   // v0.86 (P2-6): deep-link — renderer kéo route đang chờ lúc mount.
   // Đánh dấu renderer đã sẵn (URL tới sau đó main đẩy thẳng qua
   // `deep-link:open`); route trả về 1 lần duy nhất rồi xóa.
-  ipcMain.handle('deep-link:pending', () => {
+  registerMainWindowIpcHandler('deep-link:pending', () => {
     deepLinkRendererReady = true;
     const route = pendingDeepLinkRoute;
     pendingDeepLinkRoute = null;
@@ -7703,7 +7738,7 @@ function registerIpc(): void {
     return validateDeepLinkRoute(route);
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'settings:set',
     (
       _event: unknown,
@@ -7791,7 +7826,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('settings:test', async (_event: unknown, payload: { providerId: string }) => {
+  registerMainWindowIpcHandler('settings:test', async (_event: unknown, payload: { providerId: string }) => {
     const providerId = requireId(payload?.providerId, 'providerId');
     if (!isKnownProvider(providerId)) throw new Error(`Không rõ provider id: ${providerId}.`);
     if (!isProviderAllowed(activePolicy, providerId)) {
@@ -7825,7 +7860,7 @@ function registerIpc(): void {
   // v0.28: trạng thái lưu task A2A — renderer hỏi lúc mở app để hiện
   // banner cảnh báo nếu lần lưu gần nhất thất bại sau hết retry
   // (Local API chưa chạy thì trả trạng thái "ok" mặc định).
-  ipcMain.handle('a2a:persist-status', () =>
+  registerMainWindowIpcHandler('a2a:persist-status', () =>
     a2aServerRef?.getPersistStatus() ?? {
       ok: true,
       lastError: null,
@@ -7901,9 +7936,9 @@ function registerIpc(): void {
     ...(typeof card.signature?.keyId === 'string' ? { cardKeyId: card.signature.keyId } : {}),
   });
 
-  ipcMain.handle('a2a:trusted-list', () => readTrustedA2aAgents());
+  registerMainWindowIpcHandler('a2a:trusted-list', () => readTrustedA2aAgents());
 
-  ipcMain.handle('a2a:trusted-add', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('a2a:trusted-add', async (_event: unknown, payload: unknown) => {
     const p = (payload ?? {}) as { url?: unknown; token?: unknown };
     const baseUrl = normalizeA2aBaseUrl(requireHttpUrl(p.url, 'url'));
     const token = typeof p.token === 'string' && p.token.length > 0 ? p.token : undefined;
@@ -7917,7 +7952,7 @@ function registerIpc(): void {
     return record;
   });
 
-  ipcMain.handle('a2a:trusted-remove', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('a2a:trusted-remove', (_event: unknown, payload: unknown) => {
     const p = (payload ?? {}) as { baseUrl?: unknown };
     const baseUrl = normalizeA2aBaseUrl(requireHttpUrl(p.baseUrl, 'baseUrl'));
     const kept = readTrustedA2aAgents().filter((a) => a.baseUrl !== baseUrl);
@@ -7925,7 +7960,7 @@ function registerIpc(): void {
     return kept;
   });
 
-  ipcMain.handle('a2a:trusted-send', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('a2a:trusted-send', async (_event: unknown, payload: unknown) => {
     const p = (payload ?? {}) as { baseUrl?: unknown; message?: unknown; timeoutMs?: unknown };
     const baseUrl = normalizeA2aBaseUrl(requireHttpUrl(p.baseUrl, 'baseUrl'));
     const message = requireText(p.message, 'message');
@@ -7960,8 +7995,8 @@ function registerIpc(): void {
   // chỉ có hiệu lực cho push webhook + client/delegation; Local API
   // mount A2A vẫn bind loopback cho tới khi coordinator nối bind host
   // của API theo policy (ghi rõ trong kết quả trả về để UI báo đúng).
-  ipcMain.handle('a2a:network-policy-get', () => readA2aNetworkPolicy());
-  ipcMain.handle('a2a:network-policy-set', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('a2a:network-policy-get', () => readA2aNetworkPolicy());
+  registerMainWindowIpcHandler('a2a:network-policy-set', (_event: unknown, payload: unknown) => {
     const saved = writeA2aNetworkPolicy(payload as A2aNetworkPolicy);
     return {
       policy: saved,
@@ -7973,7 +8008,7 @@ function registerIpc(): void {
   // card rồi kiểm tra version negotiation + chữ ký Ed25519. Key đã
   // trust cho agent này (cardKeyId lúc trust) thì đối chiếu để báo
   // key mới/đổi; agent chưa trust thì mọi key ký hợp lệ đều firstSeen.
-  ipcMain.handle('a2a:verify-card', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('a2a:verify-card', async (_event: unknown, payload: unknown) => {
     const p = (payload ?? {}) as { url?: unknown; token?: unknown };
     const baseUrl = normalizeA2aBaseUrl(requireHttpUrl(p.url, 'url'));
     const token = typeof p.token === 'string' && p.token.length > 0 ? p.token : undefined;
@@ -8001,7 +8036,7 @@ function registerIpc(): void {
     };
   });
 
-  ipcMain.handle('tasks:list', async (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('tasks:list', async (_event: unknown, payload: { botId: string }) => {
     const botId = requireId(payload?.botId, 'botId');
     const bot = settings.bots.find((b) => b.id === botId);
     if (!bot) return [];
@@ -8032,7 +8067,7 @@ function registerIpc(): void {
   // selected bot when it knows it). A bad file never throws — the reader
   // skips it. A bot whose workspace cannot be resolved contributes
   // nothing instead of failing the list.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'plans:list',
     (_event: unknown, payload?: { botId?: string }): StoredPlan[] => {
       const bots =
@@ -8059,7 +8094,7 @@ function registerIpc(): void {
   // định vào memory + file plan, và chỉ approve mới ghi dấu để run kế
   // tiếp tự duyệt tool-call. Lỗi (bot/plan không có, plan đã quyết rồi,
   // decision sai) throw thẳng để renderer báo lại cho người dùng.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'plans:review',
     async (
       _event: unknown,
@@ -8095,7 +8130,7 @@ function registerIpc(): void {
   // sách, quyết định đề xuất replan; trạng thái live của plan chạy
   // về renderer qua event `plan.event` (kênh `plan:event`, xem
   // routeCoordinatorEvent) — không poll.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'plans:run-create',
     async (
       _event: unknown,
@@ -8125,20 +8160,20 @@ function registerIpc(): void {
       });
     },
   );
-  ipcMain.handle('plans:run-list', () => getCoordinator().listRunPlans());
-  ipcMain.handle('plans:run-templates', () => getCoordinator().listPlanTemplates());
-  ipcMain.handle('plans:run-resume', () => getCoordinator().resumeRunPlans());
-  ipcMain.handle(
+  registerMainWindowIpcHandler('plans:run-list', () => getCoordinator().listRunPlans());
+  registerMainWindowIpcHandler('plans:run-templates', () => getCoordinator().listPlanTemplates());
+  registerMainWindowIpcHandler('plans:run-resume', () => getCoordinator().resumeRunPlans());
+  registerMainWindowIpcHandler(
     'plans:run-get',
     (_event: unknown, payload?: { planId?: string }) =>
       getCoordinator().getRunPlan(requireId(payload?.planId, 'planId')),
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'plans:run-delete',
     (_event: unknown, payload?: { planId?: string }) =>
       getCoordinator().deleteRunPlan(requireId(payload?.planId, 'planId')),
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'plans:run-decide-replan',
     (
       _event: unknown,
@@ -8162,12 +8197,12 @@ function registerIpc(): void {
   // người dùng tạo tường minh; lỗi validate (pattern nguy hiểm, thiếu
   // field…) throw thẳng để renderer báo lại. Không cần bot runtime:
   // rule là cấu hình toàn cục/bot, không gắn với runtime đang chạy.
-  ipcMain.handle('auto-approve:list', async () => {
+  registerMainWindowIpcHandler('auto-approve:list', async () => {
     const { rules } = await getCoordinator().listAutoApproveRules();
     return rules;
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'auto-approve:add',
     async (_event: unknown, payload?: Record<string, unknown>) => {
       if (!payload || typeof payload !== 'object') {
@@ -8180,13 +8215,13 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('auto-approve:remove', async (_event: unknown, payload?: { id?: string }) => {
+  registerMainWindowIpcHandler('auto-approve:remove', async (_event: unknown, payload?: { id?: string }) => {
     const id = requireId(payload?.id, 'id');
     const { removed } = await getCoordinator().removeAutoApproveRule(id);
     return removed;
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'auto-approve:set-enabled',
     async (_event: unknown, payload?: { id?: string; enabled?: boolean }) => {
       const id = requireId(payload?.id, 'id');
@@ -8203,11 +8238,11 @@ function registerIpc(): void {
   // trình con, file `<userData>/risk-rules.json` + `budget-history.json`).
   // Rule do người dùng tạo tường minh; lỗi validate (regex sai, thiếu
   // field…) throw thẳng để renderer báo lại. Không cần bot runtime.
-  ipcMain.handle('risk-rules:list', async () => {
+  registerMainWindowIpcHandler('risk-rules:list', async () => {
     return getCoordinator().listRiskRules();
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'risk-rules:add',
     async (_event: unknown, payload?: { rule?: unknown }) => {
       if (!payload || typeof payload.rule !== 'object' || payload.rule === null) {
@@ -8218,13 +8253,13 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('risk-rules:remove', async (_event: unknown, payload?: { id?: string }) => {
+  registerMainWindowIpcHandler('risk-rules:remove', async (_event: unknown, payload?: { id?: string }) => {
     const id = requireId(payload?.id, 'id');
     const { removed } = await getCoordinator().removeRiskRule(id);
     return removed;
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'risk-lists:set',
     async (
       _event: unknown,
@@ -8247,11 +8282,11 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('risk-builtin:list', async () => {
+  registerMainWindowIpcHandler('risk-builtin:list', async () => {
     return getCoordinator().listBuiltinRiskRules();
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'risk-builtin:set-enabled',
     async (_event: unknown, payload?: { id?: string; enabled?: boolean }) => {
       const id = requireId(payload?.id, 'id');
@@ -8262,29 +8297,29 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('risk-confirmations:list', async () => {
+  registerMainWindowIpcHandler('risk-confirmations:list', async () => {
     const { confirmations } = await getCoordinator().listPendingConfirmations();
     return confirmations;
   });
 
-  ipcMain.handle('risk-audit:list', async () => {
+  registerMainWindowIpcHandler('risk-audit:list', async () => {
     const { audit } = await getCoordinator().getConfirmationAudit();
     return audit;
   });
 
-  ipcMain.handle('risk-budget:list', async (_event: unknown, payload?: { botId?: string }) => {
+  registerMainWindowIpcHandler('risk-budget:list', async (_event: unknown, payload?: { botId?: string }) => {
     const { entries } = await getCoordinator().listBudgetHistory({
       ...(typeof payload?.botId === 'string' && payload.botId ? { botId: payload.botId } : {}),
     });
     return entries;
   });
 
-  ipcMain.handle('risk-budget:totals', async (_event: unknown, payload?: { botId?: string }) => {
+  registerMainWindowIpcHandler('risk-budget:totals', async (_event: unknown, payload?: { botId?: string }) => {
     const botId = requireId(payload?.botId, 'botId');
     return getCoordinator().getBudgetTotals({ botId });
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'risk-report:get',
     async (_event: unknown, payload?: { botId?: string; conversationId?: string }) => {
       const botId = requireId(payload?.botId, 'botId');
@@ -8301,7 +8336,7 @@ function registerIpc(): void {
   // The coordinator child writes traces to the same file (its wiring
   // lands separately); main only READS it for the TraceView UI, so a
   // missing/empty file is just "no traces yet", never an error.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'traces:list',
     (_event: unknown, payload?: { botId?: string; runId?: string; limit?: number }): TraceSummary[] => {
       const botId = payload?.botId === undefined ? undefined : requireId(payload.botId, 'botId');
@@ -8311,7 +8346,7 @@ function registerIpc(): void {
       return getTraceStore().listTraces({ botId, runId, limit });
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'traces:get',
     (_event: unknown, payload: { traceId?: string; runId?: string }): Trace | null => {
       if (typeof payload?.traceId === 'string' && payload.traceId) {
@@ -8325,14 +8360,14 @@ function registerIpc(): void {
   );
 
   // --- v0.4: Vault (secret KHÔNG BAO GIỜ rời main process) ---
-  ipcMain.handle('vault:list', () => {
+  registerMainWindowIpcHandler('vault:list', () => {
     // Trả về tên key theo namespace — KHÔNG trả value.
     const out: Record<string, string[]> = {};
     for (const ns of vault.listNamespaces()) out[ns] = vault.listSecrets(ns);
     return out;
   });
 
-  ipcMain.handle('vault:set', (_event: unknown, payload: { namespace: string; key: string; value: string }) => {
+  registerMainWindowIpcHandler('vault:set', (_event: unknown, payload: { namespace: string; key: string; value: string }) => {
     // v0.7: namespace/key theo đúng 3 loại credential — session /
     // oauth-refresh / provider (cộng api, service-account, mcp,
     // plugin, identity). Giá trị rỗng hoặc quá dài bị từ chối.
@@ -8363,7 +8398,7 @@ function registerIpc(): void {
     return true;
   });
 
-  ipcMain.handle('vault:delete', (_event: unknown, payload: { namespace: string; key: string }) => {
+  registerMainWindowIpcHandler('vault:delete', (_event: unknown, payload: { namespace: string; key: string }) => {
     const namespace = requireId(payload?.namespace, 'namespace');
     const key = requireId(payload?.key, 'key');
     const removed = vault.deleteSecret(namespace, key);
@@ -8396,7 +8431,7 @@ function registerIpc(): void {
   // v0.59: thêm cờ `enabled` (settings.onePasswordEnabled, mặc định
   // bật) + IPC `onepassword:set-enabled`. Khi tắt, main không spawn
   // worker `op` nữa và import-field từ chối (fail-closed).
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'onepassword:status',
     async (): Promise<OnePasswordBrokerStatus & { enabled: boolean }> => {
       if (settings.onePasswordEnabled === false) {
@@ -8414,7 +8449,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'onepassword:set-enabled',
     (_event: unknown, payload: { enabled: boolean }): { enabled: boolean } => {
       const enabled = requireBoolean(payload?.enabled, 'enabled');
@@ -8428,7 +8463,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'onepassword:import-field',
     async (
       _event: unknown,
@@ -8454,18 +8489,18 @@ function registerIpc(): void {
   );
 
   // --- v0.4: Usage + spend limit ---
-  ipcMain.handle('usage:get', (_event: unknown, payload?: { botId?: string }) => {
+  registerMainWindowIpcHandler('usage:get', (_event: unknown, payload?: { botId?: string }) => {
     const botId = payload?.botId === undefined ? undefined : requireId(payload.botId, 'botId');
     usageTracker.reload();
     return usageTracker.getSpendStatus(botId);
   });
 
-  ipcMain.handle('usage:get-limits', () => {
+  registerMainWindowIpcHandler('usage:get-limits', () => {
     usageTracker.reload();
     return usageTracker.getLimits();
   });
 
-  ipcMain.handle('usage:set-limits', (_event: unknown, limits: SpendLimits) => {
+  registerMainWindowIpcHandler('usage:set-limits', (_event: unknown, limits: SpendLimits) => {
     // v0.7: limit phải là số hữu hạn >= 0 (UsageTracker cũng throw khi <= 0).
     if (limits === null || typeof limits !== 'object' || Array.isArray(limits)) {
       throw new Error('Tham số usage:set-limits phải là object.');
@@ -8480,7 +8515,7 @@ function registerIpc(): void {
     return usageTracker.getLimits();
   });
 
-  ipcMain.handle('usage:reset', (_event: unknown, payload: { scope: 'day' | 'month' | 'all' }) => {
+  registerMainWindowIpcHandler('usage:reset', (_event: unknown, payload: { scope: 'day' | 'month' | 'all' }) => {
     const scope = payload?.scope;
     if (scope !== 'day' && scope !== 'month' && scope !== 'all') {
       throw new Error('Scope phải là day, month hoặc all.');
@@ -8491,7 +8526,7 @@ function registerIpc(): void {
   });
 
   // --- v0.4: skills ---
-  ipcMain.handle('skills:list', () => {
+  registerMainWindowIpcHandler('skills:list', () => {
     const registry = getSkillRegistry();
     return registry.list().map((s) => ({
       name: s.name,
@@ -8505,7 +8540,7 @@ function registerIpc(): void {
     }));
   });
 
-  ipcMain.handle('skills:toggle', (_event: unknown, payload: { name: string; enabled: boolean }) => {
+  registerMainWindowIpcHandler('skills:toggle', (_event: unknown, payload: { name: string; enabled: boolean }) => {
     const name = requireString(payload?.name, 'name');
     const enabled = requireBoolean(payload?.enabled, 'enabled');
     const registry = getSkillRegistry();
@@ -8514,7 +8549,7 @@ function registerIpc(): void {
     return registry.get(name)?.enabled ?? false;
   });
 
-  ipcMain.handle('skills:reload', () => {
+  registerMainWindowIpcHandler('skills:reload', () => {
     const registry = getSkillRegistry();
     const skills = registry.load();
     // Báo coordinator reload registry của nó (nơi skill được chèn vào system prompt).
@@ -8531,13 +8566,13 @@ function registerIpc(): void {
   // từ URL/mạng (tránh supply-chain — skill lạ từ mạng chạy như hướng
   // dẫn của agent). Core validate bằng chính loader rồi ghi atomic
   // (file tạm + rename) vào `<userData>/skills/<name>/SKILL.md`.
-  ipcMain.handle('skills:read', (_event: unknown, payload: { name: string }) => {
+  registerMainWindowIpcHandler('skills:read', (_event: unknown, payload: { name: string }) => {
     const name = requireString(payload?.name, 'name');
     const content = getSkillRegistry().readSkillText(name);
     return { name, content };
   });
 
-  ipcMain.handle('skills:install', (_event: unknown, payload: { name: string; content: string }) => {
+  registerMainWindowIpcHandler('skills:install', (_event: unknown, payload: { name: string; content: string }) => {
     const name = requireString(payload?.name, 'name');
     // requireText: không trim (giữ nguyên nội dung file), cap 200.000 ký tự.
     const content = requireText(payload?.content, 'content');
@@ -8566,14 +8601,14 @@ function registerIpc(): void {
   // file — ghi canvas vẫn đi qua tool canvas_write của agent (cần
   // approval). `canvas:open` mở file JSON bằng app mặc định của hệ
   // điều hành (shell.openPath), không chạy nội dung canvas.
-  ipcMain.handle('canvas:list', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('canvas:list', (_event: unknown, payload: { botId: string }) => {
     const botId = requireId(payload?.botId, 'botId');
     const bot = settings.bots.find((b) => b.id === botId);
     if (!bot) throw new Error('Không tìm thấy bot.');
     return new CanvasStore(workspaceDirFor(bot), bot.id).list();
   });
 
-  ipcMain.handle('canvas:get', async (_event: unknown, payload: { botId: string; id: string }) => {
+  registerMainWindowIpcHandler('canvas:get', async (_event: unknown, payload: { botId: string; id: string }) => {
     const botId = requireId(payload?.botId, 'botId');
     const id = requireId(payload?.id, 'id');
     const bot = settings.bots.find((b) => b.id === botId);
@@ -8583,7 +8618,7 @@ function registerIpc(): void {
     return doc;
   });
 
-  ipcMain.handle('canvas:delete', async (_event: unknown, payload: { botId: string; id: string }) => {
+  registerMainWindowIpcHandler('canvas:delete', async (_event: unknown, payload: { botId: string; id: string }) => {
     const botId = requireId(payload?.botId, 'botId');
     const id = requireId(payload?.id, 'id');
     const bot = settings.bots.find((b) => b.id === botId);
@@ -8593,7 +8628,7 @@ function registerIpc(): void {
     return { deleted: true };
   });
 
-  ipcMain.handle('canvas:open', async (_event: unknown, payload: { botId: string; id: string }) => {
+  registerMainWindowIpcHandler('canvas:open', async (_event: unknown, payload: { botId: string; id: string }) => {
     const botId = requireId(payload?.botId, 'botId');
     const id = requireId(payload?.id, 'id');
     const bot = settings.bots.find((b) => b.id === botId);
@@ -8613,27 +8648,27 @@ function registerIpc(): void {
   // thập + lưu local + xem/xoá; gửi (user bấm gửi rõ ràng) là sóng
   // sau, xem docs/crash-reporting.md. `crash-report:renderer` nhận
   // lỗi từ renderer (main.tsx) và chỉ ghi khi user đã bật opt-in.
-  ipcMain.handle('crash-reports:list', () => getCrashReportStore().listSummaries());
+  registerMainWindowIpcHandler('crash-reports:list', () => getCrashReportStore().listSummaries());
 
-  ipcMain.handle('crash-reports:get', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('crash-reports:get', (_event: unknown, payload: { id: string }) => {
     const id = requireId(payload?.id, 'id');
     const report = getCrashReportStore().get(id);
     if (!report) throw new Error(`Không tìm thấy crash report "${id}".`);
     return report;
   });
 
-  ipcMain.handle('crash-reports:delete', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('crash-reports:delete', (_event: unknown, payload: { id: string }) => {
     const id = requireId(payload?.id, 'id');
     const deleted = getCrashReportStore().delete(id);
     if (!deleted) throw new Error(`Không tìm thấy crash report "${id}".`);
     return { deleted: true };
   });
 
-  ipcMain.handle('crash-reports:delete-all', () => {
+  registerMainWindowIpcHandler('crash-reports:delete-all', () => {
     return { deleted: getCrashReportStore().deleteAll() };
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'crash-report:renderer',
     (_event: unknown, payload: { message?: unknown; stack?: unknown }) => {
       const message = typeof payload?.message === 'string' ? payload.message.slice(0, 65536) : '';
@@ -8689,7 +8724,7 @@ function registerIpc(): void {
     getHookRegistry();
   }
 
-  ipcMain.handle('hooks:list', () => {
+  registerMainWindowIpcHandler('hooks:list', () => {
     const registry = getHookRegistry();
     return registry.list().map((h) => ({
       name: h.name,
@@ -8700,7 +8735,7 @@ function registerIpc(): void {
     }));
   });
 
-  ipcMain.handle('hooks:toggle', (_event: unknown, payload: { name: string; enabled: boolean }) => {
+  registerMainWindowIpcHandler('hooks:toggle', (_event: unknown, payload: { name: string; enabled: boolean }) => {
     const name = requireString(payload?.name, 'name');
     const enabled = requireBoolean(payload?.enabled, 'enabled');
     const registry = getHookRegistry();
@@ -8752,11 +8787,11 @@ function registerIpc(): void {
     fs.writeFileSync(hookCommandsFilePath(), JSON.stringify(commands, null, 2), 'utf8');
   }
 
-  ipcMain.handle('hooks:commands-list', (): HookCommandSettingsEntry[] => {
+  registerMainWindowIpcHandler('hooks:commands-list', (): HookCommandSettingsEntry[] => {
     return readHookCommandsFile();
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'hooks:commands-save',
     (_event: unknown, payload: unknown): HookCommandSettingsEntry => {
       const result = validateHookCommandEntry(payload);
@@ -8776,7 +8811,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'hooks:commands-delete',
     (_event: unknown, payload: { name: string }): boolean => {
       const name = requireString(payload?.name, 'name');
@@ -8792,7 +8827,7 @@ function registerIpc(): void {
   // --- v1.01 (T2): chạy thử 1 hook lệnh với event mẫu (không chạm tool thật) ---
   // Chạy trong thư mục dữ liệu của app (cwd hiển thị trong kết quả để
   // người dùng biết lệnh đã chạy ở đâu); entry vẫn qua validate của core.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'hooks:commands-test',
     async (
       _event: unknown,
@@ -8816,11 +8851,11 @@ function registerIpc(): void {
   );
 
   // --- v1.01 (T2): test gate — lệnh kiểm tra chạy khi subagent dừng ---
-  ipcMain.handle('hooks:testgate-get', (): TestGateConfig => {
+  registerMainWindowIpcHandler('hooks:testgate-get', (): TestGateConfig => {
     return readTestGateConfig(app.getPath('userData')) ?? {};
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'hooks:testgate-save',
     (_event: unknown, payload: unknown): TestGateConfig => {
       // Một điểm validate duy nhất cho cả 2 dạng config (command đơn /
@@ -8849,7 +8884,7 @@ function registerIpc(): void {
   );
 
   // --- v1.01 (T2): hook execution log — các lần hook chạy gần đây ---
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'hooks:log-list',
     (_event: unknown, payload?: { limit?: number }): HookExecutionRecord[] => {
       const limit =
@@ -8873,7 +8908,7 @@ function registerIpc(): void {
     return pluginManager;
   }
 
-  ipcMain.handle('plugins:list', () => {
+  registerMainWindowIpcHandler('plugins:list', () => {
     const manager = getPluginManager();
     const plugins = manager.scanDir().map((p) => ({
       id: p.manifest.id,
@@ -8888,7 +8923,7 @@ function registerIpc(): void {
     return { plugins, errors };
   });
 
-  ipcMain.handle('plugins:toggle', (_event: unknown, payload: { id: string; enabled: boolean }) => {
+  registerMainWindowIpcHandler('plugins:toggle', (_event: unknown, payload: { id: string; enabled: boolean }) => {
     const id = requireId(payload?.id, 'id');
     const enabled = requireBoolean(payload?.enabled, 'enabled');
     const manager = getPluginManager();
@@ -8911,11 +8946,11 @@ function registerIpc(): void {
     return path.join(app.getPath('userData'), 'plugins');
   }
 
-  ipcMain.handle('plugin-templates:list', () => {
+  registerMainWindowIpcHandler('plugin-templates:list', () => {
     return listPluginTemplates(getPluginTemplatesDir());
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'plugin-templates:create',
     (_event: unknown, payload: CreatePluginTemplateInput) => {
       if (payload === null || typeof payload !== 'object') {
@@ -8965,7 +9000,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'plugin-templates:apply',
     (_event: unknown, payload: { id: string; overwrite?: boolean }) => {
       const id = requireId(payload?.id, 'id');
@@ -8980,20 +9015,20 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('plugin-templates:export', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('plugin-templates:export', (_event: unknown, payload: { id: string }) => {
     const id = requireId(payload?.id, 'id');
     const template = getPluginTemplate(getPluginTemplatesDir(), id);
     if (!template) throw new Error(`Không tìm thấy plugin template "${id}".`);
     return { id, json: exportPluginTemplate(template) };
   });
 
-  ipcMain.handle('plugin-templates:import', (_event: unknown, payload: { json: string }) => {
+  registerMainWindowIpcHandler('plugin-templates:import', (_event: unknown, payload: { json: string }) => {
     const json = requireString(payload?.json, 'json');
     const template = importPluginTemplate(json);
     return savePluginTemplate(getPluginTemplatesDir(), template);
   });
 
-  ipcMain.handle('plugin-templates:delete', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('plugin-templates:delete', (_event: unknown, payload: { id: string }) => {
     const id = requireId(payload?.id, 'id');
     return deletePluginTemplate(getPluginTemplatesDir(), id);
   });
@@ -9005,7 +9040,7 @@ function registerIpc(): void {
   // ngay; coordinator chưa triển khai RPC này (điều phối viên viết sau)
   // hoặc bot không tồn tại thì chỉ báo lỗi rõ ràng, không crash, và vẫn
   // giữ trạng thái đã ghi vào enabled.json.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'plugin:set-enabled',
     async (_event: unknown, payload: { botId?: string | null; pluginId: string; enabled: boolean }) => {
       const pluginId = requireId(payload?.pluginId, 'pluginId');
@@ -9045,20 +9080,20 @@ function registerIpc(): void {
   );
 
   // --- v0.4: automations ---
-  ipcMain.handle('automations:list', () => automationScheduler?.list() ?? []);
+  registerMainWindowIpcHandler('automations:list', () => automationScheduler?.list() ?? []);
 
   // --- v0.97 (Team T5): harness v2 — routines, webhook stats, health, NDJSON events ---
   const requireRoutineManager = (): RoutineManager => {
     if (!routineManager) throw new Error('Harness v2 chưa khởi động.');
     return routineManager;
   };
-  ipcMain.handle('harness2:routines:list', () => routineManager?.list() ?? []);
-  ipcMain.handle('harness2:routines:get', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('harness2:routines:list', () => routineManager?.list() ?? []);
+  registerMainWindowIpcHandler('harness2:routines:get', (_event: unknown, payload: { id: string }) => {
     const found = routineManager?.get(requireId(payload?.id, 'id'));
     if (!found) throw new Error('Không tìm thấy routine.');
     return found;
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'harness2:routines:create',
     (_event: unknown, payload: Omit<HarnessRoutine, 'id' | 'createdAt' | 'updatedAt'>) => {
       if (payload === null || typeof payload !== 'object') throw new Error('Tham số harness2:routines:create phải là object.');
@@ -9070,36 +9105,36 @@ function registerIpc(): void {
       return requireRoutineManager().create(payload);
     },
   );
-  ipcMain.handle('harness2:routines:update', (_event: unknown, payload: HarnessRoutine) => {
+  registerMainWindowIpcHandler('harness2:routines:update', (_event: unknown, payload: HarnessRoutine) => {
     if (payload === null || typeof payload !== 'object') throw new Error('Tham số harness2:routines:update phải là object.');
     return requireRoutineManager().update(payload);
   });
-  ipcMain.handle('harness2:routines:remove', (_event: unknown, payload: { id: string }) =>
+  registerMainWindowIpcHandler('harness2:routines:remove', (_event: unknown, payload: { id: string }) =>
     requireRoutineManager().remove(requireId(payload?.id, 'id')),
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'harness2:routines:set-enabled',
     (_event: unknown, payload: { id: string; enabled: boolean }) =>
       requireRoutineManager().setEnabled(requireId(payload?.id, 'id'), payload.enabled === true),
   );
-  ipcMain.handle('harness2:routines:run-now', (_event: unknown, payload: { id: string }) =>
+  registerMainWindowIpcHandler('harness2:routines:run-now', (_event: unknown, payload: { id: string }) =>
     requireRoutineManager().runNow(requireId(payload?.id, 'id')),
   );
-  ipcMain.handle('harness2:routines:retry-run', (_event: unknown, payload: { runId: string }) =>
+  registerMainWindowIpcHandler('harness2:routines:retry-run', (_event: unknown, payload: { runId: string }) =>
     requireRoutineManager().retryRun(requireId(payload?.runId, 'runId')),
   );
-  ipcMain.handle('harness2:routines:runs', (_event: unknown, payload: { routineId?: string }) =>
+  registerMainWindowIpcHandler('harness2:routines:runs', (_event: unknown, payload: { routineId?: string }) =>
     routineManager?.listRuns(payload?.routineId) ?? [],
   );
-  ipcMain.handle('harness2:routines:queue', (_event: unknown, payload: { routineId: string }) =>
+  registerMainWindowIpcHandler('harness2:routines:queue', (_event: unknown, payload: { routineId: string }) =>
     requireRoutineManager().queueStatus(requireId(payload?.routineId, 'routineId')),
   );
-  ipcMain.handle('harness2:webhook:stats', () => ({
+  registerMainWindowIpcHandler('harness2:webhook:stats', () => ({
     listening: harnessV2Receiver?.listening ?? false,
     port: HARNESS_V2_WEBHOOK_DEFAULT_PORT,
     ...(harnessV2Receiver?.stats() ?? { total: 0, accepted: 0, rejected: 0, rejectedByReason: {} }),
   }));
-  ipcMain.handle('harness2:health:probe', async () => {
+  registerMainWindowIpcHandler('harness2:health:probe', async () => {
     const prober = harnessV2HealthProber;
     if (!prober) return [] as BotComputerHealth[];
     // Refresh registrations from the live harness instances (pid) +
@@ -9119,7 +9154,7 @@ function registerIpc(): void {
     }
     return prober.probeAll();
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'harness2:events:tail',
     (_event: unknown, payload: { threadId?: string; limit?: number }) => {
       const threadId = typeof payload?.threadId === 'string' && payload.threadId !== '' ? payload.threadId : 'harness';
@@ -9131,18 +9166,18 @@ function registerIpc(): void {
   // --- v0.74d: nạp dữ liệu mẫu (SAMPLE_AUTOMATIONS) vào store thật.
   // Sample đã có sẵn thì bỏ qua, không nhân đôi (xem
   // `seedSampleAutomations` trong scheduler).
-  ipcMain.handle('automations:seed-samples', () => {
+  registerMainWindowIpcHandler('automations:seed-samples', () => {
     if (!automationScheduler) throw new Error('Scheduler chưa khởi động.');
     return automationScheduler.seedSampleAutomations();
   });
 
-  ipcMain.handle('automations:get', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('automations:get', (_event: unknown, payload: { id: string }) => {
     const found = automationScheduler?.get(requireId(payload?.id, 'id'));
     if (!found) throw new Error('Không tìm thấy automation.');
     return found;
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'automations:create',
     (_event: unknown, payload: Omit<Automation, 'id' | 'createdAt' | 'updatedAt'>) => {
       if (!automationScheduler) throw new Error('Scheduler chưa khởi động.');
@@ -9157,14 +9192,14 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('automations:update', (_event: unknown, payload: Automation) => {
+  registerMainWindowIpcHandler('automations:update', (_event: unknown, payload: Automation) => {
     if (!automationScheduler) throw new Error('Scheduler chưa khởi động.');
     if (payload === null || typeof payload !== 'object') throw new Error('Tham số automations:update phải là object.');
     requireId(payload.id, 'id');
     return automationScheduler.update(payload);
   });
 
-  ipcMain.handle('automations:delete', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('automations:delete', (_event: unknown, payload: { id: string }) => {
     if (!automationScheduler) throw new Error('Scheduler chưa khởi động.');
     const id = requireId(payload?.id, 'id');
     const removed = automationScheduler.remove(id);
@@ -9191,7 +9226,7 @@ function registerIpc(): void {
     return removed;
   });
 
-  ipcMain.handle('automations:set-enabled', (_event: unknown, payload: { id: string; enabled: boolean }) => {
+  registerMainWindowIpcHandler('automations:set-enabled', (_event: unknown, payload: { id: string; enabled: boolean }) => {
     if (!automationScheduler) throw new Error('Scheduler chưa khởi động.');
     return automationScheduler.setEnabled(
       requireId(payload?.id, 'id'),
@@ -9199,12 +9234,12 @@ function registerIpc(): void {
     );
   });
 
-  ipcMain.handle('automations:run-now', async (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('automations:run-now', async (_event: unknown, payload: { id: string }) => {
     if (!automationScheduler) throw new Error('Scheduler chưa khởi động.');
     return automationScheduler.runNow(requireId(payload?.id, 'id'));
   });
 
-  ipcMain.handle('automations:runs', (_event: unknown, payload: { automationId?: string }) => {
+  registerMainWindowIpcHandler('automations:runs', (_event: unknown, payload: { automationId?: string }) => {
     const automationId =
       payload?.automationId === undefined ? undefined : requireId(payload.automationId, 'automationId');
     return automationScheduler?.listRuns(automationId) ?? [];
@@ -9214,7 +9249,7 @@ function registerIpc(): void {
   // The secret is returned ONLY by create/rotate, exactly once. The
   // renderer must show it once and never store it; `exists` is the
   // only status check the UI gets (never a value).
-  ipcMain.handle('automations:webhook-key:create', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('automations:webhook-key:create', (_event: unknown, payload: { id: string }) => {
     if (!automationScheduler) throw new Error('Scheduler chưa khởi động.');
     const id = requireId(payload?.id, 'id');
     const automation = automationScheduler.get(id);
@@ -9225,7 +9260,7 @@ function registerIpc(): void {
     return createAutomationWebhookKey(webhookKeyStores(), id);
   });
 
-  ipcMain.handle('automations:webhook-key:rotate', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('automations:webhook-key:rotate', (_event: unknown, payload: { id: string }) => {
     if (!automationScheduler) throw new Error('Scheduler chưa khởi động.');
     const id = requireId(payload?.id, 'id');
     const automation = automationScheduler.get(id);
@@ -9236,12 +9271,12 @@ function registerIpc(): void {
     return rotateAutomationWebhookKey(webhookKeyStores(), id);
   });
 
-  ipcMain.handle('automations:webhook-key:delete', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('automations:webhook-key:delete', (_event: unknown, payload: { id: string }) => {
     const id = requireId(payload?.id, 'id');
     return deleteAutomationWebhookKey(webhookKeyStores(), id);
   });
 
-  ipcMain.handle('automations:webhook-key:exists', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('automations:webhook-key:exists', (_event: unknown, payload: { id: string }) => {
     const id = requireId(payload?.id, 'id');
     return hasAutomationWebhookKey(webhookKeyStores(), id);
   });
@@ -9249,11 +9284,11 @@ function registerIpc(): void {
   // --- v0.83b: Composio trigger (delivery qua Local API) ---
   // Danh sách trigger đã đối chiếu live (50 mục) cho picker ở UI —
   // chỉ dữ liệu tĩnh, không chứa secret.
-  ipcMain.handle('composio:trigger-defs', () => [...COMPOSIO_TRIGGER_DEFS]);
+  registerMainWindowIpcHandler('composio:trigger-defs', () => [...COMPOSIO_TRIGGER_DEFS]);
   // Signing secret: user DÁN secret webhook của project Composio
   // (COMPOSIO_WEBHOOK_SECRET) — open-bot không tự lấy được secret
   // này từ Composio. Lưu vào Vault, không bao giờ trả lại qua IPC.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'automations:composio-trigger-secret:set',
     (_event: unknown, payload: { id: string; secret: string }) => {
       if (!automationScheduler) throw new Error('Scheduler chưa khởi động.');
@@ -9268,11 +9303,11 @@ function registerIpc(): void {
       return { ok: true as const };
     },
   );
-  ipcMain.handle('automations:composio-trigger-secret:exists', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('automations:composio-trigger-secret:exists', (_event: unknown, payload: { id: string }) => {
     const id = requireId(payload?.id, 'id');
     return hasComposioTriggerSigningSecret(vault, id);
   });
-  ipcMain.handle('automations:composio-trigger-secret:delete', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('automations:composio-trigger-secret:delete', (_event: unknown, payload: { id: string }) => {
     const id = requireId(payload?.id, 'id');
     return deleteComposioTriggerSigningSecret(vault, id);
   });
@@ -9282,7 +9317,7 @@ function registerIpc(): void {
   // này từ Slack. Lưu vào Vault, không bao giờ trả lại qua IPC. Một
   // Slack app chỉ có một secret nên cùng một giá trị được dán cho mọi
   // automation nghe app đó.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'automations:slack-signing-secret:set',
     (_event: unknown, payload: { id: string; secret: string }) => {
       if (!automationScheduler) throw new Error('Scheduler chưa khởi động.');
@@ -9297,17 +9332,17 @@ function registerIpc(): void {
       return { ok: true as const };
     },
   );
-  ipcMain.handle('automations:slack-signing-secret:exists', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('automations:slack-signing-secret:exists', (_event: unknown, payload: { id: string }) => {
     const id = requireId(payload?.id, 'id');
     return hasSlackSigningSecret(vault, id);
   });
-  ipcMain.handle('automations:slack-signing-secret:delete', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('automations:slack-signing-secret:delete', (_event: unknown, payload: { id: string }) => {
     const id = requireId(payload?.id, 'id');
     return deleteSlackSigningSecret(vault, id);
   });
   // URL token (?token=): tạo/xoay trả secret ĐÚNG MỘT LẦN (renderer
   // phải hiện ngay, không lưu lại); `exists` là check duy nhất.
-  ipcMain.handle('automations:composio-trigger-token:create', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('automations:composio-trigger-token:create', (_event: unknown, payload: { id: string }) => {
     if (!automationScheduler) throw new Error('Scheduler chưa khởi động.');
     const id = requireId(payload?.id, 'id');
     const automation = automationScheduler.get(id);
@@ -9317,7 +9352,7 @@ function registerIpc(): void {
     }
     return createComposioTriggerToken(vault, id);
   });
-  ipcMain.handle('automations:composio-trigger-token:rotate', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('automations:composio-trigger-token:rotate', (_event: unknown, payload: { id: string }) => {
     if (!automationScheduler) throw new Error('Scheduler chưa khởi động.');
     const id = requireId(payload?.id, 'id');
     const automation = automationScheduler.get(id);
@@ -9327,11 +9362,11 @@ function registerIpc(): void {
     }
     return rotateComposioTriggerToken(vault, id);
   });
-  ipcMain.handle('automations:composio-trigger-token:exists', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('automations:composio-trigger-token:exists', (_event: unknown, payload: { id: string }) => {
     const id = requireId(payload?.id, 'id');
     return hasComposioTriggerToken(vault, id);
   });
-  ipcMain.handle('automations:composio-trigger-token:delete', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('automations:composio-trigger-token:delete', (_event: unknown, payload: { id: string }) => {
     const id = requireId(payload?.id, 'id');
     return deleteComposioTriggerToken(vault, id);
   });
@@ -9339,7 +9374,7 @@ function registerIpc(): void {
   // (the secret never leaves the main process). Lets the user verify
   // the whole trigger path end-to-end from the UI without Composio
   // sending anything real — same idea as `automations:webhook:test`.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'automations:composio-trigger:test',
     async (_event: unknown, payload: { id: string; data?: unknown }) => {
       if (!automationScheduler) throw new Error('Scheduler chưa khởi động.');
@@ -9381,7 +9416,7 @@ function registerIpc(): void {
   // channel message; `payload.text` overrides the message text and
   // `payload.channelType` overrides the channel kind ('channel' /
   // 'im' / 'group') so the slug-match check can be exercised too.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'automations:slack-inbound:test',
     async (_event: unknown, payload: { id: string; text?: string; channelType?: string }) => {
       if (!automationScheduler) throw new Error('Scheduler chưa khởi động.');
@@ -9426,7 +9461,7 @@ function registerIpc(): void {
   // no run is recorded. The same path is served over HTTP by the
   // Local API (`POST /v1/automations/:id/webhook`, v0.59) — the UI
   // test button below exercises it through IPC instead.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'automations:webhook',
     async (_event: unknown, payload: { id: string; body: string; signature?: string | null }) => {
       if (!automationScheduler) throw new Error('Scheduler chưa khởi động.');
@@ -9440,7 +9475,7 @@ function registerIpc(): void {
   // Sign-and-deliver a test webhook with the stored key (the secret
   // never leaves the main process). Lets the user verify the HMAC
   // path end-to-end from the UI without handling the secret.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'automations:webhook:test',
     async (_event: unknown, payload: { id: string; payload?: unknown }) => {
       if (!automationScheduler) throw new Error('Scheduler chưa khởi động.');
@@ -9454,7 +9489,7 @@ function registerIpc(): void {
   );
 
   // --- v0.52 P0-5: retry a failed run with the same input ---
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'automations:retry-run',
     async (_event: unknown, payload: { runId?: string; automationId?: string }) => {
       if (!automationScheduler) throw new Error('Scheduler chưa khởi động.');
@@ -9470,9 +9505,9 @@ function registerIpc(): void {
   );
 
   // --- v0.4: dream ---
-  ipcMain.handle('dream:get', () => ({ ...dreamConfig }));
+  registerMainWindowIpcHandler('dream:get', () => ({ ...dreamConfig }));
 
-  ipcMain.handle('dream:set', (_event: unknown, payload: DreamConfig) => {
+  registerMainWindowIpcHandler('dream:set', (_event: unknown, payload: DreamConfig) => {
     if (payload === null || typeof payload !== 'object') throw new Error('Tham số dream:set phải là object.');
     requireBoolean(payload.enabled, 'enabled');
     if (payload.idleMinutes !== undefined) requireInt(payload.idleMinutes, 'idleMinutes', 5, 240);
@@ -9484,8 +9519,8 @@ function registerIpc(): void {
   // system engine is probed lazily on first use, and speak() never
   // throws (no engine -> { spoken: false, reason }).
   const ttsHarness = new TtsHarness();
-  ipcMain.handle('tts:status', async () => ttsHarness.status());
-  ipcMain.handle('tts:voices', async (_event: unknown, payload: { lang?: string }) => {
+  registerMainWindowIpcHandler('tts:status', async () => ttsHarness.status());
+  registerMainWindowIpcHandler('tts:voices', async (_event: unknown, payload: { lang?: string }) => {
     const lang = typeof payload?.lang === 'string' ? payload.lang : undefined;
     return ttsHarness.listVoices(lang);
   });
@@ -9493,8 +9528,8 @@ function registerIpc(): void {
   // (SIGKILL on the engine process; the in-flight `tts:speak`
   // promise then resolves `{ spoken: false, reason: 'stopped' }`).
   // Never throws; `{ stopped: false }` when nothing is speaking.
-  ipcMain.handle('tts:stop', async () => ttsHarness.stop());
-  ipcMain.handle(
+  registerMainWindowIpcHandler('tts:stop', async () => ttsHarness.stop());
+  registerMainWindowIpcHandler(
     'tts:speak',
     async (
       _event: unknown,
@@ -9511,7 +9546,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('voice:available', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('voice:available', (_event: unknown, payload: { botId: string }) => {
     const botId = requireId(payload?.botId, 'botId');
     const bot = settings.bots.find((b) => b.id === botId);
     if (!bot) return { available: false };
@@ -9528,10 +9563,10 @@ function registerIpc(): void {
     if (!session) return { session: undefined, error: `Không tìm thấy voice v7 session "${String(id ?? '')}".` };
     return { session };
   };
-  ipcMain.handle('voice-v7:list', () => {
+  registerMainWindowIpcHandler('voice-v7:list', () => {
     return { sessions: voiceV7Manager.listSessions(), manager: voiceV7Manager.getStats() };
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'voice-v7:create',
     async (
       _event: unknown,
@@ -9564,7 +9599,7 @@ function registerIpc(): void {
       }
     },
   );
-  ipcMain.handle('voice-v7:connect', async (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('voice-v7:connect', async (_event: unknown, payload: { id: string }) => {
     const { session, error } = voiceV7SessionOrError(payload?.id);
     if (!session) return { ok: false, error };
     try {
@@ -9574,17 +9609,17 @@ function registerIpc(): void {
       return { ok: false, error: e instanceof Error ? e.message : String(e) };
     }
   });
-  ipcMain.handle('voice-v7:stop', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('voice-v7:stop', (_event: unknown, payload: { id: string }) => {
     const { session, error } = voiceV7SessionOrError(payload?.id);
     if (!session) return { ok: false, error };
     session.disconnect();
     return { ok: true, summary: session.getSummary() };
   });
-  ipcMain.handle('voice-v7:delete', (_event: unknown, payload: { id: string }) => {
+  registerMainWindowIpcHandler('voice-v7:delete', (_event: unknown, payload: { id: string }) => {
     const id = typeof payload?.id === 'string' ? payload.id.trim() : '';
     return { ok: true, deleted: voiceV7Manager.removeSession(id) };
   });
-  ipcMain.handle('voice-v7:transcript', (_event: unknown, payload: { id: string; limit?: number }) => {
+  registerMainWindowIpcHandler('voice-v7:transcript', (_event: unknown, payload: { id: string; limit?: number }) => {
     const { session, error } = voiceV7SessionOrError(payload?.id);
     if (!session) return { ok: false, error };
     const limit =
@@ -9594,7 +9629,7 @@ function registerIpc(): void {
     const lines = session.getTranscriptStream().getLines().slice(-limit);
     return { ok: true, phase: session.getPhase(), lines, stats: session.getTranscriptStream().getStats() };
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'voice-v7:simulate',
     async (_event: unknown, payload: { id: string; userText: string; modelReply?: string }) => {
       const { session, error } = voiceV7SessionOrError(payload?.id);
@@ -9609,7 +9644,7 @@ function registerIpc(): void {
       return { ok: true, simulated, phase: session.getPhase() };
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'voice-v7:vad',
     (_event: unknown, payload: { id: string; action?: string; preset?: string; [key: string]: unknown }) => {
       const { session, error } = voiceV7SessionOrError(payload?.id);
@@ -9650,7 +9685,7 @@ function registerIpc(): void {
       }
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'voice-v7:barge-in',
     async (_event: unknown, payload: { id: string; action?: string; rms?: number }) => {
       const { session, error } = voiceV7SessionOrError(payload?.id);
@@ -9677,7 +9712,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('voice:connect', async (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('voice:connect', async (_event: unknown, payload: { botId: string }) => {
     const botId = requireId(payload?.botId, 'botId');
     const bot = settings.bots.find((b) => b.id === botId);
     if (!bot) return { ok: false, error: 'Không tìm thấy bot.' };
@@ -9705,7 +9740,7 @@ function registerIpc(): void {
   /** Renderer gửi từng frame PCM16 (16 kHz mono) thu qua AudioWorklet.
    *  Session kiểm tra frame (Uint8Array, độ dài byte chẵn) rồi mới
    *  đưa xuống RealtimeClient — frame hỏng thì bỏ, không crash main. */
-  ipcMain.on('voice:audio', (_event: unknown, payload: { botId: string; audioBase64: string }) => {
+  registerMainWindowIpcListener('voice:audio', (_event: unknown, payload: { botId: string; audioBase64: string }) => {
     // v0.7: handler `.on` không được throw (sẽ thành uncaught
     // exception) — tham số sai thì bỏ frame, không crash main.
     try {
@@ -9720,7 +9755,7 @@ function registerIpc(): void {
   });
 
   /** Kết thúc câu nói: commit buffer + xin model trả lời. */
-  ipcMain.handle('voice:commit', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('voice:commit', (_event: unknown, payload: { botId: string }) => {
     const botId = requireId(payload?.botId, 'botId');
     const session = voiceSessions.get(botId);
     if (!session?.isConnected()) return { ok: false, error: 'Chưa kết nối voice.' };
@@ -9732,7 +9767,7 @@ function registerIpc(): void {
     }
   });
 
-  ipcMain.handle('voice:disconnect', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('voice:disconnect', (_event: unknown, payload: { botId: string }) => {
     const botId = requireId(payload?.botId, 'botId');
     // Ngắt cuộc gọi nhưng GIỮ surface đã đăng ký: user gọi lại từ
     // cùng một view thì không cần đăng ký lại (dispose chỉ khi xoá bot).
@@ -9749,7 +9784,7 @@ function registerIpc(): void {
   // Mic frames đi kênh riêng 'voice:realtime-audio' để không lẫn với
   // voice:audio của call cũ; transcript/audio vẫn về các channel
   // voice:* đã có nên CallView hiện tại dùng lại được.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'voice:realtime-connect',
     async (
       _event: unknown,
@@ -9829,7 +9864,7 @@ function registerIpc(): void {
   // (key configured? connected? connect / first-audio latency?).
   // No network, no key material — only the health snapshot.
   // v0.98 adds the measured barge-in stats + last measurement.
-  ipcMain.handle('voice:realtime-health', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('voice:realtime-health', (_event: unknown, payload: { botId: string }) => {
     const botId = requireId(payload?.botId, 'botId');
     const session = realtimeSessions.get(botId);
     if (!session) return { ok: false, error: 'Chưa có realtime session cho bot này.' };
@@ -9850,7 +9885,7 @@ function registerIpc(): void {
   // Settings → Voice view. No network, no key material — only
   // decisions ("live via Vault" / "mock, cần key") and the
   // whisper binary/model status.
-  ipcMain.handle('voice:realtime-key-status', () => {
+  registerMainWindowIpcHandler('voice:realtime-key-status', () => {
     const decisions = realtimeKeyGate.decideAll({
       'openai-compatible': settings.providers['openai-compatible']?.realtimeUrl,
     });
@@ -9870,7 +9905,7 @@ function registerIpc(): void {
   // surrogate flow, never a file/argument/log) and probes the
   // Live endpoint unauthenticated. Slow (up to ~30 s) — call it
   // on demand from Settings, never on every render.
-  ipcMain.handle('voice:gemini-live-readiness', async () => {
+  registerMainWindowIpcHandler('voice:gemini-live-readiness', async () => {
     try {
       const readiness = await probeGeminiLiveReadiness();
       return { ok: true, readiness };
@@ -9879,13 +9914,13 @@ function registerIpc(): void {
     }
   });
 
-  ipcMain.handle('voice:realtime-disconnect', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('voice:realtime-disconnect', (_event: unknown, payload: { botId: string }) => {
     const botId = requireId(payload?.botId, 'botId');
     realtimeSessions.get(botId)?.disconnect();
     return { ok: true };
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'voice:realtime-mode',
     (_event: unknown, payload: { botId: string; turnMode: string }) => {
       const botId = requireId(payload?.botId, 'botId');
@@ -9899,7 +9934,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'voice:realtime-talk',
     (_event: unknown, payload: { botId: string; held: boolean }) => {
       const botId = requireId(payload?.botId, 'botId');
@@ -9911,7 +9946,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('voice:realtime-interrupt', (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('voice:realtime-interrupt', (_event: unknown, payload: { botId: string }) => {
     const botId = requireId(payload?.botId, 'botId');
     const session = realtimeSessions.get(botId);
     if (!session?.isConnected()) return { ok: false, error: 'Chưa kết nối voice realtime.' };
@@ -9919,7 +9954,7 @@ function registerIpc(): void {
   });
 
   /** Mic frames cho realtime session (kênh riêng, không lẫn voice:audio). */
-  ipcMain.on('voice:realtime-audio', (_event: unknown, payload: { botId: string; audioBase64: string }) => {
+  registerMainWindowIpcListener('voice:realtime-audio', (_event: unknown, payload: { botId: string; audioBase64: string }) => {
     try {
       const botId = requireId(payload?.botId, 'botId');
       const audioBase64 = requireBase64(payload?.audioBase64, 'audioBase64');
@@ -9939,7 +9974,7 @@ function registerIpc(): void {
   // định guidance trong session instructions + cap độ dài câu trả lời
   // thoại). Event voice:* nào cũng mang surface + surfaceIds để
   // surface chỉ nhận đúng event của bot mình.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'voice:surface-register',
     (_event: unknown, payload: { botId: string; surface: string; view?: string }) => {
       const botId = requireId(payload?.botId, 'botId');
@@ -9958,7 +9993,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('voice:surface-unregister', (_event: unknown, payload: { surfaceId: string }) => {
+  registerMainWindowIpcHandler('voice:surface-unregister', (_event: unknown, payload: { surfaceId: string }) => {
     const surfaceId = requireId(payload?.surfaceId, 'surfaceId');
     for (const session of voiceSessions.values()) {
       if (session.unregisterSurface(surfaceId)) return { ok: true };
@@ -9966,7 +10001,7 @@ function registerIpc(): void {
     return { ok: false, error: 'Không tìm thấy surface đã đăng ký.' };
   });
 
-  ipcMain.handle('voice:surface-list', (_event: unknown, payload?: { botId?: string }) => {
+  registerMainWindowIpcHandler('voice:surface-list', (_event: unknown, payload?: { botId?: string }) => {
     if (payload?.botId !== undefined) {
       const botId = requireId(payload.botId, 'botId');
       return { ok: true, surfaces: voiceSessions.get(botId)?.listSurfaces() ?? [] };
@@ -9979,7 +10014,7 @@ function registerIpc(): void {
    *  audio PCM16 base64, main bọc WAV rồi gọi endpoint STT của
    *  provider (transcribeDictation). Đường realtime trong cuộc gọi
    *  vẫn là voice:audio → session.sendAudio → RealtimeClient. */
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'voice:dictation',
     async (_event: unknown, payload: { botId: string; audioBase64: string }) => {
       const botId = requireId(payload?.botId, 'botId');
@@ -10013,7 +10048,7 @@ function registerIpc(): void {
   );
 
   /** Voice memo: renderer thu bằng MediaRecorder (webm/opus), gửi bytes lên đây. */
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'voice:memo-transcribe',
     async (_event: unknown, payload: { botId: string; audioBase64: string }) => {
       const botId = requireId(payload?.botId, 'botId');
@@ -10045,7 +10080,7 @@ function registerIpc(): void {
   );
 
   // --- v0.4: hiệu năng ---
-  ipcMain.handle('perf:stats', async () => {
+  registerMainWindowIpcHandler('perf:stats', async () => {
     const poolStats = workerPool.stats();
     let cacheStats: unknown = null;
     try {
@@ -10056,7 +10091,7 @@ function registerIpc(): void {
     return { ok: true, pool: poolStats, cache: cacheStats };
   });
 
-  ipcMain.handle('cache:clear', async () => {
+  registerMainWindowIpcHandler('cache:clear', async () => {
     try {
       await getCoordinator().clearCache();
       return { ok: true };
@@ -10082,7 +10117,7 @@ function registerIpc(): void {
   /** Model pull đang chạy nền (chống pull trùng cùng model). */
   const ollamaPullsInFlight = new Set<string>();
 
-  ipcMain.handle('models:list', (): ModelRegistrySnapshot => {
+  registerMainWindowIpcHandler('models:list', (): ModelRegistrySnapshot => {
     if (!modelRegistry) throw new Error('Model registry chưa khởi động.');
     return modelRegistry.snapshot();
   });
@@ -10094,7 +10129,7 @@ function registerIpc(): void {
   // currentProviderId }` để lọc rail theo bot (BotForm/App truyền danh
   // sách nguồn tắt của bot + provider hiện tại; không truyền = rail
   // toàn cục như trước — tương thích ngược với caller cũ).
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'models:rail',
     async (
       _event: unknown,
@@ -10132,7 +10167,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'models:set-feature',
     (_event: unknown, payload: { feature: string; providerId: string; model: string }) => {
       if (!modelRegistry) throw new Error('Model registry chưa khởi động.');
@@ -10151,7 +10186,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'models:set-default',
     (_event: unknown, payload: { providerId: string; model: string }) => {
       if (!modelRegistry) throw new Error('Model registry chưa khởi động.');
@@ -10161,7 +10196,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'models:set-fallback',
     (_event: unknown, payload: { providerId: string; model: string }) => {
       if (!modelRegistry) throw new Error('Model registry chưa khởi động.');
@@ -10171,7 +10206,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'models:set-flag',
     (_event: unknown, payload: { name: string; enabled: boolean }) => {
       if (!modelRegistry) throw new Error('Model registry chưa khởi động.');
@@ -10184,14 +10219,14 @@ function registerIpc(): void {
   // --- M1: Detected CLI engines (Settings → Engines) ---
   // Snapshot an toàn để gửi về renderer (chỉ nhãn/trạng thái, không
   // secret). detect() có cache 60s; redetect quét lại ngay.
-  ipcMain.handle('engines:list', async (): Promise<DetectedEnginesSnapshot> => {
+  registerMainWindowIpcHandler('engines:list', async (): Promise<DetectedEnginesSnapshot> => {
     return getDetectedEngines().detect();
   });
 
   // M3: sau mỗi lần quét lại / đổi trạng thái / thêm-sửa-xoá CLI tuỳ
   // chỉnh, main đẩy snapshot mới về renderer qua 'engines:changed'
   // để BotForm (model picker) cập nhật theo mà không cần mở lại form.
-  ipcMain.handle('engines:redetect', async (): Promise<DetectedEnginesSnapshot> => {
+  registerMainWindowIpcHandler('engines:redetect', async (): Promise<DetectedEnginesSnapshot> => {
     const snapshot = await getDetectedEngines().detect({ force: true });
     sendToRenderer('engines:changed', snapshot);
     return snapshot;
@@ -10200,7 +10235,7 @@ function registerIpc(): void {
   // M4: quét lại chỉ một engine (nút Re-detect từng engine trong
   // Settings → Engines) — nhanh hơn quét tất cả, snapshot mới cũng
   // được đẩy về renderer qua 'engines:changed'.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'engines:redetect-one',
     async (_event: unknown, payload: { kind: string }): Promise<DetectedEnginesSnapshot> => {
       const kind = requireString(payload?.kind, 'kind');
@@ -10210,7 +10245,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'engines:set-enabled',
     async (
       _event: unknown,
@@ -10230,10 +10265,10 @@ function registerIpc(): void {
   // Payload chỉ chứa đường dẫn + argv (không secret — validate ở
   // core từ chối cờ key/token). Mỗi lần đổi xong đều quét lại ngay
   // (force) để snapshot trả về đã có engine mới + đẩy event cho picker.
-  ipcMain.handle('engines:custom-list', () => {
+  registerMainWindowIpcHandler('engines:custom-list', () => {
     return getDetectedEngines().listCustomClis();
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'engines:custom-add',
     async (
       _event: unknown,
@@ -10254,7 +10289,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'engines:custom-update',
     async (
       _event: unknown,
@@ -10274,7 +10309,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'engines:custom-remove',
     async (_event: unknown, payload: { id: string }): Promise<DetectedEnginesSnapshot> => {
       const registry = getDetectedEngines();
@@ -10294,7 +10329,7 @@ function registerIpc(): void {
   // 'router:changed' trong routeCoordinatorEvent (kind
   // 'router.decision'). Payload validate ở đây (id/limit/config
   // phải đúng kiểu) rồi coordinator validate lại lần nữa.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'router:decisions',
     async (
       _event: unknown,
@@ -10309,7 +10344,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'router:stats',
     async (_event: unknown, payload?: { botId?: string }): Promise<GetRouterStatsResult> => {
       const botId = payload?.botId === undefined ? undefined : requireString(payload.botId, 'botId');
@@ -10319,11 +10354,11 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('router:get-config', async (): Promise<GetRouterConfigResult> => {
+  registerMainWindowIpcHandler('router:get-config', async (): Promise<GetRouterConfigResult> => {
     return getCoordinator().getRouterConfig();
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'router:set-config',
     async (
       _event: unknown,
@@ -10344,7 +10379,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'router:clear-log',
     async (_event: unknown, payload?: { botId?: string }): Promise<{ cleared: number }> => {
       const botId = payload?.botId === undefined ? undefined : requireString(payload.botId, 'botId');
@@ -10354,11 +10389,11 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('router:targets', async (): Promise<GetRouterTargetsResult> => {
+  registerMainWindowIpcHandler('router:targets', async (): Promise<GetRouterTargetsResult> => {
     return getCoordinator().getRouterTargets();
   });
 
-  ipcMain.handle('models:ollama-list', async (): Promise<string[]> => {
+  registerMainWindowIpcHandler('models:ollama-list', async (): Promise<string[]> => {
     const names = await ollamaProvider().listLocalModels();
     // B-platform M3: model local đã pull gộp vào catalogue (nhãn "(local)")
     // để picker/rail hiện chúng ngay; best-effort, registry chưa khởi
@@ -10372,7 +10407,7 @@ function registerIpc(): void {
   // (cache + TTL, model đã pull vào registry); provider API
   // OpenAI-compatible qua /v1/models khi vault có key (key chỉ dùng
   // trong main, không bao giờ gửi xuống renderer).
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'models:refresh',
     async (
       _event: unknown,
@@ -10406,7 +10441,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'models:refresh-status',
     (_event: unknown, payload?: { providerIds?: string[] }): ModelRefreshStatus[] => {
       const service = getModelRefreshService();
@@ -10424,7 +10459,7 @@ function registerIpc(): void {
   // v1.05 (Đội T3): trạng thái máy-tính-bot theo bot — quota đã đặt
   // (team-computers.json trong userData) + đĩa workspace đo thật.
   // Không probe toàn máy ở đây (chậm): levelFeasible = null.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'computers:status',
     (_event: unknown, payload: { botId: string; workspaceDir?: string }): BotComputerStatusView => {
       if (!payload || typeof payload.botId !== 'string' || payload.botId.trim() === '') {
@@ -10449,14 +10484,14 @@ function registerIpc(): void {
 
   // v1.05 (Đội T3): doctor trong app — cùng checks với CLI
   // (`open-bot doctor`), chạy với userData + Vault thật của desktop.
-  ipcMain.handle('doctor:run', async (): Promise<DoctorReport> => {
+  registerMainWindowIpcHandler('doctor:run', async (): Promise<DoctorReport> => {
     return runDoctorChecks({
       dataDir: app.getPath('userData'),
       hasVaultSecret: (providerId: string) => vault.hasSecret('provider', providerId),
     });
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'models:ollama-pull',
     (_event: unknown, payload: unknown): { ok: boolean; error?: string } => {
       // Renderer gửi chuỗi trần; chấp nhận cả dạng { model } cho chắc.
@@ -10485,7 +10520,7 @@ function registerIpc(): void {
   );
 
   // --- v0.5: Local API + webhooks ---
-  ipcMain.handle('api:get', () => ({
+  registerMainWindowIpcHandler('api:get', () => ({
     enabled: apiConfig.enabled,
     port: apiConfig.port,
     tokenSet: vault.hasSecret(API_TOKEN_NAMESPACE, API_TOKEN_KEY),
@@ -10496,7 +10531,7 @@ function registerIpc(): void {
     lastError: apiStartError,
   }));
 
-  ipcMain.handle('api:set', async (_event: unknown, patch: { enabled?: boolean; port?: number }) => {
+  registerMainWindowIpcHandler('api:set', async (_event: unknown, patch: { enabled?: boolean; port?: number }) => {
     if (patch === null || typeof patch !== 'object') throw new Error('Tham số api:set phải là object.');
     if (patch.enabled !== undefined) requireBoolean(patch.enabled, 'enabled');
     if (patch.port !== undefined) requireInt(patch.port, 'port', 1024, 65535);
@@ -10515,9 +10550,9 @@ function registerIpc(): void {
 
   // Token chỉ trả về khi người dùng bấm "Hiện token" — renderer không
   // tự gọi channel này lúc load trang. KHÔNG log token.
-  ipcMain.handle('api:get-token', () => ({ token: getOrCreateApiToken() }));
+  registerMainWindowIpcHandler('api:get-token', () => ({ token: getOrCreateApiToken() }));
 
-  ipcMain.handle('api:regenerate-token', async () => {
+  registerMainWindowIpcHandler('api:regenerate-token', async () => {
     const token = randomBytes(32).toString('hex');
     vault.setSecret(API_TOKEN_NAMESPACE, API_TOKEN_KEY, token);
     // Server đang chạy giữ token cũ trong closure -> khởi động lại để
@@ -10529,9 +10564,9 @@ function registerIpc(): void {
     return { token };
   });
 
-  ipcMain.handle('api:webhooks-list', () => getWebhookDispatcher().list());
+  registerMainWindowIpcHandler('api:webhooks-list', () => getWebhookDispatcher().list());
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'api:webhooks-add',
     (_event: unknown, payload: { url: string; events: string[] }) => {
       const url = requireHttpUrl(payload?.url, 'url');
@@ -10550,7 +10585,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('api:webhooks-remove', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('api:webhooks-remove', (_event: unknown, payload: unknown) => {
     const id =
       typeof payload === 'string'
         ? payload
@@ -10596,12 +10631,12 @@ function registerIpc(): void {
     };
   }
 
-  ipcMain.handle('team:get-workspace', () => {
+  registerMainWindowIpcHandler('team:get-workspace', () => {
     const team = loadTeamConfig(app.getPath('userData'));
     return { dir: team.workspaceDir ?? '', teamId: getTeamId(team) };
   });
 
-  ipcMain.handle('team:set-workspace-dir', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('team:set-workspace-dir', (_event: unknown, payload: unknown) => {
     const dir = asStringParam(payload);
     // v0.7: thư mục team dùng chung có thể nằm ngoài userData (thư mục
     // chia sẻ của team), nhưng vẫn phải là đường dẫn tuyệt đối, không
@@ -10615,12 +10650,12 @@ function registerIpc(): void {
     return { dir: next.workspaceDir ?? '', teamId: getTeamId(next) };
   });
 
-  ipcMain.handle('team:service-accounts-list', () => {
+  registerMainWindowIpcHandler('team:service-accounts-list', () => {
     const team = loadTeamConfig(app.getPath('userData'));
     return listServiceAccounts(team).map(serviceAccountView);
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'team:service-account-create',
     (_event: unknown, payload: { name: string; scope: ServiceAccountScope }) => {
       const name = requireString(payload?.name, 'name');
@@ -10647,7 +10682,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('team:service-account-delete', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('team:service-account-delete', (_event: unknown, payload: unknown) => {
     const id = asStringParam(payload);
     const team = loadTeamConfig(app.getPath('userData'));
     // revokeServiceAccount trả về { team, removed }.
@@ -10718,20 +10753,20 @@ function registerIpc(): void {
     return view;
   }
 
-  ipcMain.handle('computers:probe', async () => {
+  registerMainWindowIpcHandler('computers:probe', async () => {
     const { profile, backends } = await getComputerProbe();
     const busy = isHostBusy(profile);
     return { profile, backends, busy: busy.busy, ...(busy.reason ? { busyReason: busy.reason } : {}) };
   });
 
-  ipcMain.handle('computers:plan', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('computers:plan', async (_event: unknown, payload: unknown) => {
     const botIds = requireBotIds(payload);
     const { profile, backends } = await getComputerProbe();
     const requests: BotComputerRequest[] = botIds.map((botId) => ({ botId }));
     return planComputers(profile, requests, backends);
   });
 
-  ipcMain.handle('computers:create', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('computers:create', async (_event: unknown, payload: unknown) => {
     const botIds = requireBotIds(payload);
     const { profile, backends } = await getComputerProbe();
     const requests: BotComputerRequest[] = botIds.map((botId) => ({ botId }));
@@ -10759,7 +10794,7 @@ function registerIpc(): void {
     return runtime.listComputers().map((c) => computerStatusView(c.botId));
   });
 
-  ipcMain.handle('computers:list', async () => {
+  registerMainWindowIpcHandler('computers:list', async () => {
     const runtime = getComputerRuntime();
     // v0.90c: tick scheduler trên probe cache 30s (không probe mới):
     // promote entry đủ chỗ + auto-shed (chỉ khi user đã bật opt-in).
@@ -10781,31 +10816,31 @@ function registerIpc(): void {
     return views;
   });
 
-  ipcMain.handle('computers:start', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('computers:start', async (_event: unknown, payload: unknown) => {
     const botId = asStringParam(payload);
     await getComputerRuntime().startComputer(botId);
     return computerStatusView(botId);
   });
 
-  ipcMain.handle('computers:pause', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('computers:pause', (_event: unknown, payload: unknown) => {
     const botId = asStringParam(payload);
     getComputerRuntime().pauseComputer(botId);
     return computerStatusView(botId);
   });
 
-  ipcMain.handle('computers:resume', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('computers:resume', (_event: unknown, payload: unknown) => {
     const botId = asStringParam(payload);
     getComputerRuntime().resumeComputer(botId);
     return computerStatusView(botId);
   });
 
-  ipcMain.handle('computers:stop', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('computers:stop', async (_event: unknown, payload: unknown) => {
     const botId = asStringParam(payload);
     await getComputerRuntime().stopComputer(botId);
     return computerStatusView(botId);
   });
 
-  ipcMain.handle('computers:set-vm-image', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('computers:set-vm-image', (_event: unknown, payload: unknown) => {
     const rec = payload as { botId?: unknown; imagePath?: unknown } | null;
     const botId = typeof rec?.botId === 'string' && rec.botId.trim() !== '' ? rec.botId : '';
     const imagePath = typeof rec?.imagePath === 'string' && rec.imagePath.trim() !== '' ? rec.imagePath : '';
@@ -10818,7 +10853,7 @@ function registerIpc(): void {
     return computerStatusView(botId);
   });
 
-  ipcMain.handle('computers:set-vm-network', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('computers:set-vm-network', (_event: unknown, payload: unknown) => {
     const rec = payload as { botId?: unknown; network?: unknown } | null;
     const botId = typeof rec?.botId === 'string' && rec.botId.trim() !== '' ? rec.botId : '';
     const network = rec?.network === 'nat' ? 'nat' : rec?.network === 'none' ? 'none' : '';
@@ -10828,7 +10863,7 @@ function registerIpc(): void {
     return computerStatusView(botId);
   });
 
-  ipcMain.handle('computers:shed', async () => {
+  registerMainWindowIpcHandler('computers:shed', async () => {
     // Giảm tải dùng probe TƯƠI (không dùng cache 30s) để quyết định
     // theo tải máy hiện tại.
     const profile = await probeMachine();
@@ -10838,11 +10873,11 @@ function registerIpc(): void {
 
   // v0.90c (đội G gói C): hàng đợi scheduler + auto-shed opt-in +
   // sức khoẻ guest agent.
-  ipcMain.handle('computers:queue', () => {
+  registerMainWindowIpcHandler('computers:queue', () => {
     return getComputerRuntime().getSchedulerState();
   });
 
-  ipcMain.handle('computers:set-priority', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('computers:set-priority', (_event: unknown, payload: unknown) => {
     const rec = payload as { botId?: unknown; priority?: unknown } | null;
     const botId = typeof rec?.botId === 'string' && rec.botId.trim() !== '' ? rec.botId : '';
     if (!botId) throw new Error('botId không được rỗng.');
@@ -10855,7 +10890,7 @@ function registerIpc(): void {
     return getComputerRuntime().setComputerPriority(botId, Math.floor(rec.priority));
   });
 
-  ipcMain.handle('computers:set-auto-shed', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('computers:set-auto-shed', (_event: unknown, payload: unknown) => {
     const rec = payload as { enabled?: unknown } | null;
     if (typeof rec?.enabled !== 'boolean') {
       throw new Error('enabled phải là boolean.');
@@ -10863,7 +10898,7 @@ function registerIpc(): void {
     return getComputerRuntime().setAutoShed(rec.enabled);
   });
 
-  ipcMain.handle('computers:guest-health', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('computers:guest-health', async (_event: unknown, payload: unknown) => {
     const botId = asStringParam(payload);
     // Kiểm tra thật ngay (bypass throttle — user bấm nút Kiểm tra).
     return getComputerRuntime().checkGuestHealth(botId);
@@ -10916,14 +10951,14 @@ function registerIpc(): void {
     return role;
   }
 
-  ipcMain.handle('fleet:list', () => getFleetManager().listFleet());
-  ipcMain.handle('fleet:status', (_event: unknown, payload: unknown) => getFleetManager().getStatus(asStringParam(payload)));
+  registerMainWindowIpcHandler('fleet:list', () => getFleetManager().listFleet());
+  registerMainWindowIpcHandler('fleet:status', (_event: unknown, payload: unknown) => getFleetManager().getStatus(asStringParam(payload)));
 
-  ipcMain.handle('fleet:create', async (_event: unknown, payload: unknown) =>
+  registerMainWindowIpcHandler('fleet:create', async (_event: unknown, payload: unknown) =>
     getFleetManager().createWorkspace(asFleetCreateInput(payload), fleetActor()),
   );
 
-  ipcMain.handle('fleet:remove', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('fleet:remove', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     getFleetManager().removeWorkspace(asStringParam(payload), fleetActor(), {
       deleteData: rec.deleteData === true,
@@ -10931,45 +10966,45 @@ function registerIpc(): void {
     return { removed: true };
   });
 
-  ipcMain.handle('fleet:rename', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('fleet:rename', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     if (typeof rec.name !== 'string' || rec.name.trim() === '') throw new Error('Tên workspace không được rỗng.');
     return getFleetManager().renameWorkspace(asStringParam(payload), rec.name, fleetActor());
   });
 
-  ipcMain.handle('fleet:suspend', async (_event: unknown, payload: unknown) =>
+  registerMainWindowIpcHandler('fleet:suspend', async (_event: unknown, payload: unknown) =>
     getFleetManager().suspendWorkspace(asStringParam(payload), fleetActor()),
   );
 
-  ipcMain.handle('fleet:activate', (_event: unknown, payload: unknown) =>
+  registerMainWindowIpcHandler('fleet:activate', (_event: unknown, payload: unknown) =>
     getFleetManager().activateWorkspace(asStringParam(payload), fleetActor()),
   );
 
-  ipcMain.handle('fleet:start', async (_event: unknown, payload: unknown) =>
+  registerMainWindowIpcHandler('fleet:start', async (_event: unknown, payload: unknown) =>
     getFleetManager().startService(asStringParam(payload), fleetActor()),
   );
 
-  ipcMain.handle('fleet:stop', async (_event: unknown, payload: unknown) =>
+  registerMainWindowIpcHandler('fleet:stop', async (_event: unknown, payload: unknown) =>
     getFleetManager().stopService(asStringParam(payload), fleetActor()),
   );
 
-  ipcMain.handle('fleet:restart', async (_event: unknown, payload: unknown) =>
+  registerMainWindowIpcHandler('fleet:restart', async (_event: unknown, payload: unknown) =>
     getFleetManager().restartService(asStringParam(payload), fleetActor()),
   );
 
-  ipcMain.handle('fleet:health', async (_event: unknown, payload: unknown) =>
+  registerMainWindowIpcHandler('fleet:health', async (_event: unknown, payload: unknown) =>
     getFleetManager().healthCheck(asStringParam(payload)),
   );
 
   // v1.09 (Đội T1): Agent Teams v1 — theo dõi team (CHỈ ĐỌC, local-first).
   // Đọc file `<userData>/agent-teams-v109.json` qua TeamsV109Store; tạo
   // team / claim task do agent làm qua tool team_* (không qua IPC này).
-  ipcMain.handle('agent-teams-v109:list', () => {
+  registerMainWindowIpcHandler('agent-teams-v109:list', () => {
     const store = new TeamsV109Store(app.getPath('userData'));
     return store.load().teams.map((team) => TeamService.restore(team).summary());
   });
 
-  ipcMain.handle('agent-teams-v109:status', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('agent-teams-v109:status', (_event: unknown, payload: unknown) => {
     const store = new TeamsV109Store(app.getPath('userData'));
     return store.find(asStringParam(payload)) ?? null;
   });
@@ -10978,7 +11013,7 @@ function registerIpc(): void {
   // Đọc team v1 + trạng thái v2 (`teams-v2/<teamId>/`) rồi gom thành
   // snapshot dashboard; tạo team / claim task do agent làm qua tool
   // teams_v2_* (không qua IPC này).
-  ipcMain.handle('agent-teams-v2:dashboard', () => {
+  registerMainWindowIpcHandler('agent-teams-v2:dashboard', () => {
     const baseDir = app.getPath('userData');
     const store = new TeamsV109Store(baseDir);
     return store.load().teams.flatMap((team) => {
@@ -10987,7 +11022,7 @@ function registerIpc(): void {
     });
   });
 
-  ipcMain.handle('fleet:capacity', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('fleet:capacity', async (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     const cpuCores = typeof rec.cpuCores === 'number' ? rec.cpuCores : 1;
     const ramBytes = typeof rec.ramBytes === 'number' ? rec.ramBytes : 512 * 1024 ** 2;
@@ -10995,7 +11030,7 @@ function registerIpc(): void {
     return getFleetManager().checkCapacity({ cpuCores, ramBytes, diskBytes });
   });
 
-  ipcMain.handle('fleet:audit', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('fleet:audit', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     return getFleetManager().listAudit({
       ...(typeof rec.actor === 'string' ? { actor: rec.actor } : {}),
@@ -11006,9 +11041,9 @@ function registerIpc(): void {
     });
   });
 
-  ipcMain.handle('fleet:audit-verify', () => getFleetManager().verifyAudit());
+  registerMainWindowIpcHandler('fleet:audit-verify', () => getFleetManager().verifyAudit());
 
-  ipcMain.handle('fleet:decisions', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('fleet:decisions', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     return getFleetManager().listDecisions({
       ...(typeof rec.actor === 'string' ? { actor: rec.actor } : {}),
@@ -11020,32 +11055,32 @@ function registerIpc(): void {
     });
   });
 
-  ipcMain.handle('fleet:decisions-verify', () => getFleetManager().verifyDecisions());
+  registerMainWindowIpcHandler('fleet:decisions-verify', () => getFleetManager().verifyDecisions());
 
-  ipcMain.handle('fleet:usage', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('fleet:usage', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     return getFleetManager().getUsage(asStringParam(payload), {
       ...(typeof rec.since === 'number' ? { since: rec.since } : {}),
     });
   });
 
-  ipcMain.handle('fleet:record-usage', (_event: unknown, payload: unknown) =>
+  registerMainWindowIpcHandler('fleet:record-usage', (_event: unknown, payload: unknown) =>
     getFleetManager().recordUsage(asStringParam(payload)),
   );
 
-  ipcMain.handle('fleet:add-member', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('fleet:add-member', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     if (typeof rec.userId !== 'string' || rec.userId.trim() === '') throw new Error('userId không được rỗng.');
     return getFleetManager().addMember(asStringParam(payload), { userId: rec.userId, role: asFleetRole(payload) }, fleetActor());
   });
 
-  ipcMain.handle('fleet:remove-member', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('fleet:remove-member', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     if (typeof rec.userId !== 'string' || rec.userId.trim() === '') throw new Error('userId không được rỗng.');
     return getFleetManager().removeMember(asStringParam(payload), rec.userId, fleetActor());
   });
 
-  ipcMain.handle('fleet:set-member-role', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('fleet:set-member-role', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     if (typeof rec.userId !== 'string' || rec.userId.trim() === '') throw new Error('userId không được rỗng.');
     return getFleetManager().setMemberRole(asStringParam(payload), rec.userId, asFleetRole(payload), fleetActor());
@@ -11082,9 +11117,9 @@ function registerIpc(): void {
     return checkBotQuotas(quotas, samplesByBot);
   }
 
-  ipcMain.handle('fleet:console-users', () => getFleetConsole().listUsers());
+  registerMainWindowIpcHandler('fleet:console-users', () => getFleetConsole().listUsers());
 
-  ipcMain.handle('fleet:console-add-user', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('fleet:console-add-user', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     if (typeof rec.userId !== 'string' || rec.userId.trim() === '') throw new Error('userId không được rỗng.');
     return getFleetConsole().addUser(
@@ -11097,18 +11132,18 @@ function registerIpc(): void {
     );
   });
 
-  ipcMain.handle('fleet:console-set-role', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('fleet:console-set-role', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     if (typeof rec.userId !== 'string' || rec.userId.trim() === '') throw new Error('userId không được rỗng.');
     return getFleetConsole().setRole(rec.userId, asFleetConsoleRole(payload), fleetActor());
   });
 
-  ipcMain.handle('fleet:console-remove-user', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('fleet:console-remove-user', (_event: unknown, payload: unknown) => {
     const removed = getFleetConsole().removeUser(asStringParam(payload), fleetActor());
     return { removed };
   });
 
-  ipcMain.handle('fleet:console-assign-workspace', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('fleet:console-assign-workspace', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     if (typeof rec.userId !== 'string' || rec.userId.trim() === '') throw new Error('userId không được rỗng.');
     if (typeof rec.workspaceId !== 'string' || rec.workspaceId.trim() === '')
@@ -11116,7 +11151,7 @@ function registerIpc(): void {
     return getFleetConsole().assignWorkspace(rec.userId, rec.workspaceId, fleetActor());
   });
 
-  ipcMain.handle('fleet:console-unassign-workspace', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('fleet:console-unassign-workspace', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     if (typeof rec.userId !== 'string' || rec.userId.trim() === '') throw new Error('userId không được rỗng.');
     if (typeof rec.workspaceId !== 'string' || rec.workspaceId.trim() === '')
@@ -11124,7 +11159,7 @@ function registerIpc(): void {
     return getFleetConsole().unassignWorkspace(rec.userId, rec.workspaceId, fleetActor());
   });
 
-  ipcMain.handle('fleet:console-overview', () => {
+  registerMainWindowIpcHandler('fleet:console-overview', () => {
     const statuses = getFleetManager().listFleet();
     return {
       bots: buildFleetBotOverview(statuses),
@@ -11133,9 +11168,9 @@ function registerIpc(): void {
     };
   });
 
-  ipcMain.handle('fleet:quotas-list', () => loadBotQuotas(fleetRootDir()));
+  registerMainWindowIpcHandler('fleet:quotas-list', () => loadBotQuotas(fleetRootDir()));
 
-  ipcMain.handle('fleet:quotas-set', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('fleet:quotas-set', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     if (typeof rec.botId !== 'string' || rec.botId.trim() === '') throw new Error('botId không được rỗng.');
     return setBotQuota(
@@ -11152,19 +11187,19 @@ function registerIpc(): void {
     );
   });
 
-  ipcMain.handle('fleet:quotas-remove', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('fleet:quotas-remove', (_event: unknown, payload: unknown) => {
     const removed = removeBotQuota(fleetRootDir(), asStringParam(payload));
     return { removed };
   });
 
-  ipcMain.handle('fleet:quotas-alerts', () => fleetQuotaAlerts());
+  registerMainWindowIpcHandler('fleet:quotas-alerts', () => fleetQuotaAlerts());
 
   // v1.09 (Đội T6): fleet v6 overview — scheduler + quota nhóm + health.
-  ipcMain.handle('fleet:v6-overview', () => buildFleetV6Overview(fleetRootDir()));
+  registerMainWindowIpcHandler('fleet:v6-overview', () => buildFleetV6Overview(fleetRootDir()));
 
   // v1.11 (Đội T6): fleet v8 dashboard — node health + problem bots +
   // running campaigns + recent incidents (CHỈ ĐỌC, local-first).
-  ipcMain.handle('fleet:v8-dashboard', () => buildFleetV8Dashboard(fleetRootDir()));
+  registerMainWindowIpcHandler('fleet:v8-dashboard', () => buildFleetV8Dashboard(fleetRootDir()));
 
   // v1.12 (Team T4): ACP Control Center — managed external CLI agents.
   // State under <userData>/acp-control (registrations + usage JSON,
@@ -11182,13 +11217,13 @@ function registerIpc(): void {
     if (!view) throw new Error(`unknown managed agent: ${agentId}`);
     return buildAcpControlAgentView(view);
   }
-  ipcMain.handle('acp-control:list', () => buildAcpControlSnapshot(getAcpControlCenter()));
-  ipcMain.handle('acp-control:discover', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('acp-control:list', () => buildAcpControlSnapshot(getAcpControlCenter()));
+  registerMainWindowIpcHandler('acp-control:discover', async (_event: unknown, payload: unknown) => {
     const probeAcp = Boolean((payload as Record<string, unknown> | undefined)?.probeAcp);
     const found = await getAcpControlCenter().discover({ probeAcp });
     return found.map(toAcpControlDiscoveredView);
   });
-  ipcMain.handle('acp-control:register', async (_event: unknown, backendId: unknown) => {
+  registerMainWindowIpcHandler('acp-control:register', async (_event: unknown, backendId: unknown) => {
     const center = getAcpControlCenter();
     const found = await center.discover();
     const match = found.find((f) => f.backendId === asStringParam(backendId));
@@ -11197,20 +11232,20 @@ function registerIpc(): void {
     const record = center.registerDiscovered(match);
     return acpControlAgentView(record.id);
   });
-  ipcMain.handle('acp-control:start', async (_event: unknown, agentId: unknown) => {
+  registerMainWindowIpcHandler('acp-control:start', async (_event: unknown, agentId: unknown) => {
     const record = await getAcpControlCenter().start(asStringParam(agentId));
     return acpControlAgentView(record.id);
   });
-  ipcMain.handle('acp-control:stop', (_event: unknown, agentId: unknown) => {
+  registerMainWindowIpcHandler('acp-control:stop', (_event: unknown, agentId: unknown) => {
     const stopped = getAcpControlCenter().stop(asStringParam(agentId));
     return { stopped };
   });
-  ipcMain.handle('acp-control:set-enabled', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('acp-control:set-enabled', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     const record = getAcpControlCenter().setEnabled(asStringParam(rec.agentId), rec.enabled === true);
     return acpControlAgentView(record.id);
   });
-  ipcMain.handle('acp-control:set-budget', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('acp-control:set-budget', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     const budget = (rec.budget ?? {}) as Record<string, unknown>;
     const patch: { maxTokensPerDay?: number; maxCostUsdPerDay?: number; maxCallsPerDay?: number; maxWallMsPerDay?: number } = {};
@@ -11222,10 +11257,10 @@ function registerIpc(): void {
     const { record } = getAcpControlCenter().setBudget(asStringParam(rec.agentId), patch);
     return acpControlAgentView(record.id);
   });
-  ipcMain.handle('acp-control:usage', (_event: unknown, agentId: unknown) => {
+  registerMainWindowIpcHandler('acp-control:usage', (_event: unknown, agentId: unknown) => {
     return getAcpControlCenter().history(asStringParam(agentId), 20).map(toAcpControlTurnView);
   });
-  ipcMain.handle('acp-control:report', (_event: unknown, agentId: unknown, days: unknown) => {
+  registerMainWindowIpcHandler('acp-control:report', (_event: unknown, agentId: unknown, days: unknown) => {
     const n = typeof days === 'number' && Number.isFinite(days) ? Math.max(1, Math.min(30, Math.floor(days))) : 7;
     return buildAcpControlReport(getAcpControlCenter(), asStringParam(agentId), n);
   });
@@ -11234,7 +11269,7 @@ function registerIpc(): void {
   // top consumers, capacity forecast, placement planning, and the
   // durable placement queue. All local-first; placement never moves
   // a bot by itself (the queue only records intent).
-  ipcMain.handle('fleet:overview', () => {
+  registerMainWindowIpcHandler('fleet:overview', () => {
     const rootDir = fleetRootDir();
     const statuses = getFleetManager().listFleet();
     const quotas = loadBotQuotas(rootDir);
@@ -11243,7 +11278,7 @@ function registerIpc(): void {
     return buildFleetOverview(statuses, quotas, fleetQuotaAlerts(), samplesByBot);
   });
 
-  ipcMain.handle('fleet:schedule-plan', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('fleet:schedule-plan', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     const strategy = rec.strategy;
     if (strategy !== undefined && strategy !== 'spread' && strategy !== 'binpack') {
@@ -11268,9 +11303,9 @@ function registerIpc(): void {
     );
   });
 
-  ipcMain.handle('fleet:schedule-queue', () => loadScheduleQueue(fleetRootDir()));
+  registerMainWindowIpcHandler('fleet:schedule-queue', () => loadScheduleQueue(fleetRootDir()));
 
-  ipcMain.handle('fleet:schedule-enqueue', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('fleet:schedule-enqueue', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     return enqueuePlacement(fleetRootDir(), {
       request: {
@@ -11289,11 +11324,11 @@ function registerIpc(): void {
     });
   });
 
-  ipcMain.handle('fleet:schedule-claim', (_event: unknown, payload: unknown) =>
+  registerMainWindowIpcHandler('fleet:schedule-claim', (_event: unknown, payload: unknown) =>
     claimPlacement(fleetRootDir(), asStringParam(payload), fleetActor()),
   );
 
-  ipcMain.handle('fleet:schedule-cancel', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('fleet:schedule-cancel', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     return cancelPlacement(
       fleetRootDir(),
@@ -11304,11 +11339,11 @@ function registerIpc(): void {
 
   // v1.03 (Team T6): bot marketplace v3 — collections, version
   // history, install into a fleet workspace (recorded).
-  ipcMain.handle('marketplace-v3:collections', () =>
+  registerMainWindowIpcHandler('marketplace-v3:collections', () =>
     listMarketplaceCollections(app.getPath('userData')),
   );
 
-  ipcMain.handle('marketplace-v3:create-collection', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('marketplace-v3:create-collection', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     const entryIds = Array.isArray(rec.entryIds) ? rec.entryIds.filter((e): e is string => typeof e === 'string') : [];
     return createMarketplaceCollection(app.getPath('userData'), {
@@ -11319,16 +11354,16 @@ function registerIpc(): void {
     });
   });
 
-  ipcMain.handle('marketplace-v3:remove-collection', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('marketplace-v3:remove-collection', (_event: unknown, payload: unknown) => {
     const removed = removeMarketplaceCollection(app.getPath('userData'), asStringParam(payload));
     return { removed };
   });
 
-  ipcMain.handle('marketplace-v3:versions', (_event: unknown, payload: unknown) =>
+  registerMainWindowIpcHandler('marketplace-v3:versions', (_event: unknown, payload: unknown) =>
     listMarketplaceEntryVersions(app.getPath('userData'), asStringParam(payload)),
   );
 
-  ipcMain.handle('marketplace-v3:record-version', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('marketplace-v3:record-version', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     return recordMarketplaceEntryVersion(
       app.getPath('userData'),
@@ -11339,7 +11374,7 @@ function registerIpc(): void {
     );
   });
 
-  ipcMain.handle('marketplace-v3:install-to-workspace', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('marketplace-v3:install-to-workspace', async (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     // Install returns a fresh BotConfig; the caller (App) saves it as
     // a bot via the existing onBotInstalled path.
@@ -11352,7 +11387,7 @@ function registerIpc(): void {
     return { config: result.config, entry: result.entry, record: result.record };
   });
 
-  ipcMain.handle('marketplace-v3:installs', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('marketplace-v3:installs', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     if (typeof rec.workspaceId === 'string' && rec.workspaceId.trim() !== '') {
       return listMarketplaceInstallsForWorkspace(app.getPath('userData'), rec.workspaceId);
@@ -11362,7 +11397,7 @@ function registerIpc(): void {
 
   // v1.03 (Team T6): plugin marketplace v3 — updates, dependencies,
   // install queue, rollback records.
-  ipcMain.handle('plugin-marketplace-v3:updates', () => {
+  registerMainWindowIpcHandler('plugin-marketplace-v3:updates', () => {
     const catalog = mergePluginCatalog(
       scanInstalledPlugins(pluginsDirForMarketplace()),
       scanPluginTemplatesAsCatalog(path.join(app.getPath('userData'), PLUGIN_TEMPLATES_DIR)),
@@ -11370,7 +11405,7 @@ function registerIpc(): void {
     return checkPluginUpdatesV3(catalog);
   });
 
-  ipcMain.handle('plugin-marketplace-v3:dependencies', () => {
+  registerMainWindowIpcHandler('plugin-marketplace-v3:dependencies', () => {
     const pluginsDir = pluginsDirForMarketplace();
     const catalog = mergePluginCatalog(
       scanInstalledPlugins(pluginsDir),
@@ -11382,11 +11417,11 @@ function registerIpc(): void {
       .map((entry) => checkPluginDependencies(entry.id, dependencies, catalog));
   });
 
-  ipcMain.handle('plugin-marketplace-v3:queue', () =>
+  registerMainWindowIpcHandler('plugin-marketplace-v3:queue', () =>
     listPluginInstallQueue(pluginsDirForMarketplace()),
   );
 
-  ipcMain.handle('plugin-marketplace-v3:rollbacks', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('plugin-marketplace-v3:rollbacks', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     if (typeof rec.pluginId === 'string' && rec.pluginId.trim() !== '') {
       return listPluginRollbacksFor(pluginsDirForMarketplace(), rec.pluginId);
@@ -11394,7 +11429,7 @@ function registerIpc(): void {
     return listPluginRollbacks(pluginsDirForMarketplace());
   });
 
-  ipcMain.handle('plugin-marketplace-v3:record-rollback', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('plugin-marketplace-v3:record-rollback', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     return recordPluginRollback(pluginsDirForMarketplace(), {
       pluginId: requireId(rec.pluginId, 'pluginId'),
@@ -11407,9 +11442,9 @@ function registerIpc(): void {
 
   // v1.03 (Team T6): eval harness — suites stored in
   // <userData>/evals.json; scoring replays recorded runs (runlog).
-  ipcMain.handle('evals:list', () => listEvalSuites(app.getPath('userData')));
+  registerMainWindowIpcHandler('evals:list', () => listEvalSuites(app.getPath('userData')));
 
-  ipcMain.handle('evals:create-suite', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('evals:create-suite', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     return createEvalSuite(
       app.getPath('userData'),
@@ -11418,12 +11453,12 @@ function registerIpc(): void {
     );
   });
 
-  ipcMain.handle('evals:remove-suite', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('evals:remove-suite', (_event: unknown, payload: unknown) => {
     const removed = removeEvalSuite(app.getPath('userData'), asStringParam(payload));
     return { removed };
   });
 
-  ipcMain.handle('evals:add-case', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('evals:add-case', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     const checks = Array.isArray(rec.checks) ? (rec.checks as never[]) : [];
     return addEvalCase(app.getPath('userData'), requireId(rec.suiteId, 'suiteId'), {
@@ -11434,7 +11469,7 @@ function registerIpc(): void {
     });
   });
 
-  ipcMain.handle('evals:remove-case', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('evals:remove-case', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     const removed = removeEvalCase(
       app.getPath('userData'),
@@ -11444,7 +11479,7 @@ function registerIpc(): void {
     return { removed };
   });
 
-  ipcMain.handle('evals:score-case', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('evals:score-case', async (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     const suiteId = requireId(rec.suiteId, 'suiteId');
     const caseId = requireId(rec.caseId, 'caseId');
@@ -11458,7 +11493,7 @@ function registerIpc(): void {
     return scoreEvalCase(evalCase, state);
   });
 
-  ipcMain.handle('evals:run-suite', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('evals:run-suite', async (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     const suiteId = requireId(rec.suiteId, 'suiteId');
     const runsByCaseId = (rec.runsByCaseId ?? {}) as Record<string, unknown>;
@@ -11476,7 +11511,7 @@ function registerIpc(): void {
   // v1.05 (Team T6): memory eval v3 — dataset fixture offline + mock
   // embedding, chạy local, lưu lịch sử vào
   // <userData>/eval-memory-history.json.
-  ipcMain.handle('memoryEval:history', () => {
+  registerMainWindowIpcHandler('memoryEval:history', () => {
     const history = listMemoryEvalHistory(app.getPath('userData'));
     const latest = history.length > 0 ? history[history.length - 1] : null;
     return {
@@ -11495,7 +11530,7 @@ function registerIpc(): void {
     };
   });
 
-  ipcMain.handle('memoryEval:datasets', () =>
+  registerMainWindowIpcHandler('memoryEval:datasets', () =>
     BUILTIN_MEMORY_EVAL_DATASETS.map((d) => ({
       id: d.id,
       name: d.name,
@@ -11505,7 +11540,7 @@ function registerIpc(): void {
     })),
   );
 
-  ipcMain.handle('memoryEval:run', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('memoryEval:run', async (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     const datasetId = typeof rec.datasetId === 'string' && rec.datasetId.trim() !== '' ? rec.datasetId.trim() : BUILTIN_MEMORY_EVAL_DATASET.id;
     const dataset = getBuiltinMemoryEvalDataset(datasetId);
@@ -11520,7 +11555,7 @@ function registerIpc(): void {
     });
   });
 
-  ipcMain.handle('memoryEval:compare', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('memoryEval:compare', (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     const history = listMemoryEvalHistory(app.getPath('userData'));
     if (history.length < 2) {
@@ -11540,18 +11575,18 @@ function registerIpc(): void {
 
   // v1.05 (Team T6): fleet policy v4 — đọc/ghi
   // <userData>/fleet/fleet-policy-v4.json.
-  ipcMain.handle('fleetV4:policy-get', () =>
+  registerMainWindowIpcHandler('fleetV4:policy-get', () =>
     loadFleetPolicyV4(path.join(app.getPath('userData'), 'fleet')),
   );
 
-  ipcMain.handle('fleetV4:policy-set', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('fleetV4:policy-set', (_event: unknown, payload: unknown) => {
     const fleetRoot = path.join(app.getPath('userData'), 'fleet');
     const current = loadFleetPolicyV4(fleetRoot);
     return saveFleetPolicyV4(fleetRoot, { ...current, ...((payload ?? {}) as Record<string, unknown>) });
   });
 
   // v1.05 (Team T6): fleet task queue v4 — durable queue file.
-  ipcMain.handle('fleetV4:tasks-list', () => {
+  registerMainWindowIpcHandler('fleetV4:tasks-list', () => {
     const fleetRoot = path.join(app.getPath('userData'), 'fleet');
     const orchestrator = new FleetOrchestrator({ fleetRoot, policy: loadFleetPolicyV4(fleetRoot) });
     orchestrator.loadTasks();
@@ -11561,7 +11596,7 @@ function registerIpc(): void {
   // v1.03 (Team T6): event stream — cross-run filter/summary/timeline
   // over the run log (reads via the coordinator's runlog store, same
   // sanitised events the replay view already shows).
-  ipcMain.handle('runlog:event-stream', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('runlog:event-stream', async (_event: unknown, payload: unknown) => {
     const rec = (payload ?? {}) as Record<string, unknown>;
     const runIds = Array.isArray(rec.runIds)
       ? rec.runIds.filter((r): r is string => typeof r === 'string')
@@ -11595,12 +11630,12 @@ function registerIpc(): void {
 
   // v0.15 (L5 audit): kèm số secret tạm để UI hỏi xác nhận trước
   // khi tắt NO_STORAGE (khi còn secret tạm thì tắt sẽ flush chúng).
-  ipcMain.handle('vault:get-nostorage', () => ({
+  registerMainWindowIpcHandler('vault:get-nostorage', () => ({
     enabled: vault.isNoStorage(),
     pendingSecrets: vault.countNoStoragePendingSecrets(),
   }));
 
-  ipcMain.handle('vault:set-nostorage', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('vault:set-nostorage', (_event: unknown, payload: unknown) => {
     const enabled = asBooleanParam(payload);
     // v0.15 (L5 audit): renderer có thể gửi kèm opts trong cùng
     // payload `{ enabled, discardTemporarySecrets }` (asBooleanParam
@@ -11619,18 +11654,18 @@ function registerIpc(): void {
   });
 
   // --- v0.7: đăng nhập đa tầng + OAuth + tự cập nhật ---
-  ipcMain.handle('auth:profile-get', (): LocalProfile => {
+  registerMainWindowIpcHandler('auth:profile-get', (): LocalProfile => {
     if (!localProfile) localProfile = getLocalProfile(app.getPath('userData'));
     return { ...localProfile };
   });
 
-  ipcMain.handle('auth:profile-set', (_event: unknown, payload: { displayName?: string }) => {
+  registerMainWindowIpcHandler('auth:profile-set', (_event: unknown, payload: { displayName?: string }) => {
     const displayName = optionalString(payload?.displayName, 'displayName') ?? '';
     localProfile = setLocalDisplayName(app.getPath('userData'), displayName);
     return { ...localProfile };
   });
 
-  ipcMain.handle('auth:identities-list', (): Array<{ providerId: string; identity: ProviderIdentity | null }> => {
+  registerMainWindowIpcHandler('auth:identities-list', (): Array<{ providerId: string; identity: ProviderIdentity | null }> => {
     const out: Array<{ providerId: string; identity: ProviderIdentity | null }> = (
       PROVIDERS as Array<{ id: string }>
     ).map((p) => {
@@ -11671,7 +11706,7 @@ function registerIpc(): void {
     return out;
   });
 
-  ipcMain.handle('auth:identity-delete', (_event: unknown, payload: { providerId: string }) => {
+  registerMainWindowIpcHandler('auth:identity-delete', (_event: unknown, payload: { providerId: string }) => {
     const providerId = requireId(payload?.providerId, 'providerId');
     // W11b: signing out a connector also drops its TokenSet so the
     // connector really disconnects (tools go back to "not
@@ -11686,11 +11721,11 @@ function registerIpc(): void {
     return deleteProviderIdentity(vault, providerId);
   });
 
-  ipcMain.handle('auth:oauth-supported', () =>
+  registerMainWindowIpcHandler('auth:oauth-supported', () =>
     Object.values(OAUTH_PROVIDERS).map((p) => ({ id: p.id, label: p.label })),
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'auth:oauth-start',
     async (
       _event: unknown,
@@ -11742,9 +11777,9 @@ function registerIpc(): void {
   // M7: Connected apps — catalog + trạng thái auth cho Settings.
   // v0.70: 'apps:list' là async vì trạng thái app github được xác thực
   // lại với api.github.com (cache 1 giờ, timeout 10s).
-  ipcMain.handle('apps:list', async (): Promise<AppStatusView[]> => buildAppStatusViews());
+  registerMainWindowIpcHandler('apps:list', async (): Promise<AppStatusView[]> => buildAppStatusViews());
 
-  ipcMain.handle('apps:disconnect', async (_event: unknown, payload: { appId: string }) => {
+  registerMainWindowIpcHandler('apps:disconnect', async (_event: unknown, payload: { appId: string }) => {
     const appId = requireId(payload?.appId, 'appId');
     const app = getApp(appId);
     if (!app) throw new Error(`Không rõ app "${appId}".`);
@@ -11810,7 +11845,7 @@ function registerIpc(): void {
   // mới lưu + seed (kèm login làm nhãn tài khoản cho UI). App token
   // khác (hiện chưa có app nào) giữ hành vi cũ vì chưa có endpoint
   // xác thực riêng — không gọi api.github.com cho app không phải GitHub.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'apps:set-token',
     async (_event: unknown, payload: { appId?: unknown; token?: unknown }) => {
       const appId = requireId(payload?.appId, 'appId');
@@ -11853,7 +11888,7 @@ function registerIpc(): void {
   // renderer; v0.59: nhập/xoá key xong main seed lại cho coordinator
   // qua RPC `composio.setApiKey` (để con dùng được ngay cả khi Vault
   // dùng safeStorage/NO_STORAGE mà file reader không mở được).
-  ipcMain.handle('composio:get-state', (): ComposioStateView => {
+  registerMainWindowIpcHandler('composio:get-state', (): ComposioStateView => {
     return buildComposioStateView(
       getComposioSource(),
       hasComposioApiKey(vault),
@@ -11861,7 +11896,7 @@ function registerIpc(): void {
     );
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'composio:set-enabled',
     async (_event: unknown, payload: { enabled?: unknown }): Promise<ComposioStateView> => {
       const enabled = requireBoolean(payload?.enabled, 'enabled');
@@ -11876,7 +11911,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'composio:set-app-enabled',
     async (
       _event: unknown,
@@ -11898,7 +11933,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'composio:set-key',
     async (_event: unknown, payload: { apiKey?: unknown }): Promise<ComposioStateView> => {
       // Key Composio thường < 200 ký tự; cho tối đa 500 để không chặn
@@ -11918,7 +11953,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('composio:clear-key', async (): Promise<ComposioStateView> => {
+  registerMainWindowIpcHandler('composio:clear-key', async (): Promise<ComposioStateView> => {
     clearComposioApiKey(vault);
     // v0.59: xoá cả bản seed trong coordinator (seed null → con về
     // fallback / fail-closed, không giữ key cũ trong bộ nhớ).
@@ -11939,7 +11974,7 @@ function registerIpc(): void {
   // qua RPC `composio.setUserId` (đổi id → session cũ bị huỷ ngay,
   // không cần restart app). Validate ở `setComposioUserId` (rỗng/
   // khoảng trắng/ký tự lạ → lỗi rõ, không ghi).
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'composio:set-user-id',
     async (_event: unknown, payload: { userId?: unknown }): Promise<ComposioStateView> => {
       // User id Composio thường < 100 ký tự; cho tối đa 500 để không
@@ -11956,7 +11991,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('composio:clear-user-id', async (): Promise<ComposioStateView> => {
+  registerMainWindowIpcHandler('composio:clear-user-id', async (): Promise<ComposioStateView> => {
     clearComposioUserId(vault);
     // Xoá cả bản seed trong coordinator (seed null → con về mặc định
     // 'local-user', không giữ id cũ trong bộ nhớ / session cũ).
@@ -11972,11 +12007,11 @@ function registerIpc(): void {
   // phút (clamp [1 phút, 24 giờ] ở core) + cờ bật/tắt từng poller;
   // `poll-now` poll tay một poller ngay (lỗi thiếu key/kết nối trả về
   // cho UI hiển thị, không crash main).
-  ipcMain.handle('composio:get-poll-status', (): ComposioPollStatus[] => {
+  registerMainWindowIpcHandler('composio:get-poll-status', (): ComposioPollStatus[] => {
     return getComposioPollStatus();
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'composio:set-poll-config',
     async (
       _event: unknown,
@@ -12000,7 +12035,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'composio:poll-now',
     async (_event: unknown, payload: { name?: unknown }): Promise<ComposioPollStatus[]> => {
       if (!composioPollScheduler) return [];
@@ -12018,14 +12053,14 @@ function registerIpc(): void {
   // seed lại cho coordinator qua RPC `media.setKey` (đổi key → lần
   // gọi image/video sau dùng key mới ngay, không cần restart app).
   // Provider lạ / key rỗng → lỗi rõ, không ghi.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'media:get-status',
     (): Record<string, { configured: boolean; suffix: string | null }> => {
       return getMediaKeyStatus(vault);
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'media:set-key',
     async (
       _event: unknown,
@@ -12044,7 +12079,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'media:clear-key',
     async (
       _event: unknown,
@@ -12067,7 +12102,7 @@ function registerIpc(): void {
   // session hiện tại). Chỉ trả toolkit + trạng thái + nhãn tài khoản;
   // lỗi (chưa có key/session) ném về renderer dạng message để UI
   // hiển thị, không chứa user id/key.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'composio:get-connection-status',
     async (
       _event: unknown,
@@ -12091,7 +12126,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('update:check', async (): Promise<UpdateCheckResult> => {
+  registerMainWindowIpcHandler('update:check', async (): Promise<UpdateCheckResult> => {
     // Phiên bản hiện tại lấy từ package.json qua app.getVersion().
     return checkForUpdate({ currentVersion: app.getVersion() });
   });
@@ -12101,11 +12136,11 @@ function registerIpc(): void {
   // Các kênh `updates:*` dùng UpdateService: track persist, check lúc
   // startup + định kỳ, feed stub cho track chưa có feed thật (xem
   // updateService.ts — KHÔNG bịa release server).
-  ipcMain.handle('updates:get-status', (): UpdateStatus => getUpdateService().getStatus());
-  ipcMain.handle('updates:set-track', (_event: unknown, payload: { track?: unknown }): UpdateStatus => {
+  registerMainWindowIpcHandler('updates:get-status', (): UpdateStatus => getUpdateService().getStatus());
+  registerMainWindowIpcHandler('updates:set-track', (_event: unknown, payload: { track?: unknown }): UpdateStatus => {
     return getUpdateService().setUpdateTrack(payload?.track);
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'updates:check',
     async (_event: unknown, payload: { trigger?: unknown }): Promise<UpdateStatus> => {
       const trigger: UpdateCheckTrigger =
@@ -12113,18 +12148,18 @@ function registerIpc(): void {
       return getUpdateService().checkForUpdates(trigger);
     },
   );
-  ipcMain.handle('updates:quit-and-install', (): { installed: boolean; reason: string } => {
+  registerMainWindowIpcHandler('updates:quit-and-install', (): { installed: boolean; reason: string } => {
     return getUpdateService().quitAndInstallUpdate();
   });
 
   // --- v0.54 (P1-8): checkpoint/resume + interrupt HITL cho run dài ---
   // Resume/time-travel qua coordinator con (checkpoint sống trong
   // BotMemory SQLite của bot — sống qua restart app).
-  ipcMain.handle('runs:list-checkpoints', async (_event: unknown, payload: { botId: string }) => {
+  registerMainWindowIpcHandler('runs:list-checkpoints', async (_event: unknown, payload: { botId: string }) => {
     const botId = requireId(payload?.botId, 'botId');
     return getCoordinator().listBotCheckpoints(botId);
   });
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'runs:interrupt',
     async (_event: unknown, payload: { runId: string; question?: string }) => {
       const runId = requireId(payload?.runId, 'runId');
@@ -12132,7 +12167,7 @@ function registerIpc(): void {
       return getCoordinator().interruptRun(runId, question ?? undefined);
     },
   );
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'runs:replay',
     async (_event: unknown, payload: { botId: string; runId: string; stepIndex?: number | 'latest' }) => {
       const botId = requireId(payload?.botId, 'botId');
@@ -12145,7 +12180,7 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle('update:open-download', async (_event: unknown, payload: { url?: string }) => {
+  registerMainWindowIpcHandler('update:open-download', async (_event: unknown, payload: { url?: string }) => {
     const url = requireHttpUrl(payload?.url, 'url');
     // Chỉ mở link release chính thức của repo open-bot — chặn URL lạ
     // từ renderer (kể cả khi renderer bị chèn nội dung xấu).
@@ -12160,7 +12195,7 @@ function registerIpc(): void {
   // Renderer trả lời phê duyệt tool call (ipcRenderer.send, không phải
   // invoke): chuyển tiếp vào tiến trình coordinator con, nơi run đang chờ.
   // v0.7: handler `.on` không được throw — tham số sai thì bỏ qua.
-  ipcMain.on('chat:approval-response', (_event: unknown, payload: { callId: string; approved: boolean; args?: Record<string, unknown> }) => {
+  registerMainWindowIpcListener('chat:approval-response', (_event: unknown, payload: { callId: string; approved: boolean; args?: Record<string, unknown> }) => {
     try {
       const callId = requireId(payload?.callId, 'callId');
       const approved = requireBoolean(payload?.approved, 'approved');
@@ -12180,7 +12215,7 @@ function registerIpc(): void {
   // v0.50 (M8): renderer trả lời permission của CLI engine (thẻ
   // PermissionCard) — chuyển tiếp vào coordinator con, nơi broker
   // đang chờ (RPC `harnessDecidePermission`).
-  ipcMain.on(
+  registerMainWindowIpcListener(
     'chat:harness-permission-response',
     (_event: unknown, payload: { requestId: string; allowed: boolean }) => {
       try {
@@ -12199,13 +12234,13 @@ function registerIpc(): void {
   // status registry + đọc NDJSON log theo thread (phân trang, lọc
   // kind). Params validate bằng ipc/validate.ts
   // (`parseHarnessThreadLogParams`); sai thì lỗi rõ về renderer.
-  ipcMain.handle('harness:status', async () => getCoordinator().harnessStatus());
+  registerMainWindowIpcHandler('harness:status', async () => getCoordinator().harnessStatus());
 
   // v0.97 (Team T3): renderer trả lời một generative-UI component
   // (GENERATIVE_UI) — chuyển tiếp vào coordinator con (RPC
   // `answerAgUiComponent`, nơi registry đang giữ component chờ).
   // Response không hợp lệ / component đã trả lời → `{ found: false }`.
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'agui:answer-component',
     async (_event: unknown, payload: unknown): Promise<{ componentId: string; found: boolean }> => {
       const record = (payload ?? {}) as Record<string, unknown>;
@@ -12229,12 +12264,12 @@ function registerIpc(): void {
   // v0.97 (Team T3): renderer đọc shared state hiện tại của một run
   // AG-UI (AgUiPanel) — lấy từ store của main (nuôi từ event forward
   // của coordinator con + bridge harness). Run chưa biết → null.
-  ipcMain.handle('agui:run-state', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('agui:run-state', async (_event: unknown, payload: unknown) => {
     const record = (payload ?? {}) as Record<string, unknown>;
     const runId = requireId(record['runId'], 'runId');
     return getAgUiStateStore().get(runId) ?? null;
   });
-  ipcMain.handle('harness:thread-log', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('harness:thread-log', async (_event: unknown, payload: unknown) => {
     const params = parseHarnessThreadLogParams(payload);
     // kinds đã validate nằm trong HARNESS_EVENT_KINDS ở
     // parseHarnessThreadLogParams — cast này giữ đúng hợp đồng
@@ -12251,12 +12286,12 @@ function registerIpc(): void {
   // export JSONL, kiểm chứng hash chain, pause/resume/fork. Mọi tham
   // số validate ở đây (runId bắt buộc, còn lại optional + typeof);
   // coordinator cũng validate lại phía child.
-  ipcMain.handle('runlog:list', async () => getCoordinator().listRunLogs());
-  ipcMain.handle('runlog:meta', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('runlog:list', async () => getCoordinator().listRunLogs());
+  registerMainWindowIpcHandler('runlog:meta', async (_event: unknown, payload: unknown) => {
     const record = (payload ?? {}) as Record<string, unknown>;
     return getCoordinator().runLogMeta(requireId(record['runId'], 'runId'));
   });
-  ipcMain.handle('runlog:read', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('runlog:read', async (_event: unknown, payload: unknown) => {
     const record = (payload ?? {}) as Record<string, unknown>;
     const runId = requireId(record['runId'], 'runId');
     const query = (record['query'] ?? {}) as Record<string, unknown>;
@@ -12273,44 +12308,44 @@ function registerIpc(): void {
       ...(typeof query['offset'] === 'number' ? { offset: query['offset'] } : {}),
     });
   });
-  ipcMain.handle('runlog:export', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('runlog:export', async (_event: unknown, payload: unknown) => {
     const record = (payload ?? {}) as Record<string, unknown>;
     const runId = requireId(record['runId'], 'runId');
     return { runId, jsonl: await getCoordinator().exportRunLog(runId) };
   });
-  ipcMain.handle('runlog:verify', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('runlog:verify', async (_event: unknown, payload: unknown) => {
     const record = (payload ?? {}) as Record<string, unknown>;
     return getCoordinator().verifyRunLog(requireId(record['runId'], 'runId'));
   });
-  ipcMain.handle('runlog:verify-all', async () => getCoordinator().verifyAllRunLogs());
-  ipcMain.handle('runlog:pause', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('runlog:verify-all', async () => getCoordinator().verifyAllRunLogs());
+  registerMainWindowIpcHandler('runlog:pause', async (_event: unknown, payload: unknown) => {
     const record = (payload ?? {}) as Record<string, unknown>;
     return getCoordinator().pauseRunLog(
       requireId(record['runId'], 'runId'),
       optionalString(record['reason'], 'reason', 500),
     );
   });
-  ipcMain.handle('runlog:resume', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('runlog:resume', async (_event: unknown, payload: unknown) => {
     const record = (payload ?? {}) as Record<string, unknown>;
     return getCoordinator().resumeRunLog(
       requireId(record['runId'], 'runId'),
       optionalString(record['reason'], 'reason', 500),
     );
   });
-  ipcMain.handle('runlog:fork', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('runlog:fork', async (_event: unknown, payload: unknown) => {
     const record = (payload ?? {}) as Record<string, unknown>;
     return getCoordinator().forkRunLog(
       requireId(record['runId'], 'runId'),
       typeof record['fromSeq'] === 'number' ? record['fromSeq'] : undefined,
     );
   });
-  ipcMain.handle('runlog:replay', async (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('runlog:replay', async (_event: unknown, payload: unknown) => {
     const record = (payload ?? {}) as Record<string, unknown>;
     return getCoordinator().replayRunLog(requireId(record['runId'], 'runId'));
   });
 
   // Renderer trả lời câu hỏi của agent (tool ask_user): tương tự.
-  ipcMain.on('chat:ask-user-response', (_event: unknown, payload: { requestId: string; answer: string }) => {
+  registerMainWindowIpcListener('chat:ask-user-response', (_event: unknown, payload: { requestId: string; answer: string }) => {
     try {
       const requestId = requireId(payload?.requestId, 'requestId');
       const answer = optionalString(payload?.answer, 'answer', 200_000) ?? '';
@@ -12326,7 +12361,7 @@ function registerIpc(): void {
   // điểm interrupt): chuyển tiếp vào coordinator con qua RPC
   // `respondInterrupt`. Decision sai/không rõ thì coi như cancel (an
   // toàn) — coordinator tự chuẩn hoá.
-  ipcMain.on(
+  registerMainWindowIpcListener(
     'chat:interrupt-response',
     (
       _event: unknown,
@@ -12362,7 +12397,7 @@ function registerIpc(): void {
   // v0.54 (P1-10): renderer báo telemetry `client_persistence` khi
   // persisted store lỗi (đọc/ghi/xoá/migrate). Chỉ log ở main (không
   // gửi đi đâu) — fail soft, không crash main.
-  ipcMain.on(
+  registerMainWindowIpcListener(
     'telemetry:client-persistence',
     (
       _event: unknown,
@@ -12382,7 +12417,7 @@ function registerIpc(): void {
   // v0.13: renderer trả lời elicitation của MCP server (ElicitationModal):
   // tương tự ask-user, nhưng action phải là accept/decline/cancel và
   // content (khi có) phải là plain object — sai thì bỏ qua, không crash main.
-  ipcMain.on(
+  registerMainWindowIpcListener(
     'chat:elicitation-response',
     (
       _event: unknown,
