@@ -66,6 +66,9 @@ import type {
   ValidateSkillV14Options,
 } from './types.js';
 
+/** Re-export các giới hạn độ dài hay dùng trong test/spec (validator là entry tự nhiên cho chúng). */
+export { SKILL_V14_DESCRIPTION_MAX_LENGTH, SKILL_V14_NAME_MAX_LENGTH } from './types.js';
+
 /** Rough token estimate: ~4 characters per token. */
 export function estimateTokensV14(text: string): number {
   return Math.max(1, Math.ceil(text.length / 4));

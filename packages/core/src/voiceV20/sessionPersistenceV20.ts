@@ -219,6 +219,10 @@ export class SessionPersistenceStoreV20 {
     if (errors.length > 0) throw new Error(`Invalid SessionPersistenceV20 options: ${errors.join('; ')}`);
     this.opts = { ...defaultSessionPersistenceV20Options(), ...opts };
     if (this.opts.baseDir) fs.mkdirSync(this.opts.baseDir, { recursive: true });
+    // A fresh instance over an existing dir must report the sessions
+    // already on disk: without this, summary()/getStats() said
+    // "0 sessions, 0 checkpoints" until the next save/prune/delete.
+    this.refreshCounts();
   }
 
   get options(): SessionPersistenceV20Options { return { ...this.opts }; }

@@ -230,6 +230,8 @@ export interface BoxManagerOptions {
   /** Thư mục gốc chứa mọi box (vd `<workspace>/.open-bot/`). */
   rootDir: string;
   logger?: { warn(message: string): void };
+  /** Injectable process spawner for deterministic lifecycle/race tests. */
+  spawnProcess?: typeof spawn;
   /**
    * v0.78 (cgroup): hook gọi ngay sau mỗi lần spawn thành công (cả
    * spawn chính lẫn fallback chạy thường) — caller (vd
@@ -259,11 +261,13 @@ export interface RunInBoxOptions {
 export class BotBoxManager {
   readonly rootDir: string;
   private readonly warn: (message: string) => void;
+  private readonly spawnProcess: typeof spawn;
   private spawnHook?: (botId: string, child: ChildProcess) => void;
 
   constructor(options: BoxManagerOptions) {
     this.rootDir = options.rootDir;
     this.warn = options.logger ? (m) => options.logger?.warn(m) : () => undefined;
+    this.spawnProcess = options.spawnProcess ?? spawn;
     this.spawnHook = options.onSpawn;
   }
 
@@ -454,7 +458,6 @@ export class BotBoxManager {
       // tải nặng) thì thử lại cùng backend MỘT lần, rồi mới fallback
       // chạy thường — giống đường spawn lỗi, luôn ghi rõ vào isolation.
       let child: ChildProcess | undefined;
-      let spawnedChild: ChildProcess | undefined;
       let fellBack = false;
       let setupRetries = 0;
       const attachIO = (c: ChildProcess): void => {
@@ -474,7 +477,7 @@ export class BotBoxManager {
           limitsApplied.enforced = false;
           limitsApplied.reason = 'backend lỗi, fallback chạy thường (prlimit không còn áp dụng)';
         }
-        const fallback = spawn(command, args, {
+        const fallback = this.spawnProcess(command, args, {
           cwd: box.workspaceDir,
           env,
           detached: true,
@@ -485,7 +488,6 @@ export class BotBoxManager {
         isolation.detail = 'none — chạy thường (backend lỗi, fallback)';
         isolation.warning = `Backend "${requested}" lỗi, đã fallback chạy thường (không cách ly).`;
         child = fallback;
-        spawnedChild = fallback;
         // v0.78 (cgroup): cả process fallback cũng phải vào cgroup.
         this.fireSpawnHook(botId, fallback);
         attachIO(fallback);
@@ -496,7 +498,7 @@ export class BotBoxManager {
         if (settled || fellBack) return;
         let next: ChildProcess;
         try {
-          next = spawn(spawnArgv[0] as string, spawnArgv.slice(1), {
+          next = this.spawnProcess(spawnArgv[0] as string, spawnArgv.slice(1), {
             cwd: box.workspaceDir,
             env,
             detached: true,
@@ -510,7 +512,6 @@ export class BotBoxManager {
           return;
         }
         child = next;
-        spawnedChild = next;
         // v0.78 (cgroup): đưa process vào cgroup NGAY sau spawn để cửa
         // sổ race cấp phát trước khi bị giới hạn là nhỏ nhất.
         this.fireSpawnHook(botId, next);
@@ -536,7 +537,9 @@ export class BotBoxManager {
           // sang tiến trình khác, tiến trình cũ đóng lại không được kết
           // thúc sớm bằng stdout rỗng — race này đã làm một test flaky
           // (fallback chưa kịp chạy đã finish).
-          if (child !== spawnedChild) return;
+          // A backend may emit close after its error handler has already
+          // started the plain fallback. Only the active child may settle this run.
+          if (next !== child) return;
           // Backend chạy được nhưng lỗi setup (chưa exec tool): thử lại
           // cùng backend một lần (lỗi nhất thời lúc tải nặng), rồi mới
           // fallback. Tool lỗi thật thì không khớp mẫu setup → finish

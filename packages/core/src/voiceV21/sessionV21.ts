@@ -260,6 +260,11 @@ export class VoiceSessionV21 {
       this.panel.setTurnState('confirming', t);
       this.panel.setToolCall(record, t);
       await this.speak(this.toolCalls.confirmationPrompt(record), turnId, t, record.id);
+      // Đọc prompt xong phải quay lại 'confirming': speak() kết thúc ở
+      // 'listening' (agent-speak-end), nhưng tool vẫn đang chờ yes/no —
+      // để 'listening' thì turn sau sẽ chạy như turn thường, mất xác nhận.
+      this.turns.handle('confirm-requested', t);
+      this.panel.setTurnState('confirming', t);
       return record;
     }
 

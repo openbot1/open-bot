@@ -93,11 +93,23 @@ export function cleanModelIds(ids: unknown): string[] {
 }
 
 /**
+ * Base URL Ollama cho models refresh: OLLAMA_HOST khi user set (quy ước
+ * như routerV2/localDetectV2 — `host:port` hoặc URL đầy đủ), mặc định
+ * http://127.0.0.1:11434.
+ */
+function ollamaModelFetcherBaseUrl(): string {
+  const host = (process.env['OLLAMA_HOST'] ?? '').trim();
+  if (!host) return 'http://127.0.0.1:11434';
+  if (/^https?:\/\//.test(host)) return host.replace(/\/+$/, '');
+  return `http://${host.replace(/\/+$/, '')}`;
+}
+
+/**
  * Fetcher Ollama local: GET `<baseUrl>/api/tags` → `models[].name`.
  * `fetchFn` mặc định là global fetch; test truyền mock.
  */
 export function createOllamaModelFetcher(
-  baseUrl = 'http://127.0.0.1:11434',
+  baseUrl = ollamaModelFetcherBaseUrl(),
   fetchFn: typeof fetch = fetch,
   timeoutMs = 5000,
 ): ModelListFetcher {

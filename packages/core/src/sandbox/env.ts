@@ -141,18 +141,32 @@ export function buildBoxEnv(
 /**
  * True khi binary có mặt trên PATH (chạy `<cmd> --version`, timeout 5s).
  * Dùng để dò backend (bwrap/unshare/prlimit...) — không chạy gì khác.
+ *
+ * v144 fix (production): spawn có thể lỗi NHẤT THỜI dưới tải (EAGAIN
+ * khi fork, timeout...) — lỗi đó KHÔNG có nghĩa là binary không có mặt.
+ * Chỉ ENOENT (thật sự không tìm thấy binary) mới kết luận false ngay;
+ * mọi lỗi khác đều thử lại tối đa 3 lần, nghỉ 100ms giữa các lần, rồi
+ * mới kết luận false. Nếu không, một lần fork lỗi thoáng qua sẽ làm
+ * cả suite báo sai isolation (bwrap -> unshare/local) như ở r3.
  */
 export function commandAvailable(cmd: string): boolean {
   return commandExists(cmd);
 }
 
 function commandExists(cmd: string): boolean {
-  try {
-    execFileSync(cmd, ['--version'], { stdio: 'ignore', timeout: 5000 });
-    return true;
-  } catch {
-    return false;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      execFileSync(cmd, ['--version'], { stdio: 'ignore', timeout: 5000 });
+      return true;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException | null)?.code;
+      if (code === 'ENOENT') return false;
+      if (attempt === 2) return false;
+      // Nghỉ đồng bộ ngắn trước khi thử lại (probe chạy đồng bộ).
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+    }
   }
+  return false;
 }
 
 /**

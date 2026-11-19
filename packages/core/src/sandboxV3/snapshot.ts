@@ -161,6 +161,11 @@ export class SnapshotStore {
   private readonly maxFiles: number;
   private readonly maxBytes: number;
   private readonly maxPerSession: number;
+  // v1.35 fix: createdAtMs phai don dieu tang de listSnapshots ("oldest
+  // first") dung that. Hai capture trong cung 1ms co createdAtMs bang
+  // nhau thi sort on dinh giu thu tu UUID (ngau nhien) — list[0] co the
+  // la snapshot moi hon, va prune() se xoa nham snapshot moi thay vi cu.
+  private lastCreatedAtMs = 0;
 
   constructor(options: SnapshotStoreOptions) {
     this.baseDir = path.resolve(options.baseDir);
@@ -173,6 +178,17 @@ export class SnapshotStore {
   /** Root dir of the store. */
   getBaseDir(): string {
     return this.baseDir;
+  }
+
+  /**
+   * Monotonic creation timestamp: never goes backwards and never
+   * repeats within one store instance, so listSnapshots order is a
+   * true creation order even when two captures land in one ms.
+   */
+  private nextCreatedAtMs(): number {
+    const now = Date.now();
+    this.lastCreatedAtMs = Math.max(now, this.lastCreatedAtMs + 1);
+    return this.lastCreatedAtMs;
   }
 
   /**
@@ -245,7 +261,7 @@ export class SnapshotStore {
     const snapshot: SandboxV3Snapshot = {
       id: randomUUID(),
       sessionId,
-      createdAtMs: Date.now(),
+      createdAtMs: this.nextCreatedAtMs(),
       label,
       fileCount: entries.filter((entry) => entry.kind === 'file').length,
       totalBytes,
