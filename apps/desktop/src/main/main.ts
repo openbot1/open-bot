@@ -1697,7 +1697,12 @@ async function applyApiConfig(next: ApiSettings): Promise<ApiSettings> {
 }
 
 async function startApiServer(): Promise<void> {
-  // Startup must not silently create a persistent token with weaker encryption.
+  // Startup must not silently create a persistent token with weaker encryption,
+  // nor retry writes while the existing store is unreadable.
+  if (vaultStorageStatus === 'unavailable') {
+    apiStartError = 'Local API chưa khởi động: Vault không thể giải mã toàn bộ secret hiện có; dữ liệu được giữ nguyên và không thể ghi token mới.';
+    return;
+  }
   if (vaultStorageStatus === 'degraded' && !vault.hasSecret(API_TOKEN_NAMESPACE, API_TOKEN_KEY)) {
     apiStartError = 'Local API chưa khởi động: mở Settings → API và xác nhận lưu token bằng LocalEncryptor fallback.';
     return;
