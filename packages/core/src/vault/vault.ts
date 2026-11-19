@@ -524,31 +524,33 @@ export class Vault {
     if (!this.keyFilePath) return;
     const entries = Object.entries(this.secrets);
     if (entries.length === 0) return;
-    const [, firstStored] = entries[0]!;
-    const tryDecrypt = (encryptor: Encryptor): boolean => {
-      try {
-        encryptor.decrypt(Buffer.from(firstStored!, 'base64'));
-        return true;
-      } catch {
-        return false;
+
+    // A recovery key is authoritative only when it decrypts the COMPLETE
+    // store. Checking only the first entry could delete .new/.bak while
+    // later ciphertext still depends on another key or backend.
+    const decryptsAllEntries = (encryptor: Encryptor): boolean => {
+      for (const [, stored] of entries) {
+        try {
+          encryptor.decrypt(Buffer.from(stored, 'base64'));
+        } catch {
+          return false;
+        }
       }
+      return true;
     };
-    if (tryDecrypt(this.encryptor)) {
-      // Key hiện tại đọc được store — `.new`/`.bak` còn sót (vd crash
-      // trước khi ghi store, hoặc rotate trong lúc NO_STORAGE bật rồi
-      // crash trước khi flush) là key không dùng tới: dọn để lần sau
-      // không nhầm với key của một lần rotate khác. An toàn vì store
-      // chỉ có một key đúng tại một thời điểm — key hiện tại đã đọc
-      // được thì `.new` không còn cần cho store này nữa.
+
+    if (decryptsAllEntries(this.encryptor)) {
+      // The current key opens every entry — staged recovery keys are stale.
       for (const suffix of ['.new', '.bak']) {
         try {
           fs.rmSync(`${this.keyFilePath}${suffix}`);
         } catch {
-          // Không xoá được file tạm cũng không sao.
+          // Best-effort cleanup only after full-store verification.
         }
       }
       return;
     }
+
     for (const suffix of ['.new', '.bak']) {
       const candidatePath = `${this.keyFilePath}${suffix}`;
       let key: Buffer;
@@ -559,21 +561,21 @@ export class Vault {
         continue;
       }
       const candidate = new LocalEncryptor(key);
-      if (!tryDecrypt(candidate)) continue;
-      // Key này mở được store — nhận làm key chính và sửa key file.
+      if (!decryptsAllEntries(candidate)) continue;
+
+      // The candidate opens every entry — it is safe to make it primary.
       this.encryptor = candidate;
       fs.writeFileSync(this.keyFilePath, key, { mode: 0o600 });
       try {
         fs.rmSync(candidatePath);
       } catch {
-        // Không xoá được file tạm cũng không sao.
+        // The primary key is already durable; leftover copy is harmless.
       }
       return;
     }
-    // Không key nào mở được (vd key file sai hoàn toàn, không phải do
-    // crash): giữ nguyên hành vi cũ — constructor vẫn mở, getSecret sẽ
-    // throw "Failed to decrypt" khi đọc. Không ném ở đây để không phá
-    // contract hiện có.
+
+    // No candidate decrypts the entire store. Keep .new/.bak untouched so a
+    // future backend/recovery attempt still has every available key.
     return;
   }
 
