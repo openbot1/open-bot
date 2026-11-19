@@ -626,7 +626,7 @@ export interface OpenBotApi {
   seedSampleAutomations(): Promise<{ created: unknown[]; skipped: string[] }>;
   // v0.52 P0-5: webhook trigger keys + delivery + retry-run.
   // create/rotate return { keyId, secret } with the secret shown once only.
-  createAutomationWebhookKey(id: string): Promise<{ keyId: string; secret: string }>;
+  createAutomationWebhookKey(id: string, opts?: { allowLocalFallback?: boolean }): Promise<{ keyId: string; secret: string }>;
   // v0.97 (Team T5): harness v2 — routines, signed-webhook stats, health, NDJSON events.
   listHarnessRoutines(): Promise<unknown[]>;
   getHarnessRoutine(id: string): Promise<unknown>;
@@ -645,7 +645,7 @@ export interface OpenBotApi {
     cb: (event: { runId: string; routineId: string; status: string }) => void,
   ): () => void;
   onHarnessHealthChanged(cb: (health: unknown) => void): () => void;
-  rotateAutomationWebhookKey(id: string): Promise<{ keyId: string; secret: string }>;
+  rotateAutomationWebhookKey(id: string, opts?: { allowLocalFallback?: boolean }): Promise<{ keyId: string; secret: string }>;
   deleteAutomationWebhookKey(id: string): Promise<boolean>;
   hasAutomationWebhookKey(id: string): Promise<boolean>;
   invokeAutomationWebhook(id: string, body: string, signature?: string | null): Promise<unknown>;
@@ -1173,12 +1173,12 @@ export interface OpenBotApi {
   listProviderIdentities(): Promise<Array<{ providerId: string; identity: { id: string; displayName?: string; email?: string; updatedAt: number } | null }>>;
   deleteProviderIdentity(providerId: string): Promise<boolean>;
   listOAuthProviders(): Promise<Array<{ id: string; label: string }>>;
-  startOAuthLogin(providerId: string, clientId?: string, clientSecret?: string, connectorId?: string): Promise<{ ok: boolean; providerId: string; displayName?: string; error?: string }>;
+  startOAuthLogin(providerId: string, clientId?: string, clientSecret?: string, connectorId?: string, allowLocalFallback?: boolean): Promise<{ ok: boolean; providerId: string; displayName?: string; error?: string }>;
   // M7: connected apps (camelCase aliases, same channels as above).
   listConnectedApps(): Promise<ConnectedAppView[]>;
   disconnectConnectedApp(appId: string): Promise<ConnectedAppView[]>;
   // v0.68b: M7 app token (PAT dán tay, vd GitHub).
-  setConnectedAppToken(appId: string, token: string): Promise<ConnectedAppView[]>;
+  setConnectedAppToken(appId: string, token: string, allowLocalFallback?: boolean): Promise<ConnectedAppView[]>;
   // v0.57: Composio — opt-in (key chỉ nằm trong Vault, không trả về renderer).
   getComposioState(): Promise<ComposioStateView>;
   setComposioEnabled(enabled: boolean): Promise<ComposioStateView>;
@@ -1198,7 +1198,7 @@ export interface OpenBotApi {
   // v0.53 (P1-6): 1Password broker (camelCase aliases, same channels as above).
   onePasswordStatus(): Promise<OnePasswordBrokerStatusView>;
   setOnePasswordEnabled(enabled: boolean): Promise<{ enabled: boolean }>;
-  onePasswordImportField(payload: { itemId: string; field: string; namespace: string; key: string; saveToVault?: boolean }): Promise<{ stored: boolean }>;
+  onePasswordImportField(payload: { itemId: string; field: string; namespace: string; key: string; saveToVault?: boolean; allowLocalFallback?: boolean }): Promise<{ stored: boolean }>;
   checkForUpdate(): Promise<{ available: boolean; currentVersion: string; latestVersion: string | null; latestTag: string | null; htmlUrl: string | null; checkFailed: boolean; error?: string }>;
   openUpdateDownload(url: string): Promise<boolean>;
   // v0.54 (P1-9): update theo track (UpdateService trong main).
