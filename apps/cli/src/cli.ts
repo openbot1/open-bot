@@ -71,6 +71,11 @@ import {
   validateHarborTask,
   validateRolloutJsonl,
   writeRolloutJsonl,
+  // v1.44 (Đội T2): Eval Harness v4 — Harbor-native: task set +
+  // sandbox riêng từng task + lịch sử + hồi quy + dashboard + CLI.
+  evalHarnessV4CliHelp,
+  executeEvalHarnessV4Command,
+  parseEvalHarnessV4CliArgs,
   // v1.34 (Đội T4): Eval Harness v2 — task container hoá 2 loại +
   // oracle + runner song song + scorer 4 chiều + regression gate.
   BUILTIN_EVAL_HARNESS_V2_SUITE,
@@ -337,6 +342,17 @@ DÙNG:
   open-bot eval harbor report [--json]
                 (v1.11) Báo cáo tổng hợp từ các lần chạy Harbor đã
                 lưu (pass rate, reward, thời gian, token).
+  open-bot eval v4 run [--config FILE] [--tasks a,b] [--tags a,b] [--repeats N]
+                [--task-timeout MS] [--test-timeout MS] [--profile ID]
+                [--agent-files FILE.json] [--agent-files-by-task FILE.json]
+                [--baseline RUNID] [--no-fail-on-regression] [--json]
+                (v1.44) Chạy suite Harbor theo config (eval.config.json),
+                ghi lịch sử, so hồi quy với baseline, render dashboard.
+                Exit 0 khi gate pass/warn, exit 1 khi gate block.
+  open-bot eval v4 list|history|regressions|dashboard|flakes|config|pin|unpin [--json]
+                (v1.44) Liệt kê task / lịch sử chạy / báo cáo hồi quy /
+                dashboard / phân tích flake / config / pin baseline
+                của Eval Harness v4.
   open-bot eval-harness list [--json]
                 (v1.34) Liệt kê task Eval Harness v2 mẫu + task trên
                 đĩa <dataDir>/eval-harness-v2-tasks (2 loại:
@@ -1511,11 +1527,15 @@ function headlessLogFile(dataDir: string, flags: CliFlags): string {
   return path.join(dataDir, HEADLESS_LOG_FILE);
 }
 
-async function waitForHealth(port: number, timeoutMs: number): Promise<boolean> {
+async function waitForHealth(port: number, timeoutMs: number, expectedPid?: number): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const health = await probeHeadlessHealth('127.0.0.1', port, 1000);
-    if (health) return true;
+    // Chỉ chấp nhận đúng server vừa spawn (so pid): một server khác
+    // (sóng khác / lần chạy trước) đang giữ cổng thì /health vẫn trả ok
+    // — nhận nhầm sẽ báo start thành công giả, rồi `logs` không thấy
+    // file log của server mình (v1.44 fix round 6, suite r5).
+    if (health && (expectedPid === undefined || health.pid === expectedPid)) return true;
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   return false;
@@ -1600,11 +1620,13 @@ async function cmdHeadless(sub: string | undefined, positional: string[], flags:
       child.unref();
       if (!child.pid) fail('Không spawn được headless server.');
       writePidFile(dataDir, child.pid);
-      // Daemon import cả core (nặng) nên boot có thể mất > 5s trên máy
-      // yếu — chờ tối đa 30s.
-      const up = await waitForHealth(port, 30_000);
+      // Daemon import cả core (nặng) nên boot đo được 20–60s khi máy rỗi
+      // và > 60s dưới tải suite (máy 1,5 CPU + sóng song song — r6 fail
+      // vì serve chưa boot xong trong 60s) — chờ tối đa 180s, và chỉ
+      // nhận /health của đúng pid vừa spawn (xem waitForHealth).
+      const up = await waitForHealth(port, 180_000, child.pid);
       if (!up) {
-        fail(`Headless server đã spawn (pid ${child.pid}) nhưng không trả /health sau 30s — xem log ${logFile}.`);
+        fail(`Headless server đã spawn (pid ${child.pid}) nhưng không trả /health sau 180s — xem log ${logFile}.`);
       }
       out(
         { ok: true, pid: child.pid, url: `http://127.0.0.1:${port}`, logFile },
@@ -2565,6 +2587,49 @@ async function cmdEvalHarbor(
 }
 
 /**
+ * Lệnh `eval v4 ...` (v1.44, Đội T2) — Eval Harness v4 từ terminal.
+ *
+ * Chuyển CliFlags thành argv cho core parser (bỏ cờ global
+ * --data-dir), rồi gọi `executeEvalHarnessV4Command` trong core:
+ * run / list / history / regressions / dashboard / config / pin /
+ * unpin. CLI không gọi model trực tiếp — agent chạy bằng executor
+ * scripted (--agent-files / --agent-files-by-task) hoặc no-op,
+ * nên `eval v4` không cần API key. Exit code theo gate của core
+ * (0 pass/warn, 1 block, 2 lỗi tham số/config).
+ */
+async function cmdEvalV4(
+  positional: string[],
+  flags: CliFlags,
+  dataDir: string,
+): Promise<number> {
+  const argv: string[] = [...positional];
+  for (const [key, value] of Object.entries(flags)) {
+    if (key === 'data-dir') continue;
+    if (value === true) argv.push(`--${key}`);
+    else if (typeof value === 'string') argv.push(`--${key}`, value);
+    else if (Array.isArray(value)) {
+      for (const v of value) argv.push(`--${key}`, v);
+    }
+  }
+  const parsed = parseEvalHarnessV4CliArgs(argv);
+  let result: Awaited<ReturnType<typeof executeEvalHarnessV4Command>>;
+  try {
+    result = await executeEvalHarnessV4Command(parsed, {
+      baseDir: dataDir,
+      cwd: process.cwd(),
+    });
+  } catch (err) {
+    fail(`eval v4 lỗi: ${(err as Error).message}`);
+  }
+  if (flags['json'] === true && result.json !== undefined) {
+    process.stdout.write(`${JSON.stringify(result.json, null, 2)}\n`);
+  } else {
+    process.stdout.write(result.stdout);
+  }
+  return result.exitCode;
+}
+
+/**
  * Lệnh `eval-harness ...` (v1.34, Đội T4) — Eval Harness v2 từ terminal.
  *
  * Các lệnh con (xem HELP): list / validate / run / suite / baseline /
@@ -2893,6 +2958,9 @@ async function cmdEval(
   if (suite === 'harbor') {
     return cmdEvalHarbor(positional[0], positional.slice(1), flags, resolveDataDir(flags));
   }
+  if (suite === 'v4') {
+    return cmdEvalV4(positional, flags, resolveDataDir(flags));
+  }
   if (suite === 'trends') {
     const dataDir = resolveDataDir(flags);
     const trends = buildEvalTrends(loadEvalReportHistory(dataDir));
@@ -2904,7 +2972,7 @@ async function cmdEval(
     return 0;
   }
   if (suite !== 'memory' && suite !== 'mcp' && suite !== 'all') {
-    fail('eval cần suite: memory | mcp | all | trends | harbor (vd: open-bot eval all).');
+    fail('eval cần suite: memory | mcp | all | trends | harbor | v4 (vd: open-bot eval all).');
   }
   const dataDir = resolveDataDir(flags);
   const asJson = flags['json'] === true;
