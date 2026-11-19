@@ -53,6 +53,11 @@ function fakeSafeStorage(initiallyAvailable = true) {
 const storePathIn = (dir) => path.join(dir, 'vault.json');
 const keyPathIn = (dir) => path.join(dir, 'vault.json.key');
 
+test('package core barrel re-exports the desktop safeStorage opener', async () => {
+  const core = await import('../packages/core/dist/index.js');
+  assert.equal(core.openVaultWithSafeStorage, openVaultWithSafeStorage);
+});
+
 test('safeStorage available: opener reports available and persists a readable OS-backed secret', () => {
   const dir = makeTempDir();
   const safeStorage = fakeSafeStorage(true);
