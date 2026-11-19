@@ -14,7 +14,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { assertTrustedMainWindowIpcSender, isTrustedMainWindowIpcSender } from './ipcSenderGuard';
+import { assertTrustedMainWindowIpcSender } from './ipcSenderGuard';
 import { randomBytes, randomUUID } from 'node:crypto';
 import {
   AutomationScheduler,
@@ -4432,15 +4432,6 @@ function registerMainWindowIpcHandler(
   });
 }
 
-function registerMainWindowIpcListener(
-  channel: string,
-  listener: (...args: any[]) => void,
-): void {
-  ipcMain.on(channel, (event, ...args) => {
-    if (!isTrustedMainWindowIpcSender(event, mainWindow, expectedMainRendererUrl())) return;
-    listener(event, ...args);
-  });
-}
 function registerIpc(): void {
   ipcMain.handle('bots:list', () => settings.bots);
 
