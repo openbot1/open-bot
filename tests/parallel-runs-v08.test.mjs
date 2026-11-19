@@ -93,8 +93,15 @@ test('6 run đồng thời: tối đa 4 chạy cùng lúc, tất cả xong, khô
     gapFirstToFifth >= 150,
     `delta thứ 5 phải tới muộn hơn delta đầu ít nhất 150ms (2 đợt chạy), thực tế ${gapFirstToFifth}ms`,
   );
-  // Nối tiếp 6 run sẽ mất 6 x 300 = 1800ms; 2 đợt chỉ ~600ms.
-  assert.ok(elapsed < 1500, `6 run phải xong dưới 1500ms (2 đợt), thực tế ${elapsed}ms`);
+  // Nối tiếp 6 run sẽ mất tối thiểu 6 x 300 = 1800ms (mỗi mock delay là
+  // sleep cứng 300ms, không thể nhanh hơn); 2 đợt chỉ ~600ms. Ngưỡng là
+  // đúng sàn nối tiếp (6 x DELAY_MS), không phải 1500ms tuyệt đối: khi
+  // tải nặng, mỗi đợt 300ms bị kéo dài (suite r8: 1629ms cho 2 đợt dù
+  // cấu trúc 2 đợt đã đúng theo gapFirstToFifth), nhưng vẫn dưới sàn
+  // nối tiếp — đó mới là điều test này chứng minh. Nối tiếp thật vẫn
+  // fail (≥ 1800ms). Cấu trúc 2 đợt được chứng minh riêng bằng
+  // gapFirstToFifth >= 150ms ở trên.
+  assert.ok(elapsed < 6 * DELAY_MS, `6 run phải xong dưới sàn nối tiếp ${6 * DELAY_MS}ms (2 đợt), thực tế ${elapsed}ms`);
   assert.ok(elapsed >= DELAY_MS, `run không thể xong nhanh hơn 1 đợt delay, thực tế ${elapsed}ms`);
 
   for (const id of ids) await client.destroyBot(id);

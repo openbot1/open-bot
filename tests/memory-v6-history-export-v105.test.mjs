@@ -74,9 +74,12 @@ function rewriteStoreFile(dir, mutate) {
 
 async function runCli(args, cwd) {
   try {
+    // v1.44 fix round 8 (suite r8): như risk-budget — CLI cold start
+    // 2,7s khi rảnh, vượt 30s dưới tải full-suite; helper này map
+    // timeout thành code 1 + stderr rỗng nên r8 fail dạng `1 !== 0`.
     const { stdout, stderr } = await run(process.execPath, [cli, ...args], {
       cwd,
-      timeout: 30_000,
+      timeout: 120_000,
     });
     return { code: 0, stdout, stderr };
   } catch (err) {

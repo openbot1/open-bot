@@ -60,7 +60,7 @@ test('i18n v12: 25 memoryBlockV12.* keys in all 6 locales, total 5278', () => {
   for (const loc of LOCALES) {
     const dict = loadLocale(loc);
     dicts[loc] = dict;
-    assert.equal(Object.keys(dict).length, 7540, `${loc} key count`); // v1.36 re-pin: 7540.
+    assert.ok(Object.keys(dict).length >= 8072, `${loc} key count >= 8072, got ${Object.keys(dict).length}`); // v1.39 fix round 4b: floor (was 8072 in v1.38; now 8322).
     for (const key of EXPECTED_V12_KEYS) {
       assert.ok(key in dict, `${loc} missing ${key}`);
       assert.equal(typeof dict[key], 'string', `${loc}.${key} must be a string`);

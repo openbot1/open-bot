@@ -25,6 +25,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import {
+  LocalBudgetTracker,
+  LocalGateway,
+  LocalModelRegistry,
+  PolicyRouter,
+} from '../packages/core/dist/index.js';
 import { ALL_TOOLS } from '../packages/tools/dist/tools.js';
 import {
   ROUTER_LOCAL_V115_TOOL_NAMES,
@@ -33,6 +39,18 @@ import {
   createRouterLocalV115Tools,
   isRouterLocalV115ToolName,
 } from '../packages/tools/dist/routerLocalV115Tools.js';
+
+/** State như mặc định nhưng registry trỏ Ollama tới port đóng
+ * (127.0.0.1:1) — test "không có daemon" không phụ thuộc vào việc
+ * máy chạy suite có đang chạy `ollama serve` hay không. */
+function stateWithDeadOllama() {
+  const registry = new LocalModelRegistry({ ollamaBaseUrl: 'http://127.0.0.1:1' });
+  const budget = new LocalBudgetTracker();
+  const policy = new PolicyRouter();
+  const gateway = new LocalGateway({ registry, budget, policy });
+  gateway.start();
+  return { registry, budget, policy, gateway };
+}
 
 function toolByName(tools, name) {
   const tool = tools.find((t) => t.definition.name === name);
@@ -164,8 +182,9 @@ test('gateway key create: secret once, hint stored', async () => {
 });
 
 test('model tools without a real Ollama daemon: load errors, status answers', async () => {
-  const tools = createRouterLocalV115Tools(createDefaultRouterLocalV115State());
-  // Khong co Ollama that tren may test — load phai bao loi ro, khong throw.
+  // Registry trỏ tới port đóng (không phải Ollama mặc định) để test
+  // không phụ thuộc vào việc máy có đang chạy `ollama serve` hay không.
+  const tools = createRouterLocalV115Tools(stateWithDeadOllama());
   const load = await run(tools, 'router_local_model_load', { modelId: 'qwen3-4b' });
   assert.ok(load.startsWith('Error:') || JSON.parse(load).ok === false);
   const loadBadBackend = await run(tools, 'router_local_model_load', { modelId: 'qwen3-4b', backend: 'khong-co' });

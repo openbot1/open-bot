@@ -284,11 +284,14 @@ test('UI-5 smoke: thread list, create, resume, search, delete', async (t) => {
   const bots = await evalJs(`window.openBot.listBots()`);
   assert.ok(Array.isArray(bots) && bots.length >= 1, `expected a seeded bot, got ${JSON.stringify(bots)}`);
   const bot = bots[0];
-  // v0.93c: 30s, not 10s — the default thread row is main-process bound
+  // v0.93c: 30s, không phải 10s — the default thread row is main-process bound
   // (createBot IPC → bot-switch effect → listThreads IPC → SQLite
   // default-thread creation → render) and measured 8.2s @ load 8.6,
   // 13.2s @ load ~12, 17.0s @ load ~9. 10s failed a healthy app.
-  await waitFor(`document.querySelectorAll('[data-testid="thread-row"]').length === 1`, 30_000, 'default thread row');
+  // v1.44 fix round 8 (suite r8): 30s vẫn không đủ khi full-suite chạy
+  // cùng lúc với sóng khác trên máy 1,5 CPU (r8: hết 30s, row chưa hiện);
+  // 60s là cửa sổ quan sát, row không bao giờ hiện vẫn fail.
+  await waitFor(`document.querySelectorAll('[data-testid="thread-row"]').length === 1`, 60_000, 'default thread row');
   assert.equal(await threadRowCount(), 1, 'a new bot must have exactly its default thread');
   assert.ok(
     (await threadRowTitles()).some((title) => title.includes('Cuộc trò chuyện mới')),

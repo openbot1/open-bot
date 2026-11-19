@@ -93,7 +93,10 @@ function setupProject() {
   const home = tmpDir('v14-mkt-home-');
   const agentsDir = path.join(project, '.agents', 'skills');
   writeSkill(agentsDir, 'note-taker', NOTE_SKILL);
-  writeSkill(agentsDir, 'review-helper', REVIEW_SKILL);
+  // review-helper ở root thứ hai (project .claude/skills) để browse thật
+  // sự quét ≥ 2 root — để cả 3 skill trong .agents/skills thì chỉ có
+  // 1 root tồn tại và assert scannedRoots >= 2 không bao giờ đạt.
+  writeSkill(path.join(project, '.claude', 'skills'), 'review-helper', REVIEW_SKILL);
   writeSkill(agentsDir, 'quick-note', QUICK_SKILL);
   // An (empty) home skills dir: browse must report at least the project
   // root AND one global root as scanned. Without it the home roots do

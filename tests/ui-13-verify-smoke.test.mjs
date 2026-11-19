@@ -35,7 +35,11 @@ import { fileURLToPath } from 'node:url';
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ELECTRON = path.join(REPO, 'node_modules', 'electron', 'dist', 'electron');
 const APP_DIR = path.join(REPO, 'apps', 'desktop');
-const JS_TIMEOUT_MS = 15000;
+// v1.44 fix round 8 (suite r8): CDP evaluate timeout 15s → 30s — renderer
+// bận > 15s dưới tải full-suite (UI-6 fail: listSlashCommands evaluate
+// timeout), không phải renderer chết. Cửa sổ quan sát, không phải ngưỡng
+// sản phẩm: renderer chết thật vẫn timeout (lâu hơn) và fail.
+const JS_TIMEOUT_MS = 30000;
 
 const hasDisplay = Boolean(process.env.DISPLAY);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -398,12 +402,22 @@ test('smoke UI-8: a live Ollama turn shows a real token footer under the assista
   // budget was already exceeded twice (242s, turn still generating)
   // when the model was cold, and a slow failure is cheaper than a
   // load flake.
+  // v1.44 fix round 9 (targeted RC): settle budget 300s → 420s — the
+  // live turn took 227s in suite r8 and ~300s in the RC targeted run
+  // (3.3k-token prompt on a CPU-starved 1.5-CPU machine; unloaded the
+  // same turn is ~7s). 420s is still an observation window, not a
+  // product threshold: a turn that never settles still times out.
+  // v1.44 fix round 10 (retest): the expression MUST return a boolean —
+  // round 8's version returned the footer DOM node itself, which CDP
+  // `returnByValue` cannot serialise (value comes back undefined), so
+  // waitFor could never observe the footer and always timed out even
+  // though the turn had finished (diagnostics proved it). Wrap in !!.
   const settledAt = Date.now();
   try {
     await appA.waitFor(
-      `(() => { const ta = document.querySelector('.chat-input textarea'); return ta && !ta.disabled && !document.querySelector('[data-testid="stop-run-button"]') && document.querySelectorAll('.msg.assistant').length > 0; })()`,
-      300_000,
-      'live turn to settle (input enabled, Stop gone, assistant bubble present)',
+      `(() => { const ta = document.querySelector('.chat-input textarea'); return !!(ta && !ta.disabled && !document.querySelector('[data-testid="stop-run-button"]') && document.querySelectorAll('.msg.assistant').length > 0 && document.querySelector('[data-testid="turn-usage"]')); })()`,
+      420_000,
+      'live turn to settle (input enabled, Stop gone, assistant bubble + usage footer present)',
     );
   } catch (e) {
     let diag = '(diagnostic snapshot unavailable)';

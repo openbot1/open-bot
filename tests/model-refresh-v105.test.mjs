@@ -48,6 +48,30 @@ test('model refresh: Ollama fetcher sai provider -> throw', async () => {
   await assert.rejects(() => fetcher('openai'), /không hỗ trợ/);
 });
 
+test('model refresh: Ollama fetcher tôn trọng OLLAMA_HOST (host:port lẫn URL)', async () => {
+  const prev = process.env['OLLAMA_HOST'];
+  try {
+    let seenUrl = '';
+    process.env['OLLAMA_HOST'] = '127.0.0.1:22222';
+    const fetcher = createOllamaModelFetcher(undefined, async (url) => {
+      seenUrl = url;
+      return { ok: true, status: 200, json: async () => OLLAMA_TAGS };
+    });
+    await fetcher('ollama');
+    assert.ok(seenUrl.startsWith('http://127.0.0.1:22222/api/tags'), seenUrl);
+    process.env['OLLAMA_HOST'] = 'http://127.0.0.1:33333/';
+    const fetcher2 = createOllamaModelFetcher(undefined, async (url) => {
+      seenUrl = url;
+      return { ok: true, status: 200, json: async () => OLLAMA_TAGS };
+    });
+    await fetcher2('ollama');
+    assert.ok(seenUrl.startsWith('http://127.0.0.1:33333/api/tags'), seenUrl);
+  } finally {
+    if (prev === undefined) delete process.env['OLLAMA_HOST'];
+    else process.env['OLLAMA_HOST'] = prev;
+  }
+});
+
 test('model refresh: Ollama fetcher HTTP lỗi -> throw rõ', async () => {
   const fetcher = createOllamaModelFetcher(
     'http://127.0.0.1:11434',

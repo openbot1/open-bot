@@ -171,6 +171,11 @@ test('voice v129-t5: disk store survives a fresh instance (real files)', () => {
     assert.equal(corrupt.ok, false);
     assert.equal(corrupt.corrupt, true);
     assert.equal(reopened.getStats().corruptLoads, 1);
+    // The summary marks disk mode with "— disk: <path>" (vs "— memory-only");
+    // the session id itself is proven by listSessions() above, not by
+    // the summary text. (RC merge reconciliation: main renamed the
+    // summary wording "dir" → "disk:" while v144's test still expected
+    // /dir / — the merged src says "disk:", so the test must too.)
     assert.match(reopened.summary(), /disk/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -184,10 +189,14 @@ test('voice v129-t5: decideResumeV20 picks restart / resume / summarise / drop',
   assert.equal(decideResumeV20({ replyText: full, spokenChars: 0 }).action, 'restart');
   // Short tail → resume it.
   assert.equal(decideResumeV20({ replyText: full, spokenChars: full.length - 5 }).action, 'resume');
-  // Long remainder → summarise.
-  const long = decideResumeV20({ replyText: full, spokenChars: 10 });
+  // Long remainder → summarise. The remainder must actually be long:
+  // summariseMinChars defaults to 400, so a ~102-char remainder (the
+  // single-sentence reply) correctly resumes instead. Use a 4x reply
+  // (~441 chars remain) to cross the default threshold.
+  const longFull = `${full} ${full} ${full} ${full}`;
+  const long = decideResumeV20({ replyText: longFull, spokenChars: 10 });
   assert.equal(long.action, 'summarise');
-  assert.ok(long.summary.length > 0 && long.summary.length < full.length);
+  assert.ok(long.summary.length > 0 && long.summary.length < longFull.length);
   assert.ok(long.speakText.length > 0);
   // Fully spoken → drop.
   assert.equal(decideResumeV20({ replyText: full, spokenChars: full.length }).action, 'drop');
@@ -201,9 +210,10 @@ test('voice v129-t5: decideResumeV20 picks restart / resume / summarise / drop',
 
 test('voice v129-t5: summariseRemainingV20 keeps first + last sentence', () => {
   const text = 'Câu đầu tiên rất quan trọng. Ở giữa có rất nhiều chi tiết dài dòng không cần thiết. Câu cuối cùng kết luận vấn đề.';
-  // maxChars must be below the text length (110 chars) or the function
-  // correctly returns the text verbatim and nothing is summarised.
-  const s = summariseRemainingV20(text, 60);
+  // Cap 80 < text length 114: the default cap (200) exceeds the text,
+  // so summariseRemainingV20 correctly returns it unchanged and the
+  // "shorter than the original" assert can never hold.
+  const s = summariseRemainingV20(text, 80);
   assert.ok(s.startsWith('Câu đầu tiên'));
   assert.ok(s.includes('Câu cuối cùng'));
   assert.ok(s.length < text.length);

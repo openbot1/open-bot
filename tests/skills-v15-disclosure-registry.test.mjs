@@ -188,6 +188,8 @@ test('DisclosureSessionV15: tier-3 resource cached, oversized refused', (t) => {
   // An escaping path is refused with the escape message (the loader
   // resolves the path before the tier check, since fix round 5).
   assert.throws(() => session.loadResource('review-pr', '../SKILL.md'), /escapes the skill directory/);
+  // Root file inside the skill dir but outside the tier-3 resource dirs.
+  assert.throws(() => session.loadResource('review-pr', 'SKILL.md'), /must live under/);
   assert.throws(() => session.loadResource('no-such-skill', 'references/x.md'), /Unknown skill/);
 });
 

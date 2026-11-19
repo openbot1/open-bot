@@ -55,9 +55,13 @@ after(() => {
 });
 
 function runCli(dataDir, args) {
+  // v1.44 fix round 8 (suite r8): CLI cold start đo được 2,7s khi máy
+  // rảnh, nhưng dưới tải full-suite (1,5 CPU + sóng khác) vượt 30s →
+  // spawnSync ETIMEDOUT, 6/6 test CLI risk fail. 120s là cửa sổ quan
+  // sát, không phải ngưỡng sản phẩm: CLI hỏng vẫn fail (exit ≠ 0).
   return execFileSync('node', [cliJs, ...args, '--data-dir', dataDir], {
     encoding: 'utf-8',
-    timeout: 30_000,
+    timeout: 120_000,
   });
 }
 

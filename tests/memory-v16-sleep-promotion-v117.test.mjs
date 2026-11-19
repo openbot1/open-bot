@@ -203,7 +203,12 @@ test('v16 promoteActiveFacts: chi lay fact active dang hieu luc, xep theo confid
     at: new Date('2026-11-16T00:00:00.000Z'),
   });
   assert.equal(report.promoted.length, 1);
-  assert.equal(report.promoted[0].factId, store.listFacts({ status: 'active' })[0].id);
+  // listFacts xep theo updatedAt DESC nen [0] la coin flip theo ms
+  // (seed trong cung ms thi on dinh, khac ms thi fact them sau len truoc);
+  // xac dinh fact mong doi theo objectText thay vi vi tri [0].
+  const pho = store.listFacts({ status: 'active' }).find((f) => f.objectText === 'phở bò');
+  assert.ok(pho, 'fact pho bo active phai ton tai');
+  assert.equal(report.promoted[0].factId, pho.id);
 });
 
 // --- sleep consolidation v2 -------------------------------------------------
