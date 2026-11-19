@@ -20,7 +20,7 @@
  * LocalEncryptor is built from the sibling key file.
  */
 import * as path from 'node:path';
-import type { Encryptor } from './vault';
+import type { Encryptor, VaultWritePolicy } from './vault';
 import { Vault } from './vault';
 
 /** File name of the webhook key store inside its directory. */
@@ -44,6 +44,8 @@ export interface WebhookKeyStoreOptions {
   maxEntries?: number;
   /** Start in NO_STORAGE mode (memory only, passed to the Vault). */
   noStorage?: boolean;
+  /** Same durable-write policy as the main Vault. */
+  writePolicy?: VaultWritePolicy;
 }
 
 export interface WebhookKeyOptions {
@@ -56,6 +58,8 @@ export interface WebhookKeyOptions {
    * Default true.
    */
   saveToVault?: boolean;
+  /** One-operation consent to persist this key with LocalEncryptor. */
+  allowLocalFallback?: boolean;
 }
 
 /**
@@ -74,6 +78,7 @@ export class WebhookKeyStore {
       ...(options.keyFilePath ? { keyFilePath: options.keyFilePath } : {}),
       ...(options.maxEntries !== undefined ? { maxEntries: options.maxEntries } : {}),
       ...(options.noStorage !== undefined ? { noStorage: options.noStorage } : {}),
+      ...(options.writePolicy ? { writePolicy: options.writePolicy } : {}),
     });
   }
 
@@ -87,6 +92,7 @@ export class WebhookKeyStore {
     this.vault.setSecret('webhook', id, secret, {
       ...(opts?.maxAgeMs !== undefined ? { maxAgeMs: opts.maxAgeMs } : {}),
       ...(opts?.saveToVault !== undefined ? { saveToVault: opts.saveToVault } : {}),
+      ...(opts?.allowLocalFallback === true ? { allowLocalFallback: true } : {}),
     });
   }
 
