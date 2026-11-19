@@ -10626,7 +10626,10 @@ function registerIpc(): void {
   // Token chỉ trả về khi người dùng bấm "Hiện token" — renderer không
   // tự gọi channel này lúc load trang. KHÔNG log token.
   ipcMain.handle('api:get-token', async (_event: unknown, payload?: { allowLocalFallback?: boolean }) => {
-    const allowLocalFallback = await requestLocalFallbackConsent(payload?.allowLocalFallback, 'Local API bearer token');
+    const needsNewToken = !vault.hasSecret(API_TOKEN_NAMESPACE, API_TOKEN_KEY);
+    const allowLocalFallback = needsNewToken
+      ? await requestLocalFallbackConsent(payload?.allowLocalFallback, 'Local API bearer token')
+      : false;
     const token = getOrCreateApiToken(allowLocalFallback);
     if (apiConfig?.enabled && !apiServer) await startApiServer();
     return { token };
