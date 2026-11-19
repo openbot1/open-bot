@@ -1832,12 +1832,16 @@ export default function SettingsView({ onBack, botId = null, onOpenConnectedApps
       setVaultError('');
     }
     try {
-      const [secrets, storageStatus] = await Promise.all([
-        window.openBot.listVaultSecrets(),
-        window.openBot.getVaultStorageStatus(),
-      ]);
-      setVaultSecrets(secrets);
-      setVaultStorageStatus(storageStatus);
+      setVaultSecrets(await window.openBot.listVaultSecrets());
+      try {
+        if (typeof window.openBot.getVaultStorageStatus === 'function') {
+          setVaultStorageStatus(await window.openBot.getVaultStorageStatus());
+        } else {
+          setVaultStorageStatus(null);
+        }
+      } catch {
+        setVaultStorageStatus(null);
+      }
       setVaultError('');
       vaultLoadedOnce.current = true;
     } catch {
