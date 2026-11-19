@@ -77,6 +77,7 @@ test('http_request remains policy-bound and public requests still pass', async (
     fetchCalls += 1;
     return new Response('{"ok":true}', {
       status: 200,
+      statusText: 'OK',
       headers: { 'content-type': 'application/json' },
     });
   };
