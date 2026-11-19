@@ -13,6 +13,8 @@ import { app, BrowserWindow, dialog, ipcMain, Notification, safeStorage, shell }
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { assertTrustedMainWindowIpcSender, isTrustedMainWindowIpcSender } from './ipcSenderGuard';
 import { randomBytes, randomUUID } from 'node:crypto';
 import {
   AutomationScheduler,
@@ -1368,14 +1370,47 @@ function getWebhookDispatcher(): WebhookDispatcher {
 }
 
 /**
+ * LocalEncryptor fallback is weaker than OS safeStorage. No durable write
+ * gets implicit consent, including generated tokens and OAuth refreshes.
+ * A supplied true flag represents a one-operation confirmation already
+ * performed by the Settings UI; internal/event-driven writes prompt here.
+ */
+async function requestLocalFallbackConsent(
+  suppliedConsent: boolean | undefined,
+  purpose: string,
+): Promise<boolean> {
+  if (vaultStorageStatus !== 'degraded') return false;
+  if (suppliedConsent === true) return true;
+  const options = {
+    type: 'warning' as const,
+    title: 'Vault đang dùng mã hoá dự phòng',
+    message: 'Secret này sẽ không được bảo vệ bởi OS keychain.',
+    detail:
+      `Open Bot đang dùng LocalEncryptor cho ${purpose}. Khóa mã hoá nằm trong file cạnh Vault; ` +
+      'người đọc được cả hai file có thể giải mã secret. Chỉ tiếp tục cho lần lưu này nếu bạn chấp nhận rủi ro.',
+    buttons: ['Huỷ', 'Lưu bằng fallback yếu hơn'],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true,
+  };
+  const result =
+    mainWindow && !mainWindow.isDestroyed()
+      ? await dialog.showMessageBox(mainWindow, options)
+      : await dialog.showMessageBox(options);
+  if (result.response !== 1) {
+    throw new Error('Đã huỷ lưu secret: LocalEncryptor fallback cần xác nhận riêng cho từng lần lưu.');
+  }
+  return true;
+}
+/**
  * Lấy token API từ Vault, sinh mới khi chưa có. Token là 32 byte
  * ngẫu nhiên (hex, 64 ký tự). KHÔNG log giá trị token ở bất kỳ đâu.
  */
-function getOrCreateApiToken(): string {
+function getOrCreateApiToken(allowLocalFallback = false): string {
   const existing = vault.getSecret(API_TOKEN_NAMESPACE, API_TOKEN_KEY);
   if (existing) return existing;
   const token = randomBytes(32).toString('hex');
-  vault.setSecret(API_TOKEN_NAMESPACE, API_TOKEN_KEY, token);
+  vault.setSecret(API_TOKEN_NAMESPACE, API_TOKEN_KEY, token, { allowLocalFallback });
   return token;
 }
 
@@ -1662,6 +1697,11 @@ async function applyApiConfig(next: ApiSettings): Promise<ApiSettings> {
 }
 
 async function startApiServer(): Promise<void> {
+  // Startup must not silently create a persistent token with weaker encryption.
+  if (vaultStorageStatus === 'degraded' && !vault.hasSecret(API_TOKEN_NAMESPACE, API_TOKEN_KEY)) {
+    apiStartError = 'Local API chưa khởi động: mở Settings → API và xác nhận lưu token bằng LocalEncryptor fallback.';
+    return;
+  }
   const token = getOrCreateApiToken(); // KHÔNG log token
   // v0.7: token gắn với teamId lúc tạo — server yêu cầu header
   // X-Open-Bot-Team khớp teamId này; service-account token cũng được
@@ -3378,7 +3418,9 @@ function routeCoordinatorEvent(event: AgentEvent): void {
       // namespace 'mcp-oauth' (key = tên server) để lần mở sau còn.
       const payload = event.payload as { server?: unknown; value?: unknown };
       if (typeof payload?.server === 'string' && typeof payload?.value === 'string') {
-        vault.setSecret('mcp-oauth', payload.server, payload.value);
+        void requestLocalFallbackConsent(undefined, `MCP OAuth token for ${payload.server}`)
+          .then((allowLocalFallback) => vault.setSecret('mcp-oauth', payload.server as string, payload.value as string, { allowLocalFallback }))
+          .catch((err) => console.error('[open-bot] MCP OAuth token was not persisted; reconnect the server after choosing an explicit storage option:', (err as Error).message));
       }
       break;
     }
@@ -3398,7 +3440,9 @@ function routeCoordinatorEvent(event: AgentEvent): void {
         try {
           const parsed = JSON.parse(payload.value) as { accessToken?: unknown };
           if (typeof parsed.accessToken === 'string' && parsed.accessToken) {
-            vault.setSecret('connector', payload.connectorId, payload.value);
+            void requestLocalFallbackConsent(undefined, `OAuth refresh token for connector ${payload.connectorId}`)
+              .then((allowLocalFallback) => vault.setSecret('connector', payload.connectorId as string, payload.value as string, { allowLocalFallback }))
+              .catch((err) => console.error('[open-bot] Refreshed connector TokenSet was not persisted; reconnect after choosing an explicit storage option:', (err as Error).message));
           }
         } catch {
           // TokenSet JSON lỗi từ con — bỏ qua, giữ bản Vault cũ.
@@ -4372,6 +4416,31 @@ function getTraceStore(): TraceStore {
 // IPC handlers
 // ---------------------------------------------------------------------------
 
+function expectedMainRendererUrl(): string {
+  return process.env.OPEN_BOT_DEV === '1'
+    ? 'http://localhost:5173/'
+    : pathToFileURL(path.join(__dirname, '..', 'renderer', 'index.html')).href;
+}
+
+function registerMainWindowIpcHandler(
+  channel: string,
+  handler: (...args: any[]) => any,
+): void {
+  ipcMain.handle(channel, (event, ...args) => {
+    assertTrustedMainWindowIpcSender(event, mainWindow, expectedMainRendererUrl(), channel);
+    return handler(event, ...args);
+  });
+}
+
+function registerMainWindowIpcListener(
+  channel: string,
+  listener: (...args: any[]) => void,
+): void {
+  ipcMain.on(channel, (event, ...args) => {
+    if (!isTrustedMainWindowIpcSender(event, mainWindow, expectedMainRendererUrl())) return;
+    listener(event, ...args);
+  });
+}
 function registerIpc(): void {
   ipcMain.handle('bots:list', () => settings.bots);
 
@@ -7720,7 +7789,7 @@ function registerIpc(): void {
 
   ipcMain.handle(
     'settings:set',
-    (
+    async (
       _event: unknown,
       patch: {
         providers?: Record<string, { apiKey?: string; baseUrl?: string; defaultModel?: string; realtimeUrl?: string }>;
@@ -7740,6 +7809,12 @@ function registerIpc(): void {
       if (patch.allowLocalFallback !== undefined && typeof patch.allowLocalFallback !== 'boolean') {
         throw new Error('"allowLocalFallback" phải là boolean.');
       }
+      const hasProviderSecret = Object.values(patch.providers ?? {}).some(
+        (provider) => typeof provider?.apiKey === 'string' && provider.apiKey.length > 0,
+      );
+      const allowLocalFallback = hasProviderSecret
+        ? await requestLocalFallbackConsent(patch.allowLocalFallback, 'provider API key')
+        : false;
       if (isAppLocale(patch.locale)) {
         settings.locale = patch.locale;
       } else if (patch.locale !== undefined) {
@@ -7797,9 +7872,7 @@ function registerIpc(): void {
           realtimeUrl: p.realtimeUrl ?? prev.realtimeUrl,
         };
         if (p.apiKey && p.apiKey.length > 0) {
-          vault.setSecret('provider', id, p.apiKey, {
-            allowLocalFallback: patch.allowLocalFallback === true,
-          });
+          vault.setSecret('provider', id, p.apiKey, { allowLocalFallback });
           // v0.98: seed lại key cho router (best-effort).
           void syncRouterApiKeyToCoordinator(id).catch(() => undefined);
         }
@@ -8347,7 +8420,7 @@ function registerIpc(): void {
   );
 
   // --- v0.4: Vault (secret KHÔNG BAO GIỜ rời main process) ---
-  ipcMain.handle('vault:get-storage-status', () => ({
+  registerMainWindowIpcHandler('vault:get-storage-status', () => ({
     status: vaultStorageStatus,
     backend:
       vaultStorageStatus === 'available'
@@ -8355,19 +8428,21 @@ function registerIpc(): void {
         : vaultStorageStatus === 'degraded'
           ? 'local-fallback'
           : 'unavailable',
-    canWrite: vaultStorageStatus !== 'unavailable',
+    canWrite: vaultStorageStatus === 'available',
+    canWriteWithConsent: vaultStorageStatus === 'degraded',
+    consentRequired: vaultStorageStatus === 'degraded',
   }));
 
-  ipcMain.handle('vault:list', () => {
+  registerMainWindowIpcHandler('vault:list', () => {
     // Trả về tên key theo namespace — KHÔNG trả value.
     const out: Record<string, string[]> = {};
     for (const ns of vault.listNamespaces()) out[ns] = vault.listSecrets(ns);
     return out;
   });
 
-  ipcMain.handle(
+  registerMainWindowIpcHandler(
     'vault:set',
-    (
+    async (
       _event: unknown,
       payload: { namespace: string; key: string; value: string; allowLocalFallback?: boolean },
     ) => {
@@ -8377,9 +8452,8 @@ function registerIpc(): void {
     const namespace = requireId(payload?.namespace, 'namespace');
     const key = requireId(payload?.key, 'key');
     const value = requireString(payload?.value, 'value', 8192);
-    vault.setSecret(namespace, key, value, {
-      allowLocalFallback: payload?.allowLocalFallback === true,
-    });
+    const allowLocalFallback = await requestLocalFallbackConsent(payload?.allowLocalFallback, `${namespace}/${key}`);
+    vault.setSecret(namespace, key, value, { allowLocalFallback });
     // Key provider đổi -> runtime cũ dùng key cũ phải bỏ.
     if (namespace === 'provider') {
       for (const bot of settings.bots.filter((b) => b.providerId === key)) {
@@ -8403,7 +8477,7 @@ function registerIpc(): void {
     return true;
   });
 
-  ipcMain.handle('vault:delete', (_event: unknown, payload: { namespace: string; key: string }) => {
+  registerMainWindowIpcHandler('vault:delete', (_event: unknown, payload: { namespace: string; key: string }) => {
     const namespace = requireId(payload?.namespace, 'namespace');
     const key = requireId(payload?.key, 'key');
     const removed = vault.deleteSecret(namespace, key);
@@ -8472,7 +8546,7 @@ function registerIpc(): void {
     'onepassword:import-field',
     async (
       _event: unknown,
-      payload: { itemId: string; field: string; namespace: string; key: string; saveToVault?: boolean },
+      payload: { itemId: string; field: string; namespace: string; key: string; saveToVault?: boolean; allowLocalFallback?: boolean },
     ): Promise<{ stored: boolean }> => {
       if (settings.onePasswordEnabled === false) {
         throw new Error('1Password broker đã tắt trong Cài đặt.');
@@ -8483,7 +8557,10 @@ function registerIpc(): void {
       const key = requireId(payload?.key, 'key');
       const saveToVault = payload?.saveToVault !== false;
       const value = await getOnePasswordBroker().getField(itemId, field);
-      vault.setSecret(namespace, key, value, { saveToVault });
+      const allowLocalFallback = saveToVault
+        ? await requestLocalFallbackConsent(payload?.allowLocalFallback, `1Password field ${namespace}/${key}`)
+        : false;
+      vault.setSecret(namespace, key, value, { saveToVault, allowLocalFallback });
       if (namespace === 'provider') {
         for (const bot of settings.bots.filter((b) => b.providerId === key)) {
           void invalidateRuntime(bot.id);
@@ -9254,7 +9331,7 @@ function registerIpc(): void {
   // The secret is returned ONLY by create/rotate, exactly once. The
   // renderer must show it once and never store it; `exists` is the
   // only status check the UI gets (never a value).
-  ipcMain.handle('automations:webhook-key:create', (_event: unknown, payload: { id: string }) => {
+  ipcMain.handle('automations:webhook-key:create', async (_event: unknown, payload: { id: string; allowLocalFallback?: boolean }) => {
     if (!automationScheduler) throw new Error('Scheduler chưa khởi động.');
     const id = requireId(payload?.id, 'id');
     const automation = automationScheduler.get(id);
@@ -9262,10 +9339,11 @@ function registerIpc(): void {
     if (automation.trigger.kind !== 'webhook') {
       throw new Error('Automation này không dùng trigger webhook.');
     }
-    return createAutomationWebhookKey(webhookKeyStores(), id);
+    const allowLocalFallback = await requestLocalFallbackConsent(payload?.allowLocalFallback, 'automation webhook signing key');
+    return createAutomationWebhookKey(webhookKeyStores(), id, { allowLocalFallback });
   });
 
-  ipcMain.handle('automations:webhook-key:rotate', (_event: unknown, payload: { id: string }) => {
+  ipcMain.handle('automations:webhook-key:rotate', async (_event: unknown, payload: { id: string; allowLocalFallback?: boolean }) => {
     if (!automationScheduler) throw new Error('Scheduler chưa khởi động.');
     const id = requireId(payload?.id, 'id');
     const automation = automationScheduler.get(id);
@@ -9273,7 +9351,8 @@ function registerIpc(): void {
     if (automation.trigger.kind !== 'webhook') {
       throw new Error('Automation này không dùng trigger webhook.');
     }
-    return rotateAutomationWebhookKey(webhookKeyStores(), id);
+    const allowLocalFallback = await requestLocalFallbackConsent(payload?.allowLocalFallback, 'rotated automation webhook signing key');
+    return rotateAutomationWebhookKey(webhookKeyStores(), id, { allowLocalFallback });
   });
 
   ipcMain.handle('automations:webhook-key:delete', (_event: unknown, payload: { id: string }) => {
@@ -10555,11 +10634,17 @@ function registerIpc(): void {
 
   // Token chỉ trả về khi người dùng bấm "Hiện token" — renderer không
   // tự gọi channel này lúc load trang. KHÔNG log token.
-  ipcMain.handle('api:get-token', () => ({ token: getOrCreateApiToken() }));
+  ipcMain.handle('api:get-token', async (_event: unknown, payload?: { allowLocalFallback?: boolean }) => {
+    const allowLocalFallback = await requestLocalFallbackConsent(payload?.allowLocalFallback, 'Local API bearer token');
+    const token = getOrCreateApiToken(allowLocalFallback);
+    if (apiConfig?.enabled && !apiServer) await startApiServer();
+    return { token };
+  });
 
-  ipcMain.handle('api:regenerate-token', async () => {
+  ipcMain.handle('api:regenerate-token', async (_event: unknown, payload?: { allowLocalFallback?: boolean }) => {
+    const allowLocalFallback = await requestLocalFallbackConsent(payload?.allowLocalFallback, 'regenerated Local API bearer token');
     const token = randomBytes(32).toString('hex');
-    vault.setSecret(API_TOKEN_NAMESPACE, API_TOKEN_KEY, token);
+    vault.setSecret(API_TOKEN_NAMESPACE, API_TOKEN_KEY, token, { allowLocalFallback });
     // Server đang chạy giữ token cũ trong closure -> khởi động lại để
     // token mới có hiệu lực ngay; token cũ mất hiệu lực tức thì.
     if (apiServer) {
@@ -10662,7 +10747,7 @@ function registerIpc(): void {
 
   ipcMain.handle(
     'team:service-account-create',
-    (_event: unknown, payload: { name: string; scope: ServiceAccountScope }) => {
+    async (_event: unknown, payload: { name: string; scope: ServiceAccountScope; allowLocalFallback?: boolean }) => {
       const name = requireString(payload?.name, 'name');
       const scope = payload?.scope;
       if (scope !== 'run' && scope !== 'admin') {
@@ -10679,7 +10764,8 @@ function registerIpc(): void {
       const token = randomBytes(32).toString('base64url');
       // Lưu Vault trước khi lưu team.json: nếu lưu Vault lỗi thì chưa
       // có record nào trỏ tới token mồ côi.
-      vault.setSecret('service-account', account.id, token);
+      const allowLocalFallback = await requestLocalFallbackConsent(payload?.allowLocalFallback, 'new service-account token');
+      vault.setSecret('service-account', account.id, token, { allowLocalFallback });
       saveTeamConfig(app.getPath('userData'), next);
       // Token trả về DUY NHẤT 1 LẦN, trong đúng response này. Không log,
       // không lưu settings, không trả lại ở bất kỳ channel nào khác.
@@ -11635,12 +11721,12 @@ function registerIpc(): void {
 
   // v0.15 (L5 audit): kèm số secret tạm để UI hỏi xác nhận trước
   // khi tắt NO_STORAGE (khi còn secret tạm thì tắt sẽ flush chúng).
-  ipcMain.handle('vault:get-nostorage', () => ({
+  registerMainWindowIpcHandler('vault:get-nostorage', () => ({
     enabled: vault.isNoStorage(),
     pendingSecrets: vault.countNoStoragePendingSecrets(),
   }));
 
-  ipcMain.handle('vault:set-nostorage', (_event: unknown, payload: unknown) => {
+  registerMainWindowIpcHandler('vault:set-nostorage', async (_event: unknown, payload: unknown) => {
     const enabled = asBooleanParam(payload);
     // v0.15 (L5 audit): renderer có thể gửi kèm opts trong cùng
     // payload `{ enabled, discardTemporarySecrets }` (asBooleanParam
@@ -11655,9 +11741,12 @@ function registerIpc(): void {
       typeof payload === 'object' &&
       (payload as { allowLocalFallback?: unknown }).allowLocalFallback === true;
     const pendingSecrets = vault.countNoStoragePendingSecrets();
+    const confirmedFallback = !enabled && !discard && pendingSecrets > 0
+      ? await requestLocalFallbackConsent(allowLocalFallback, 'flush NO_STORAGE secrets')
+      : allowLocalFallback;
     vault.setNoStorage(enabled, {
       discardTemporarySecrets: discard,
-      allowLocalFallback,
+      allowLocalFallback: confirmedFallback,
     });
     // Lưu lựa chọn để lần mở sau áp lại (Vault không tự nhớ chế độ này).
     settings.vaultNoStorage = enabled;
@@ -11762,12 +11851,13 @@ function registerIpc(): void {
       ) {
         throw new Error(`Connector "${connectorId}" không hợp lệ.`);
       }
+      const allowLocalFallback = await requestLocalFallbackConsent(payload?.allowLocalFallback, 'OAuth client credentials and refresh tokens');
       const result = await startOAuthLogin(
         providerId,
         clientId,
         clientSecret,
         connectorId,
-        payload?.allowLocalFallback === true,
+        allowLocalFallback,
       );
       // M7: login connector thành công thì đẩy TokenSet vào kho dùng
       // chung của coordinator đang chạy ngay — bot đã tạo trước lúc
@@ -11871,7 +11961,7 @@ function registerIpc(): void {
   // xác thực riêng — không gọi api.github.com cho app không phải GitHub.
   ipcMain.handle(
     'apps:set-token',
-    async (_event: unknown, payload: { appId?: unknown; token?: unknown }) => {
+    async (_event: unknown, payload: { appId?: unknown; token?: unknown; allowLocalFallback?: boolean }) => {
       const appId = requireId(payload?.appId, 'appId');
       const app = getApp(appId);
       if (!app) throw new Error(`Không rõ app "${appId}".`);
@@ -11882,10 +11972,11 @@ function registerIpc(): void {
       const namespace = app.vaultNamespace;
       const key = app.vaultKey;
       const coord = coordinator;
+      const allowLocalFallback = await requestLocalFallbackConsent(payload?.allowLocalFallback, `${app.label} app token`);
       if (appId === 'github') {
         const { login } = await saveValidatedGithubPat({
           token,
-          save: (t) => vault.setSecret(namespace, key, t),
+          save: (t) => vault.setSecret(namespace, key, t, { allowLocalFallback }),
           ...(coord
             ? {
                 onSaved: async (t, login) => {
@@ -11898,7 +11989,7 @@ function registerIpc(): void {
         // thái trả về ngay sau đó không gọi lại GitHub.
         githubPatRevalidator.seedValid(login);
       } else {
-        vault.setSecret(namespace, key, token);
+        vault.setSecret(namespace, key, token, { allowLocalFallback });
         if (coord) {
           await coord.setPlainAppToken(appId, token).catch(() => undefined);
         }
