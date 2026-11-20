@@ -84,9 +84,9 @@ export function hasComposioUserId(vault: ComposioKeyVault): boolean {
  * Lưu Composio user id vào Vault. Validate trước khi ghi (rỗng/
  * khoảng trắng/ký tự lạ → ném lỗi rõ, không ghi). KHÔNG log giá trị.
  */
-export function setComposioUserId(vault: ComposioKeyVault, userId: string): void {
+export function setComposioUserId(vault: ComposioKeyVault, userId: string, opts?: { allowLocalFallback?: boolean }): void {
   const id = validateComposioUserId(userId);
-  vault.setSecret(COMPOSIO_VAULT_NAMESPACE, COMPOSIO_VAULT_USER_ID_KEY, id);
+  vault.setSecret(COMPOSIO_VAULT_NAMESPACE, COMPOSIO_VAULT_USER_ID_KEY, id, opts);
 }
 
 /** Xoá Composio user id khỏi Vault. Trả true khi trước đó có user id. */
@@ -97,7 +97,7 @@ export function clearComposioUserId(vault: ComposioKeyVault): boolean {
 /** Tối thiểu API Vault mà key store này cần (Vault thật khớp shape này). */
 export interface ComposioKeyVault {
   getSecret(namespace: string, key: string): string | null;
-  setSecret(namespace: string, key: string, value: string): void;
+  setSecret(namespace: string, key: string, value: string, opts?: { allowLocalFallback?: boolean }): void;
   deleteSecret(namespace: string, key: string): boolean;
 }
 
@@ -123,11 +123,11 @@ export function hasComposioApiKey(vault: ComposioKeyVault): boolean {
  * Lưu Composio API key vào Vault. Key rỗng/khoảng trắng thì ném lỗi
  * (không ghi giá trị rỗng vào Vault). KHÔNG log key.
  */
-export function setComposioApiKey(vault: ComposioKeyVault, apiKey: string): void {
+export function setComposioApiKey(vault: ComposioKeyVault, apiKey: string, opts?: { allowLocalFallback?: boolean }): void {
   if (typeof apiKey !== 'string' || !apiKey.trim()) {
     throw new Error('Composio API key không được rỗng.');
   }
-  vault.setSecret(COMPOSIO_VAULT_NAMESPACE, COMPOSIO_VAULT_KEY, apiKey.trim());
+  vault.setSecret(COMPOSIO_VAULT_NAMESPACE, COMPOSIO_VAULT_KEY, apiKey.trim(), opts);
 }
 
 /** Xoá Composio API key khỏi Vault. Trả true khi trước đó có key. */
