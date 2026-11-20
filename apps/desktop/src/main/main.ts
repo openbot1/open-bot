@@ -1381,13 +1381,11 @@ function getWebhookDispatcher(): WebhookDispatcher {
  * Every degraded-mode write requires a fresh native main-process prompt;
  * a renderer boolean is only a request hint and never proof of consent.
  *
- * Automation escape: when the app itself is launched with
- * OPENBOT_VAULT_ALLOW_LOCAL_FALLBACK=1, the launcher (the operator, not
- * the renderer — a renderer cannot set the main process's env) has
- * consented in advance, so no dialog is shown. Real-app E2E tests run
- * the app with this flag because no human is there to answer the
- * prompt; without it every degraded-mode write would hang forever.
- * Default (flag unset) still prompts for every write.
+ * Test-only automation escape: E2E launchers may set both
+ * NODE_ENV=test and OPENBOT_VAULT_ALLOW_LOCAL_FALLBACK=1 so unattended
+ * tests do not wait for a native dialog. The flag is ignored outside
+ * NODE_ENV=test; normal app launches still require a fresh confirmation
+ * for every degraded-mode write. A renderer cannot set the main process env.
  */
 async function requestLocalFallbackConsent(
   suppliedConsent: boolean | undefined,
