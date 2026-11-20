@@ -62,7 +62,7 @@ export interface AutomationWebhookKeyStore {
  * tests may pass a fake.
  */
 export interface DedicatedWebhookKeyStore {
-  setKey(id: string, secret: string, opts?: { maxAgeMs?: number; saveToVault?: boolean }): void;
+  setKey(id: string, secret: string, opts?: { maxAgeMs?: number; saveToVault?: boolean; allowLocalFallback?: boolean }): void;
   getKey(id: string): string | null;
   deleteKey(id: string): boolean;
   hasKey(id: string): boolean;
@@ -131,7 +131,7 @@ function isLegacyStore(value: unknown): value is AutomationWebhookKeyStore {
 /** Normalised read/write surface over whichever store shape was passed. */
 interface ResolvedWebhookKeyStores {
   primaryGet(id: string): string | null;
-  primarySet(id: string, secret: string): void;
+  primarySet(id: string, secret: string, opts?: { allowLocalFallback?: boolean }): void;
   primaryHas(id: string): boolean;
   primaryDelete(id: string): boolean;
   /** Legacy store, consulted only on a primary miss (migration source). */
@@ -146,7 +146,7 @@ function resolveStores(input: AutomationWebhookKeyStoreInput): ResolvedWebhookKe
   if (isDedicatedStore(input)) {
     return {
       primaryGet: (id) => input.getKey(id),
-      primarySet: (id, secret) => input.setKey(id, secret),
+      primarySet: (id, secret, opts) => input.setKey(id, secret, opts),
       primaryHas: (id) => input.hasKey(id),
       primaryDelete: (id) => input.deleteKey(id),
     };
@@ -168,7 +168,7 @@ function resolveStores(input: AutomationWebhookKeyStoreInput): ResolvedWebhookKe
   }
   const resolved: ResolvedWebhookKeyStores = {
     primaryGet: (id) => pair.store.getKey(id),
-    primarySet: (id, secret) => pair.store.setKey(id, secret),
+    primarySet: (id, secret, opts) => pair.store.setKey(id, secret, opts),
     primaryHas: (id) => pair.store.hasKey(id),
     primaryDelete: (id) => pair.store.deleteKey(id),
   };
@@ -200,11 +200,12 @@ function resolveStores(input: AutomationWebhookKeyStoreInput): ResolvedWebhookKe
 export function createAutomationWebhookKey(
   store: AutomationWebhookKeyStoreInput,
   automationId: string,
+  opts?: { allowLocalFallback?: boolean },
 ): AutomationWebhookKey {
   assertKeyId(automationId);
   const resolved = resolveStores(store);
   const secret = newSecret();
-  resolved.primarySet(automationId, secret);
+  resolved.primarySet(automationId, secret, opts);
   if (resolved.legacy) {
     try {
       resolved.legacy.delete(automationId);
@@ -220,8 +221,9 @@ export function createAutomationWebhookKey(
 export function rotateAutomationWebhookKey(
   store: AutomationWebhookKeyStoreInput,
   automationId: string,
+  opts?: { allowLocalFallback?: boolean },
 ): AutomationWebhookKey {
-  return createAutomationWebhookKey(store, automationId);
+  return createAutomationWebhookKey(store, automationId, opts);
 }
 
 /**
