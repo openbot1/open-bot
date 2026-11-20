@@ -528,7 +528,7 @@ test('testgen: child process gets runtime env only, never parent credentials or 
       `  assert.equal(process.env.PATH, ${JSON.stringify(expectedPath)});`,
       '});',
       '',
-    ].join('\\n'));
+    ].join('\n'));
 
     const run = await runV8GeneratedTests(testAbs, { cwd: dir });
     assert.equal(run.passed, true, run.output);
