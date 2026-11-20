@@ -394,10 +394,13 @@ export class WebhookDispatcher {
             'Đặt secret ở Vault namespace "webhook", key "hmac-secret" để receiver xác thực được nguồn.',
         );
       }
+      // Do not follow redirects: SSRF validation above only covers the
+      // registered URL, not a Location target returned by that endpoint.
       const res = await fetch(webhook.url, {
         method: 'POST',
         headers,
         body,
+        redirect: 'manual',
         signal: controller.signal,
       });
       // Drain the body so the connection can be reused / closed cleanly.
