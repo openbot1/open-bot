@@ -484,6 +484,65 @@ test('testgen: chạy test sinh ra thật — pass hết; coverage delta 0→3',
   assert.equal(delta.coverageAfter, 1);
 });
 
+test('testgen: child process gets runtime env only, never parent credentials or Node injection settings', async () => {
+  const dir = tmpDir();
+  const testAbs = path.join(dir, 'env-isolation.test.mjs');
+  const safeTempDir = path.join(dir, 'safe-temp');
+  fs.mkdirSync(safeTempDir);
+  const inheritedKeys = [
+    'OPENAI_API_KEY',
+    'AWS_SECRET_ACCESS_KEY',
+    'GITHUB_TOKEN',
+    'OPENBOT_VAULT_MASTER_KEY',
+    'NODE_OPTIONS',
+    'NODE_PATH',
+    'NODE_TEST_CONTEXT',
+    'NODE_TEST_WORKER_ID',
+    'NODE_ENV',
+    'TMPDIR',
+  ];
+  const previous = new Map(inheritedKeys.map((key) => [key, process.env[key]]));
+  const expectedPath = process.env.PATH;
+
+  try {
+    process.env.OPENAI_API_KEY = 'test-parent-openai-secret';
+    process.env.AWS_SECRET_ACCESS_KEY = 'test-parent-aws-secret';
+    process.env.GITHUB_TOKEN = 'test-parent-github-token';
+    process.env.OPENBOT_VAULT_MASTER_KEY = 'test-parent-vault-secret';
+    process.env.NODE_OPTIONS = '--trace-warnings';
+    process.env.NODE_PATH = path.join(dir, 'untrusted-node-modules');
+    process.env.NODE_TEST_CONTEXT = 'parent-test-context';
+    process.env.NODE_TEST_WORKER_ID = 'parent-worker';
+    process.env.NODE_ENV = 'production';
+    process.env.TMPDIR = safeTempDir;
+
+    fs.writeFileSync(testAbs, [
+      "import test from 'node:test';",
+      "import assert from 'node:assert/strict';",
+      "test('generated test process receives only allowlisted environment', () => {",
+      ...inheritedKeys
+        .filter((key) => !['NODE_ENV', 'TMPDIR'].includes(key))
+        .map((key) => `  assert.equal(process.env[${JSON.stringify(key)}], undefined, ${JSON.stringify(key + ' must not leak')});`),
+      `  assert.equal(process.env.NODE_ENV, 'production');`,
+      `  assert.equal(process.env.TMPDIR, ${JSON.stringify(safeTempDir)});`,
+      `  assert.equal(process.env.PATH, ${JSON.stringify(expectedPath)});`,
+      '});',
+      '',
+    ].join('\\n'));
+
+    const run = await runV8GeneratedTests(testAbs, { cwd: dir });
+    assert.equal(run.passed, true, run.output);
+    assert.equal(run.total, 1);
+    assert.equal(run.passedCount, 1);
+    assert.equal(run.failedCount, 0);
+  } finally {
+    for (const [key, value] of previous) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
 test('testgen: method trong class không sinh test (cần instance) + ghi lý do', () => {
   const dir = makeRepoWithFiles({
     'svc.js': 'export class Svc {\n  greet(name) {\n    return "hi " + name;\n  }\n}\n\nexport function plain(x) {\n  return x + 1;\n}\n',
