@@ -11,6 +11,7 @@
  * multi-KB string or a path escaping the allowed roots is never
  * legitimate input from the renderer.
  */
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 export const MAX_ID_CHARS = 128;
@@ -148,9 +149,51 @@ export function requireWsUrl(value: unknown, what = 'url'): string {
 }
 
 /**
+ * Resolve the existing part of a path through the filesystem (not just
+ * lexically), then append any missing tail. lstatSync is intentional:
+ * existsSync() follows symlinks and returns false for dangling links, which
+ * would otherwise let a future mkdir/write follow an unchecked link.
+ *
+ * A dangling, looping, or otherwise unresolvable symlink fails closed because
+ * realpathSync() cannot establish where the path would lead.
+ */
+function realpathWithMissingTail(candidate: string): string {
+  let existing = path.resolve(candidate);
+  const tail: string[] = [];
+
+  for (;;) {
+    try {
+      fs.lstatSync(existing);
+      break;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code !== 'ENOENT' && code !== 'ENOTDIR') throw err;
+      const parent = path.dirname(existing);
+      if (parent === existing) throw err;
+      tail.unshift(path.basename(existing));
+      existing = parent;
+    }
+  }
+
+  const realExisting = fs.realpathSync(existing);
+  return tail.length > 0 ? path.join(realExisting, ...tail) : realExisting;
+}
+
+/** True when target is equal to base or is a descendant of base. */
+function isPathWithin(base: string, target: string): boolean {
+  const relative = path.relative(base, target);
+  return (
+    relative === '' ||
+    (relative !== '..' &&
+      !relative.startsWith(`..${path.sep}`) &&
+      !path.isAbsolute(relative))
+  );
+}
+
+/**
  * Resolve `target` against the allowed roots and reject anything that
- * escapes them (`..`, absolute paths outside the roots, symlinks are
- * NOT resolved here — the caller checks existence separately).
+ * escapes them lexically or through an existing symlink. Missing path
+ * components are permitted, but every existing ancestor is realpath-checked.
  * Returns the absolute, normalized path inside one of the roots.
  */
 export function resolveWithin(roots: string[], target: string, what = 'path'): string {
@@ -160,10 +203,33 @@ export function resolveWithin(roots: string[], target: string, what = 'path'): s
   if (target.length > 4096) {
     throw new Error(`Tham số "${what}" quá dài.`);
   }
+
   const resolved = path.resolve(target);
+  let matchedLexicalRoot = false;
+
   for (const root of roots) {
     const base = path.resolve(root);
-    if (resolved === base || resolved.startsWith(base + path.sep)) return resolved;
+    if (!isPathWithin(base, resolved)) continue;
+    matchedLexicalRoot = true;
+
+    let realBase: string;
+    let realTarget: string;
+    try {
+      realBase = realpathWithMissingTail(base);
+      realTarget = realpathWithMissingTail(resolved);
+    } catch {
+      throw new Error(
+        `Không thể xác minh an toàn đường dẫn "${what}" (symlink không hợp lệ hoặc không thể resolve).`,
+      );
+    }
+
+    if (isPathWithin(realBase, realTarget)) return resolved;
+  }
+
+  if (matchedLexicalRoot) {
+    throw new Error(
+      `Đường dẫn "${what}" thoát khỏi thư mục cho phép qua symlink.`,
+    );
   }
   throw new Error(`Đường dẫn "${what}" nằm ngoài thư mục cho phép.`);
 }
