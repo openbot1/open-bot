@@ -220,6 +220,7 @@ function launchApp() {
       ...process.env,
       XDG_CONFIG_HOME: xdgDir,
       ELECTRON_DISABLE_SECURITY_WARNINGS: '1',
+      NODE_ENV: 'test',
       // PR #9: no OS keychain on this VM, so the vault runs degraded and
       // every vault:set would pop a native consent dialog nobody answers
       // (the seed writes in `before` would hang until the CDP eval times
