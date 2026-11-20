@@ -1414,7 +1414,8 @@ export interface OpenBotApi {
   listChannelMessages: (payload: { channelId: string; limit?: number }) => Promise<ChannelMessage[]>;
   // v0.4: Vault (chỉ tên key, không bao giờ trả secret) + Usage.
   listVaultSecrets: () => Promise<Record<string, string[]>>;
-  setVaultSecret: (namespace: string, key: string, value: string) => Promise<boolean>;
+  getVaultStorageStatus: () => Promise<{ status: 'available' | 'degraded' | 'unavailable'; backend: 'os-keychain' | 'local-fallback' | 'unavailable'; canWrite: boolean; canWriteWithConsent: boolean; consentRequired: boolean }>;
+  setVaultSecret: (namespace: string, key: string, value: string, opts?: { allowLocalFallback?: boolean }) => Promise<boolean>;
   deleteVaultSecret: (namespace: string, key: string) => Promise<boolean>;
   getUsage: (botId?: string) => Promise<unknown>;
   getSpendLimits: () => Promise<unknown>;
@@ -1612,7 +1613,7 @@ export interface OpenBotApi {
   seedSampleAutomations: () => Promise<{ created: unknown[]; skipped: string[] }>;
   // v0.52 P0-5: webhook trigger keys + delivery + retry-run.
   // create/rotate return { keyId, secret } with the secret shown once only.
-  createAutomationWebhookKey: (id: string) => Promise<{ keyId: string; secret: string }>;
+  createAutomationWebhookKey: (id: string, opts?: { allowLocalFallback?: boolean }) => Promise<{ keyId: string; secret: string }>;
   // v0.97 (Team T5): harness v2 — routines, signed-webhook stats, health, NDJSON events.
   listHarnessRoutines: () => Promise<unknown[]>;
   getHarnessRoutine: (id: string) => Promise<unknown>;
@@ -1629,7 +1630,7 @@ export interface OpenBotApi {
   tailHarnessEvents: (threadId?: string, limit?: number) => Promise<unknown>;
   onHarnessRunsChanged: (cb: (event: { runId: string; routineId: string; status: string }) => void) => () => void;
   onHarnessHealthChanged: (cb: (health: unknown) => void) => () => void;
-  rotateAutomationWebhookKey: (id: string) => Promise<{ keyId: string; secret: string }>;
+  rotateAutomationWebhookKey: (id: string, opts?: { allowLocalFallback?: boolean }) => Promise<{ keyId: string; secret: string }>;
   deleteAutomationWebhookKey: (id: string) => Promise<boolean>;
   hasAutomationWebhookKey: (id: string) => Promise<boolean>;
   invokeAutomationWebhook: (id: string, body: string, signature?: string | null) => Promise<unknown>;
@@ -1807,7 +1808,7 @@ export interface OpenBotApi {
   'team:get-workspace'(): Promise<{ dir: string; teamId: string }>;
   'team:set-workspace-dir'(dir: string): Promise<{ dir: string; teamId: string }>;
   'team:service-accounts-list'(): Promise<unknown[]>;
-  'team:service-account-create'(payload: { name: string; scope: string }): Promise<unknown>;
+  'team:service-account-create'(payload: { name: string; scope: string; allowLocalFallback?: boolean }): Promise<unknown>;
   'team:service-account-delete'(id: string): Promise<boolean>;
   // Sóng B (đội platform): máy tính riêng cho từng bot (IPC `computers:*`).
   'computers:probe'(): Promise<{ profile: MachineProfile; backends: ComputerBackend[]; busy: boolean; busyReason?: string }>;
@@ -2018,13 +2019,14 @@ export interface OpenBotApi {
   setBotQuota: (payload: { botId: string; cpuCoresMax: number; ramBytesMax: number; diskBytesMax: number; warnPercent?: number; enabled?: boolean }) => Promise<BotQuota>;
   removeBotQuota: (id: string) => Promise<{ removed: boolean }>;
   listQuotaAlerts: () => Promise<QuotaAlert[]>;
+  'vault:get-storage-status'(): Promise<{ status: 'available' | 'degraded' | 'unavailable'; backend: 'os-keychain' | 'local-fallback' | 'unavailable'; canWrite: boolean; canWriteWithConsent: boolean; consentRequired: boolean }>;
   'vault:get-nostorage'(): Promise<{ enabled: boolean; pendingSecrets: number }>;
   // v0.15 (L5 audit): opts.discardTemporarySecrets = true để xoá
   // secret tạm thay vì flush khi tắt NO_STORAGE. Trả về số secret
   // tạm đã bị ảnh hưởng bởi lần tắt này.
   'vault:set-nostorage'(
     enabled: boolean,
-    opts?: { discardTemporarySecrets?: boolean },
+    opts?: { discardTemporarySecrets?: boolean; allowLocalFallback?: boolean },
   ): Promise<{ enabled: boolean; pendingSecrets: number }>;
   // v0.5: camelCase aliases (same channels).
   listModels: () => Promise<unknown>;
@@ -2139,12 +2141,12 @@ export interface OpenBotApi {
   getTeamWorkspace: () => Promise<{ dir: string; teamId: string }>;
   setTeamWorkspaceDir: (dir: string) => Promise<{ dir: string; teamId: string }>;
   listServiceAccounts: () => Promise<unknown[]>;
-  createServiceAccount: (payload: { name: string; scope: string }) => Promise<unknown>;
+  createServiceAccount: (payload: { name: string; scope: string; allowLocalFallback?: boolean }) => Promise<unknown>;
   deleteServiceAccount: (id: string) => Promise<boolean>;
   getVaultNoStorage: () => Promise<{ enabled: boolean; pendingSecrets: number }>;
   setVaultNoStorage: (
     enabled: boolean,
-    opts?: { discardTemporarySecrets?: boolean },
+    opts?: { discardTemporarySecrets?: boolean; allowLocalFallback?: boolean },
   ) => Promise<{ enabled: boolean; pendingSecrets: number }>;
   // v0.7: đăng nhập đa tầng (tài khoản local + định danh provider),
   // OAuth qua trình duyệt, tự cập nhật (chỉ check + thông báo).
@@ -2153,18 +2155,18 @@ export interface OpenBotApi {
   'auth:identities-list'(): Promise<Array<{ providerId: string; identity: { id: string; displayName?: string; email?: string; updatedAt: number } | null }>>;
   'auth:identity-delete'(payload: { providerId: string }): Promise<boolean>;
   'auth:oauth-supported'(): Promise<Array<{ id: string; label: string }>>;
-  'auth:oauth-start'(payload: { providerId: string; clientId?: string; clientSecret?: string; connectorId?: string }): Promise<{ ok: boolean; providerId: string; displayName?: string; error?: string }>;
+  'auth:oauth-start'(payload: { providerId: string; clientId?: string; clientSecret?: string; connectorId?: string; allowLocalFallback?: boolean }): Promise<{ ok: boolean; providerId: string; displayName?: string; error?: string }>;
   // M7: connected apps — catalog + trạng thái auth + ngắt kết nối.
   'apps:list'(): Promise<AppStatusView[]>;
   'apps:disconnect'(payload: { appId: string }): Promise<AppStatusView[]>;
   // v0.68b: M7 app token (PAT dán tay, vd GitHub) — lưu token thô vào Vault, không trả về renderer.
-  'apps:set-token'(payload: { appId: string; token: string }): Promise<AppStatusView[]>;
+  'apps:set-token'(payload: { appId: string; token: string; allowLocalFallback?: boolean }): Promise<AppStatusView[]>;
   // v0.53 (P1-6): 1Password broker (out-of-process) — status không chứa
   // secret; import-field ghi thẳng 1 field vào Vault ở main, chỉ trả {stored}.
   // v0.59: status kèm cờ `enabled`; `set-enabled` bật/tắt broker.
   'onepassword:status'(): Promise<OnePasswordBrokerStatus & { enabled: boolean }>;
   'onepassword:set-enabled'(payload: { enabled: boolean }): Promise<{ enabled: boolean }>;
-  'onepassword:import-field'(payload: { itemId: string; field: string; namespace: string; key: string; saveToVault?: boolean }): Promise<{ stored: boolean }>;
+  'onepassword:import-field'(payload: { itemId: string; field: string; namespace: string; key: string; saveToVault?: boolean; allowLocalFallback?: boolean }): Promise<{ stored: boolean }>;
   'update:check'(): Promise<{ available: boolean; currentVersion: string; latestVersion: string | null; latestTag: string | null; htmlUrl: string | null; checkFailed: boolean; error?: string }>;
   'update:open-download'(payload: { url: string }): Promise<boolean>;
   /**
@@ -2326,12 +2328,12 @@ export interface OpenBotApi {
   importMemoryNotes: (payload: { botId: string; source?: string }) => Promise<Record<string, unknown>>;
   deleteProviderIdentity: (providerId: string) => Promise<boolean>;
   listOAuthProviders: () => Promise<Array<{ id: string; label: string }>>;
-  startOAuthLogin: (providerId: string, clientId?: string, clientSecret?: string, connectorId?: string) => Promise<{ ok: boolean; providerId: string; displayName?: string; error?: string }>;
+  startOAuthLogin: (providerId: string, clientId?: string, clientSecret?: string, connectorId?: string, allowLocalFallback?: boolean) => Promise<{ ok: boolean; providerId: string; displayName?: string; error?: string }>;
   // M7: connected apps (camelCase aliases, same channels as above).
   listConnectedApps: () => Promise<AppStatusView[]>;
   disconnectConnectedApp: (appId: string) => Promise<AppStatusView[]>;
   // v0.68b: M7 app token (PAT dán tay) — camelCase alias of 'apps:set-token'.
-  setConnectedAppToken: (appId: string, token: string) => Promise<AppStatusView[]>;
+  setConnectedAppToken: (appId: string, token: string, allowLocalFallback?: boolean) => Promise<AppStatusView[]>;
   // v0.57: Composio — opt-in, key chỉ nằm trong Vault (không trả về renderer).
   getComposioState: () => Promise<ComposioStateView>;
   setComposioEnabled: (enabled: boolean) => Promise<ComposioStateView>;
@@ -2358,7 +2360,7 @@ export interface OpenBotApi {
   // v0.59: `setOnePasswordEnabled` bật/tắt broker.
   onePasswordStatus: () => Promise<OnePasswordBrokerStatus & { enabled: boolean }>;
   setOnePasswordEnabled: (enabled: boolean) => Promise<{ enabled: boolean }>;
-  onePasswordImportField: (payload: { itemId: string; field: string; namespace: string; key: string; saveToVault?: boolean }) => Promise<{ stored: boolean }>;
+  onePasswordImportField: (payload: { itemId: string; field: string; namespace: string; key: string; saveToVault?: boolean; allowLocalFallback?: boolean }) => Promise<{ stored: boolean }>;
   checkForUpdate: () => Promise<{ available: boolean; currentVersion: string; latestVersion: string | null; latestTag: string | null; htmlUrl: string | null; checkFailed: boolean; error?: string }>;
   openUpdateDownload: (url: string) => Promise<boolean>;
 }
@@ -2891,7 +2893,11 @@ const openBot: OpenBotApi = {
   listChannelMessages: (payload) => ipcRenderer.invoke('channel:list-messages', payload),
   // v0.4: Vault + Usage.
   listVaultSecrets: () => ipcRenderer.invoke('vault:list'),
-  setVaultSecret: (namespace, key, value) => ipcRenderer.invoke('vault:set', { namespace, key, value }),
+  getVaultStorageStatus: () => ipcRenderer.invoke('vault:get-storage-status'),
+  'vault:get-storage-status': () => ipcRenderer.invoke('vault:get-storage-status'),
+  setVaultSecret: (namespace, key, value, opts) => ipcRenderer.invoke('vault:set', {
+    namespace, key, value, allowLocalFallback: opts?.allowLocalFallback === true,
+  }),
   deleteVaultSecret: (namespace, key) => ipcRenderer.invoke('vault:delete', { namespace, key }),
   getUsage: (botId) => ipcRenderer.invoke('usage:get', { botId }),
   getSpendLimits: () => ipcRenderer.invoke('usage:get-limits'),
@@ -3018,8 +3024,8 @@ const openBot: OpenBotApi = {
   // v0.52 P0-5: webhook trigger keys + delivery + retry-run.
   // create/rotate return the secret EXACTLY ONCE — the renderer shows
   // it once and never stores it.
-  createAutomationWebhookKey: (id) => ipcRenderer.invoke('automations:webhook-key:create', { id }),
-  rotateAutomationWebhookKey: (id) => ipcRenderer.invoke('automations:webhook-key:rotate', { id }),
+  createAutomationWebhookKey: (id, opts) => ipcRenderer.invoke('automations:webhook-key:create', { id, allowLocalFallback: opts?.allowLocalFallback === true }),
+  rotateAutomationWebhookKey: (id, opts) => ipcRenderer.invoke('automations:webhook-key:rotate', { id, allowLocalFallback: opts?.allowLocalFallback === true }),
   deleteAutomationWebhookKey: (id) => ipcRenderer.invoke('automations:webhook-key:delete', { id }),
   hasAutomationWebhookKey: (id) => ipcRenderer.invoke('automations:webhook-key:exists', { id }),
   invokeAutomationWebhook: (id, body, signature) =>
@@ -3152,6 +3158,7 @@ const openBot: OpenBotApi = {
     ipcRenderer.invoke('vault:set-nostorage', {
       enabled,
       discardTemporarySecrets: opts?.discardTemporarySecrets === true,
+      allowLocalFallback: opts?.allowLocalFallback === true,
     }),
   // v0.5: camelCase aliases (same channels as above).
   listModels: () => ipcRenderer.invoke('models:list'),
@@ -3214,6 +3221,7 @@ const openBot: OpenBotApi = {
     ipcRenderer.invoke('vault:set-nostorage', {
       enabled,
       discardTemporarySecrets: opts?.discardTemporarySecrets === true,
+      allowLocalFallback: opts?.allowLocalFallback === true,
     }),
   // v0.7: đăng nhập đa tầng + OAuth + tự cập nhật.
   'auth:profile-get': () => ipcRenderer.invoke('auth:profile-get'),
@@ -3353,13 +3361,13 @@ const openBot: OpenBotApi = {
   listProviderIdentities: () => ipcRenderer.invoke('auth:identities-list'),
   deleteProviderIdentity: (providerId) => ipcRenderer.invoke('auth:identity-delete', { providerId }),
   listOAuthProviders: () => ipcRenderer.invoke('auth:oauth-supported'),
-  startOAuthLogin: (providerId, clientId, clientSecret, connectorId) =>
-    ipcRenderer.invoke('auth:oauth-start', { providerId, clientId, clientSecret, connectorId }),
+  startOAuthLogin: (providerId, clientId, clientSecret, connectorId, allowLocalFallback) =>
+    ipcRenderer.invoke('auth:oauth-start', { providerId, clientId, clientSecret, connectorId, allowLocalFallback }),
   // M7: connected apps (camelCase aliases, same channels as above).
   listConnectedApps: () => ipcRenderer.invoke('apps:list'),
   disconnectConnectedApp: (appId) => ipcRenderer.invoke('apps:disconnect', { appId }),
   // v0.68b: M7 app token (PAT dán tay, vd GitHub).
-  setConnectedAppToken: (appId, token) => ipcRenderer.invoke('apps:set-token', { appId, token }),
+  setConnectedAppToken: (appId, token, allowLocalFallback) => ipcRenderer.invoke('apps:set-token', { appId, token, allowLocalFallback }),
   // v0.57: Composio — opt-in (key chỉ vào Vault qua set-key, không trả về).
   getComposioState: () => ipcRenderer.invoke('composio:get-state'),
   setComposioEnabled: (enabled) => ipcRenderer.invoke('composio:set-enabled', { enabled }),

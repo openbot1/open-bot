@@ -13,6 +13,16 @@ copyright: Copyright © 2026 open-bot
 # Đóng gói asar để gom file app thành 1 archive.
 asar: true
 
+# Existing release channel: GitHub Releases (same feed checked by core/update).
+# Publishing creates/updates a draft; a maintainer publishes it after review.
+publish:
+  provider: github
+  owner: openbot1
+  repo: open-bot
+  releaseType: draft
+  # The in-app updater is manual-only; do not emit electron-updater manifests yet.
+  publishAutoUpdate: false
+
 directories:
   output: release
 
@@ -21,6 +31,10 @@ files:
   - package.json
 
 mac:
+  # Release builds fail closed instead of silently producing an unsigned app.
+  forceCodeSigning: true
+  notarize: true
+  hardenedRuntime: true
   target:
     - target: dmg
       arch:
@@ -36,6 +50,8 @@ mac:
     NSMicrophoneUsageDescription: "open-bot cần quyền micro để ghi voice memo và trò chuyện bằng giọng nói."
 
 win:
+  # Release builds fail closed instead of silently producing an unsigned installer.
+  forceCodeSigning: true
   target:
     - target: nsis
       arch:

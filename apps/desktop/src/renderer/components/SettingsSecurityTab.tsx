@@ -24,7 +24,7 @@ export default function SettingsSecurityTab({ s, onlySections }: Props) {
     authLoading, authError, reloadAuth,
     signOutProvider, oauthProviders, oauthClientId, setOAuthClientId,
     oauthClientSecret, setOAuthClientSecret, oauthBusy, startOAuth, oauthMessage,
-    vaultSecrets, deleteVaultKey, noStorage, changeNoStorage,
+    vaultSecrets, vaultStorageStatus, deleteVaultKey, noStorage, changeNoStorage,
     noStorageLoading, noStorageError, reloadNoStorage,
     vaultLoading, vaultError, reloadVault,
     onePasswordStatus, onePasswordBusy, onePasswordChecking, onePasswordError,
@@ -121,6 +121,26 @@ export default function SettingsSecurityTab({ s, onlySections }: Props) {
         <section data-section="vault" className="card">
           <h3>{t('settings.vaultTitle')}</h3>
           <p className="hint">{t('settings.vaultIntro')}</p>
+          {vaultStorageStatus?.status === 'available' && (
+            <p className="hint" data-testid="vault-storage-available">
+              {t('settings.vaultStorageAvailable')}
+            </p>
+          )}
+          {vaultStorageStatus?.status === 'degraded' && (
+            <p className="error" role="alert" data-testid="vault-storage-degraded">
+              {t('settings.vaultStorageDegraded')}
+            </p>
+          )}
+          {vaultStorageStatus?.status === 'unavailable' && (
+            <p className="error" role="alert" data-testid="vault-storage-unavailable">
+              {t('settings.vaultStorageUnavailable')}
+            </p>
+          )}
+          {!vaultStorageStatus && (
+            <p className="hint" data-testid="vault-storage-status-loading">
+              {t('settings.vaultStorageStatusLoading')}
+            </p>
+          )}
           {/* v0.68c: the Vault used to show "empty" while its list was
               still loading, and a failed load looked exactly like an
               empty vault — loading and error + retry are explicit now. */}
