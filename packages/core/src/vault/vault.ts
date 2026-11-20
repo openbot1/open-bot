@@ -92,6 +92,30 @@ export interface SafeStorageLike {
   isEncryptionAvailable(): boolean;
 }
 
+/** Main-process security posture for the active Vault store. */
+export type VaultStorageStatus = 'available' | 'degraded' | 'unavailable';
+
+/**
+ * Disk-write policy. The default remains permissive for non-desktop callers;
+ * Electron main opts into explicit one-write consent when LocalEncryptor is
+ * active, and disables writes when the current backend cannot read the store.
+ */
+export type VaultWritePolicy = 'allow' | 'require-local-fallback-consent' | 'disabled';
+
+export interface OpenVaultWithSafeStorageOptions {
+  storePath: string;
+  safeStorage: SafeStorageLike;
+  /** Defaults to `${storePath}.key`; also checks .new/.bak recovery keys. */
+  keyFilePath?: string;
+}
+
+export interface OpenVaultWithSafeStorageResult {
+  vault: Vault;
+  /** OS-keychain encryptor for sibling stores, present only when usable. */
+  encryptor?: Encryptor;
+  status: VaultStorageStatus;
+}
+
 /**
  * Adapter around Electron `safeStorage` (DPAPI / keychain / libsecret).
  * The caller (main process) passes `safeStorage` in; core never imports
@@ -282,6 +306,12 @@ export interface VaultOptions {
    * counts. Default DEFAULT_VAULT_MAX_ENTRIES (1000).
    */
   maxEntries?: number;
+  /**
+   * v0.15 (M6 follow-up): constrain disk writes when the desktop uses the
+   * weaker LocalEncryptor fallback or cannot decrypt the existing store.
+   * Defaults to 'allow' for backwards compatibility in non-desktop callers.
+   */
+  writePolicy?: VaultWritePolicy;
 }
 
 interface VaultStoreFile {
@@ -327,6 +357,12 @@ export interface SetSecretOptions {
    * the process runs (the fresher, explicitly temporary intent).
    */
   saveToVault?: boolean;
+  /**
+   * One-operation consent to persist this specific secret with LocalEncryptor.
+   * This is never remembered by the Vault and has no effect when OS storage is
+   * active. Main-process UI must obtain fresh user confirmation before set.
+   */
+  allowLocalFallback?: boolean;
 }
 
 const NS_KEY_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
@@ -433,11 +469,13 @@ export class Vault {
    * qua `isLocalFallback()` thay vì phải đoán từ log.
    */
   private localFallback: boolean;
+  private writePolicy: VaultWritePolicy;
 
   constructor(options: VaultOptions) {
     if (!options.storePath) throw new Error('Vault needs a storePath.');
     this.storePath = options.storePath;
     this.noStorage = options.noStorage === true;
+    this.writePolicy = options.writePolicy ?? 'allow';
     if (options.encryptor) {
       this.encryptor = options.encryptor;
       this.keyFilePath = null;
@@ -486,31 +524,33 @@ export class Vault {
     if (!this.keyFilePath) return;
     const entries = Object.entries(this.secrets);
     if (entries.length === 0) return;
-    const [, firstStored] = entries[0]!;
-    const tryDecrypt = (encryptor: Encryptor): boolean => {
-      try {
-        encryptor.decrypt(Buffer.from(firstStored!, 'base64'));
-        return true;
-      } catch {
-        return false;
+
+    // A recovery key is authoritative only when it decrypts the COMPLETE
+    // store. Checking only the first entry could delete .new/.bak while
+    // later ciphertext still depends on another key or backend.
+    const decryptsAllEntries = (encryptor: Encryptor): boolean => {
+      for (const [, stored] of entries) {
+        try {
+          encryptor.decrypt(Buffer.from(stored, 'base64'));
+        } catch {
+          return false;
+        }
       }
+      return true;
     };
-    if (tryDecrypt(this.encryptor)) {
-      // Key hiện tại đọc được store — `.new`/`.bak` còn sót (vd crash
-      // trước khi ghi store, hoặc rotate trong lúc NO_STORAGE bật rồi
-      // crash trước khi flush) là key không dùng tới: dọn để lần sau
-      // không nhầm với key của một lần rotate khác. An toàn vì store
-      // chỉ có một key đúng tại một thời điểm — key hiện tại đã đọc
-      // được thì `.new` không còn cần cho store này nữa.
+
+    if (decryptsAllEntries(this.encryptor)) {
+      // The current key opens every entry — staged recovery keys are stale.
       for (const suffix of ['.new', '.bak']) {
         try {
           fs.rmSync(`${this.keyFilePath}${suffix}`);
         } catch {
-          // Không xoá được file tạm cũng không sao.
+          // Best-effort cleanup only after full-store verification.
         }
       }
       return;
     }
+
     for (const suffix of ['.new', '.bak']) {
       const candidatePath = `${this.keyFilePath}${suffix}`;
       let key: Buffer;
@@ -521,21 +561,21 @@ export class Vault {
         continue;
       }
       const candidate = new LocalEncryptor(key);
-      if (!tryDecrypt(candidate)) continue;
-      // Key này mở được store — nhận làm key chính và sửa key file.
+      if (!decryptsAllEntries(candidate)) continue;
+
+      // The candidate opens every entry — it is safe to make it primary.
       this.encryptor = candidate;
       fs.writeFileSync(this.keyFilePath, key, { mode: 0o600 });
       try {
         fs.rmSync(candidatePath);
       } catch {
-        // Không xoá được file tạm cũng không sao.
+        // The primary key is already durable; leftover copy is harmless.
       }
       return;
     }
-    // Không key nào mở được (vd key file sai hoàn toàn, không phải do
-    // crash): giữ nguyên hành vi cũ — constructor vẫn mở, getSecret sẽ
-    // throw "Failed to decrypt" khi đọc. Không ném ở đây để không phá
-    // contract hiện có.
+
+    // No candidate decrypts the entire store. Keep .new/.bak untouched so a
+    // future backend/recovery attempt still has every available key.
     return;
   }
 
@@ -560,6 +600,62 @@ export class Vault {
    */
   isLocalFallback(): boolean {
     return this.localFallback;
+  }
+
+  /** Change the disk-write policy after checking all existing ciphertext. */
+  setWritePolicy(policy: VaultWritePolicy): void {
+    this.writePolicy = policy;
+  }
+
+  /**
+   * Verify every persisted entry with the active decryptor without changing
+   * the store or deleting unreadable ciphertext. This is intentionally
+   * stronger than checking a single sample entry.
+   */
+  canDecryptAllSecrets(): boolean {
+    for (const stored of Object.values(this.secrets)) {
+      try {
+        this.encryptor.decrypt(Buffer.from(stored, 'base64'));
+      } catch {
+        return false;
+      }
+    }
+    if (this.noStorageBaseline !== null) {
+      for (const stored of Object.values(this.noStorageBaseline)) {
+        try {
+          this.encryptor.decrypt(Buffer.from(stored, 'base64'));
+        } catch {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  /** Return a stable, secret-free reason when a durable write is forbidden. */
+  private writeRefusal(allowLocalFallback: boolean): string | null {
+    if (this.writePolicy === 'disabled') {
+      return (
+        'Vault storage is unavailable: this environment cannot decrypt every existing entry. ' +
+        'Persistent writes are disabled and the existing encrypted store was left untouched.'
+      );
+    }
+    if (
+      this.writePolicy === 'require-local-fallback-consent' &&
+      this.localFallback &&
+      !allowLocalFallback
+    ) {
+      return (
+        'Vault is using LocalEncryptor fallback, not the OS keychain. ' +
+        'Saving a persistent secret requires explicit confirmation for this save.'
+      );
+    }
+    return null;
+  }
+
+  private assertWriteAllowed(allowLocalFallback: boolean): void {
+    const refusal = this.writeRefusal(allowLocalFallback);
+    if (refusal) throw new Error(refusal);
   }
 
   /**
@@ -709,7 +805,10 @@ export class Vault {
    * with `noStorage: true`. The UI toggle must therefore re-apply
    * the user's choice at startup (see docs/v05-worker3-integration.md).
    */
-  setNoStorage(enabled: boolean, opts?: { discardTemporarySecrets?: boolean }): void {
+  setNoStorage(
+    enabled: boolean,
+    opts?: { discardTemporarySecrets?: boolean; allowLocalFallback?: boolean },
+  ): void {
     const next = enabled === true;
     if (next === this.noStorage) return;
     const discard = opts?.discardTemporarySecrets === true;
@@ -743,6 +842,14 @@ export class Vault {
       finalSecrets = this.secrets;
       finalMeta = this.entryMeta;
     }
+    // A pending NO_STORAGE flush is a durable secret write. Require fresh
+    // consent in degraded mode unless the operation discards temporary
+    // entries or there is nothing new to persist.
+    const hasPendingChanges = this.countNoStoragePendingSecrets() > 0;
+    const allowLocalFallbackWrite =
+      opts?.allowLocalFallback === true || discard || !hasPendingChanges;
+    this.assertWriteAllowed(allowLocalFallbackWrite);
+
     // Chuẩn bị key file cho rotation đang chờ (nếu có) TRƯỚC KHI ghi
     // store — thứ tự crash-safe như rotateKey thường: `.bak`/`.new`
     // trước, store sau, rename key file cuối cùng. Lỗi ở đây thì chưa
@@ -758,7 +865,7 @@ export class Vault {
     this.noStorageBaseline = null;
     this.noStorageBaselineMeta = null;
     try {
-      this.saveStore();
+      this.saveStore({ allowLocalFallback: allowLocalFallbackWrite });
     } catch (err) {
       // Ghi store lỗi: quay lại trạng thái NO_STORAGE bật để thử lại
       // — store trên đĩa vẫn là state cũ (ghi atomic tmp+rename),
@@ -948,7 +1055,7 @@ export class Vault {
     delete this.secrets[composite];
     delete this.entryMeta[composite];
     try {
-      this.saveStore();
+      this.saveStore({ allowLocalFallback: true });
     } catch {
       // Đọc đã trả null; ghi dọn dẹp thất bại thì lần đọc sau sẽ
       // dọn lại — không ném từ đường đọc.
@@ -970,7 +1077,7 @@ export class Vault {
         purged += 1;
       }
     }
-    if (purged > 0) this.saveStore();
+    if (purged > 0) this.saveStore({ allowLocalFallback: true });
     return purged;
   }
 
@@ -1033,6 +1140,10 @@ export class Vault {
       });
       return { ok: true };
     }
+    if (!this.noStorage) {
+      const refusal = this.writeRefusal(opts?.allowLocalFallback === true);
+      if (refusal) return { ok: false, refusal: { kind: 'refused', message: refusal } };
+    }
     const isNew = !(composite in this.secrets);
     if (isNew && Object.keys(this.secrets).length >= this.maxEntries) {
       return {
@@ -1054,7 +1165,7 @@ export class Vault {
     // v0.24 (W17a): plaintext đang có sẵn — hash thẳng vào cache để
     // countNoStoragePendingSecrets() sau này khỏi phải giải mã lại.
     this.rememberPlainHash(stored, plain);
-    this.saveStore();
+    this.saveStore({ allowLocalFallback: opts?.allowLocalFallback === true });
     return { ok: true };
   }
 
@@ -1086,9 +1197,13 @@ export class Vault {
     const composite = `${namespace}:${key}`;
     const hadSession = this.sessionSecrets.delete(composite);
     if (!(composite in this.secrets)) return hadSession;
+    // Deletion is permitted in degraded mode because it only removes data;
+    // the 'disabled' policy still freezes the store to preserve unreadable
+    // ciphertext byte-for-byte.
+    this.assertWriteAllowed(true);
     delete this.secrets[composite];
     delete this.entryMeta[composite];
-    this.saveStore();
+    this.saveStore({ allowLocalFallback: true });
     return true;
   }
 
@@ -1169,6 +1284,9 @@ export class Vault {
    *   bằng encryptor ngoài khác.
    */
   rotateKey(newEncryptor?: Encryptor): void {
+    // A rotation rewrites every secret; never perform it silently using the
+    // weaker local backend, and never touch an unreadable store.
+    if (!this.noStorage) this.assertWriteAllowed(false);
     const oldEncryptor = this.encryptor;
     const entries = Object.entries(this.secrets);
     const plaintexts = entries.map(([composite, stored]) => {
@@ -1397,10 +1515,11 @@ export class Vault {
     return { secrets, meta };
   }
 
-  private saveStore(): void {
+  private saveStore(opts?: { allowLocalFallback?: boolean }): void {
     // v0.5 NO_STORAGE: never touch the file while the mode is on.
     // In-memory state is flushed by setNoStorage(false).
     if (this.noStorage) return;
+    this.assertWriteAllowed(opts?.allowLocalFallback === true);
     const file: VaultStoreFile = {
       version: 1,
       secrets: this.secrets,
@@ -1429,4 +1548,111 @@ export class Vault {
       }
     }
   }
+}
+
+
+/**
+ * Open the desktop Vault without ever replacing ciphertext that the current
+ * environment cannot decrypt. When safeStorage is available, the decryptor
+ * temporarily understands both OS ciphertext and retained LocalEncryptor key
+ * files; any legacy local entries are re-encrypted with safeStorage before
+ * the Vault is reported as available. The old local key is retained so the
+ * bounded on-disk backup copies remain recoverable.
+ */
+export function openVaultWithSafeStorage(
+  options: OpenVaultWithSafeStorageOptions,
+): OpenVaultWithSafeStorageResult {
+  if (!options.storePath) throw new Error('Vault needs a storePath.');
+  const keyFilePath = options.keyFilePath ?? `${options.storePath}.key`;
+
+  const openLocalFallback = (): OpenVaultWithSafeStorageResult => {
+    const vault = new Vault({
+      storePath: options.storePath,
+      keyFilePath,
+      writePolicy: 'require-local-fallback-consent',
+    });
+    if (!vault.canDecryptAllSecrets()) {
+      vault.setWritePolicy('disabled');
+      return { vault, status: 'unavailable' };
+    }
+    return { vault, status: 'degraded' };
+  };
+
+  let available = false;
+  try {
+    available = options.safeStorage.isEncryptionAvailable() === true;
+  } catch {
+    available = false;
+  }
+  if (!available) return openLocalFallback();
+
+  let safeEncryptor: Encryptor;
+  try {
+    safeEncryptor = createSafeStorageEncryptor(options.safeStorage);
+    // isEncryptionAvailable() can be optimistic on misconfigured Linux
+    // keychains. Exercise both directions before declaring the backend usable.
+    const probe = Buffer.from('open-bot-safe-storage-probe', 'utf8');
+    if (!safeEncryptor.decrypt(safeEncryptor.encrypt(probe)).equals(probe)) {
+      throw new Error('safeStorage probe did not round-trip.');
+    }
+  } catch {
+    return openLocalFallback();
+  }
+
+  const localCandidates: LocalEncryptor[] = [];
+  for (const candidatePath of [keyFilePath, `${keyFilePath}.new`, `${keyFilePath}.bak`]) {
+    try {
+      const key = fs.readFileSync(candidatePath);
+      if (key.length >= 32) localCandidates.push(new LocalEncryptor(key));
+    } catch {
+      // No retained local key at this path; safeStorage entries remain readable.
+    }
+  }
+
+  let usedLocalCiphertext = false;
+  const compatibleEncryptor: Encryptor = {
+    encrypt: (plaintext) => safeEncryptor.encrypt(plaintext),
+    decrypt: (ciphertext) => {
+      try {
+        return safeEncryptor.decrypt(ciphertext);
+      } catch (safeError) {
+        for (const local of localCandidates) {
+          try {
+            const plaintext = local.decrypt(ciphertext);
+            usedLocalCiphertext = true;
+            return plaintext;
+          } catch {
+            // Try the next retained crash-recovery key.
+          }
+        }
+        throw safeError;
+      }
+    },
+  };
+
+  const vault = new Vault({
+    storePath: options.storePath,
+    encryptor: compatibleEncryptor,
+    writePolicy: 'allow',
+  });
+  if (!vault.canDecryptAllSecrets()) {
+    // Do not repair, re-encrypt, or write a partially readable store.
+    vault.setWritePolicy('disabled');
+    return { vault, encryptor: safeEncryptor, status: 'unavailable' };
+  }
+
+  if (usedLocalCiphertext) {
+    try {
+      // rotateKey decrypts every entry before changing state and persists
+      // the complete safeStorage-encrypted store atomically with backups.
+      vault.rotateKey(safeEncryptor);
+    } catch {
+      // The prior durable file remains available (atomic write); freeze
+      // writes and let the next launch retry migration rather than guessing.
+      vault.setWritePolicy('disabled');
+      return { vault, encryptor: safeEncryptor, status: 'unavailable' };
+    }
+  }
+
+  return { vault, encryptor: safeEncryptor, status: 'available' };
 }
