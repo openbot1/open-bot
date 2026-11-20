@@ -1161,6 +1161,12 @@ function getOnePasswordBroker(): OnePasswordBroker {
  * đã rỗng.
  */
 function migrateApiKeysToVault(): void {
+  // Never clear legacy plaintext settings while any existing Vault entry is
+  // unreadable; the old value may be the only recoverable copy.
+  if (vaultStorageStatus === 'unavailable') {
+    console.error('[open-bot] Deferred legacy API-key migration because Vault cannot decrypt every existing entry; settings.json values were preserved.');
+    return;
+  }
   let moved = false;
   for (const [id, p] of Object.entries(settings.providers)) {
     const key = p.apiKey?.trim();
