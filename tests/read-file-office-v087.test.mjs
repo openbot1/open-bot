@@ -24,7 +24,6 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import Module from 'node:module';
 
 import { createDefaultTools } from '../packages/tools/dist/tools.js';
 import {
@@ -64,46 +63,43 @@ async function read(relPath, dir) {
 }
 
 test('PDF sample: text extraction works with PDF.js eval disabled', async () => {
-  // Intercept the lazy CommonJS load and observe the exact options passed
-  // to PDF.js, without replacing the real parser or mocking its result.
-  const originalLoad = Module._load;
-  let pdfOptions;
-  Module._load = function (request, parent, isMain) {
-    const loaded = originalLoad.call(this, request, parent, isMain);
-    if (request !== 'pdfjs-dist/legacy/build/pdf') return loaded;
-    return {
-      ...loaded,
-      getDocument(options) {
-        pdfOptions = options;
-        return loaded.getDocument(options);
-      },
-    };
-  };
+  // The tools package is emitted as CommonJS. Verify tsc preserves the
+  // native dynamic import required by PDF.js 4.x's ESM-only legacy build.
+  const compiledOfficeDocs = fs.readFileSync(
+    path.join(process.cwd(), 'packages/tools/dist/officeDocs.js'),
+    'utf8',
+  );
+  assert.match(
+    compiledOfficeDocs,
+    /import\(["']pdfjs-dist\/legacy\/build\/pdf\.mjs["']\)/,
+    'PDF.js 4.x must be loaded through native dynamic import in the CJS output',
+  );
+  assert.match(
+    compiledOfficeDocs,
+    /isEvalSupported:\s*false/,
+    'PDF.js must not evaluate JavaScript derived from untrusted PDF fonts (CVE-2024-4367)',
+  );
+  assert.doesNotMatch(
+    compiledOfficeDocs,
+    /disableWorker\s*:/,
+    'PDF.js 4.x no longer accepts the deprecated disableWorker getDocument option',
+  );
 
-  try {
-    const dir = makeTempWorkspace();
-    copyFixture(dir, 'read-file-v087-sample.pdf');
-    const out = await read('read-file-v087-sample.pdf', dir);
-    assert.ok(!out.startsWith('Error:'), `expected success, got: ${out.slice(0, 200)}`);
-    assert.match(out, /Format: PDF, 2 page\(s\)/);
-    assert.match(out, /--- Page 1 of 2 ---/);
-    assert.match(out, /--- Page 2 of 2 ---/);
-    assert.ok(out.includes('Hello from the DOCX fixture.'));
-    assert.ok(out.includes('Second page content for the PDF test.'));
-    assert.ok(out.includes('Xin chao open-bot'));
-    // Page 2 content must come after the page 2 marker, not page 1.
-    assert.ok(
-      out.indexOf('Second page content') > out.indexOf('--- Page 2 of 2 ---'),
-      'page 2 text must follow the page 2 marker',
-    );
-    assert.equal(
-      pdfOptions?.isEvalSupported,
-      false,
-      'PDF.js must not evaluate JavaScript derived from untrusted PDF fonts (CVE-2024-4367)',
-    );
-  } finally {
-    Module._load = originalLoad;
-  }
+  const dir = makeTempWorkspace();
+  copyFixture(dir, 'read-file-v087-sample.pdf');
+  const out = await read('read-file-v087-sample.pdf', dir);
+  assert.ok(!out.startsWith('Error:'), `expected success, got: ${out.slice(0, 200)}`);
+  assert.match(out, /Format: PDF, 2 page\(s\)/);
+  assert.match(out, /--- Page 1 of 2 ---/);
+  assert.match(out, /--- Page 2 of 2 ---/);
+  assert.ok(out.includes('Hello from the DOCX fixture.'));
+  assert.ok(out.includes('Second page content for the PDF test.'));
+  assert.ok(out.includes('Xin chao open-bot'));
+  // Page 2 content must come after the page 2 marker, not page 1.
+  assert.ok(
+    out.indexOf('Second page content') > out.indexOf('--- Page 2 of 2 ---'),
+    'page 2 text must follow the page 2 marker',
+  );
 });
 
 test('DOCX sample: heading, paragraph, table as cell | cell rows', async () => {
