@@ -24,7 +24,7 @@ export default function SettingsSecurityTab({ s, onlySections }: Props) {
     authLoading, authError, reloadAuth,
     signOutProvider, oauthProviders, oauthClientId, setOAuthClientId,
     oauthClientSecret, setOAuthClientSecret, oauthBusy, startOAuth, oauthMessage,
-    vaultSecrets, deleteVaultKey, noStorage, changeNoStorage,
+    vaultSecrets, vaultStorageStatus, deleteVaultKey, noStorage, changeNoStorage,
     noStorageLoading, noStorageError, reloadNoStorage,
     vaultLoading, vaultError, reloadVault,
     onePasswordStatus, onePasswordBusy, onePasswordChecking, onePasswordError,
@@ -121,6 +121,26 @@ export default function SettingsSecurityTab({ s, onlySections }: Props) {
         <section data-section="vault" className="card">
           <h3>{t('settings.vaultTitle')}</h3>
           <p className="hint">{t('settings.vaultIntro')}</p>
+          {vaultStorageStatus?.status === 'available' && (
+            <p className="hint" data-testid="vault-storage-available">
+              Bảo vệ bằng OS keychain / DPAPI / libsecret. Secret mới được mã hoá bằng backend của hệ điều hành.
+            </p>
+          )}
+          {vaultStorageStatus?.status === 'degraded' && (
+            <p className="error" role="alert" data-testid="vault-storage-degraded">
+              CẢNH BÁO: Vault đang dùng LocalEncryptor fallback, không phải OS keychain. Khoá giải mã nằm trong file cạnh vault; người đọc được cả hai file có thể giải mã secret. Mỗi lần lưu bền vững sẽ yêu cầu xác nhận riêng.
+            </p>
+          )}
+          {vaultStorageStatus?.status === 'unavailable' && (
+            <p className="error" role="alert" data-testid="vault-storage-unavailable">
+              Vault không thể giải mã toàn bộ dữ liệu hiện có. Ghi secret đã bị vô hiệu hoá; ciphertext hiện tại được giữ nguyên để thử mở lại khi môi trường mã hoá gốc khả dụng.
+            </p>
+          )}
+          {!vaultStorageStatus && (
+            <p className="hint" data-testid="vault-storage-status-loading">
+              Không đọc được trạng thái backend lưu trữ Vault. Hãy tải lại trạng thái trước khi lưu secret.
+            </p>
+          )}
           {/* v0.68c: the Vault used to show "empty" while its list was
               still loading, and a failed load looked exactly like an
               empty vault — loading and error + retry are explicit now. */}
