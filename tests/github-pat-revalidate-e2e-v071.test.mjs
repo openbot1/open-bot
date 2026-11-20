@@ -193,6 +193,7 @@ async function launchApp(mockPort) {
       ...process.env,
       XDG_CONFIG_HOME: xdgDir,
       ELECTRON_DISABLE_SECURITY_WARNINGS: '1',
+      NODE_ENV: 'test',
       // PR #9: no OS keychain on this VM, so the vault runs degraded and
       // `apps:set-token` would pop a native consent dialog nobody answers
       // (the UI would never flip to connected). The launcher opts in here,
