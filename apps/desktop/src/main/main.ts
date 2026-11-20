@@ -12149,7 +12149,7 @@ function registerIpc(): void {
     const url = requireHttpUrl(payload?.url, 'url');
     // Chỉ mở link release chính thức của repo open-bot — chặn URL lạ
     // từ renderer (kể cả khi renderer bị chèn nội dung xấu).
-    const prefix = 'https://github.com/hoangthuanreview20-boop/open-bot/releases/';
+    const prefix = 'https://github.com/openbot1/open-bot/releases/';
     if (!url.startsWith(prefix)) {
       throw new Error('Chỉ mở được link release chính thức của open-bot.');
     }

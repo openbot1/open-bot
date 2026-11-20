@@ -32,7 +32,7 @@
  */
 import type { UpdateTrack } from './tracks';
 
-export const UPDATE_REPO = 'hoangthuanreview20-boop/open-bot';
+export const UPDATE_REPO = 'openbot1/open-bot';
 export const UPDATE_RELEASES_API = `https://api.github.com/repos/${UPDATE_REPO}/releases/latest`;
 /** Releases list (newest first) — source for the non-stable track checks. */
 export const UPDATE_RELEASES_LIST_API = `https://api.github.com/repos/${UPDATE_REPO}/releases?per_page=20`;

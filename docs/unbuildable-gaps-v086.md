@@ -65,6 +65,9 @@ không chạy được; không đổi fail-closed thành fail-open.
 
 ## P1-1 — Tự cập nhật cài đặt thật (`quitAndInstallUpdate`)
 
+**Cập nhật 2026-11-20 (release-gate Draft PR #10):** đã bổ sung electron-builder publisher trỏ tới GitHub Releases hiện hữu (`openbot1/open-bot`), draft-release commands, preflight và cấu hình fail-closed cho signing macOS/Windows. Đây mới là cấu hình/scripts — chưa có credentials, chưa tạo/publish artifact và chưa chạy ký/notarize. Linux AppImage vẫn chưa có GPG signing. Vì vậy kết luận bên dưới về việc chưa thể chứng minh self-install vẫn còn nguyên: `quitAndInstallUpdate()` vẫn trả `installed: false`, không có app-side download/verify/install, và repo chưa có release thật để test end-to-end.
+
+
 **Hiện trạng thật (đã kiểm chứng trong code):** phần *kiểm tra* đã
 là code thật — `stable` qua GitHub releases API, `dogfood`/
 `nightly`/`lab` qua `checkForTrackUpdate`
@@ -74,7 +77,7 @@ là code thật — `stable` qua GitHub releases API, `dogfood`/
 `apps/desktop/src/main/updateService.ts` **luôn trả
 `{installed: false}`**; khi có bản mới, app chỉ mở trang release để
 người dùng tải tay (`update:open-download`, chỉ cho phép URL
-`github.com/hoangthuanreview20-boop/open-bot/releases/`).
+`github.com/openbot1/open-bot/releases/`).
 
 **Vì sao không làm được trên máy này:** thiếu cả hai thứ mà cơ chế
 tải + cài thật bắt buộc phải có, và cả hai đều nằm ngoài code:

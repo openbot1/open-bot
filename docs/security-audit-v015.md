@@ -234,7 +234,7 @@ Những khu vực này đã được đọc kỹ và có mitigation tốt — gh
 | Git/worktree | `execFile('git', [...])`, không shell (`worktree.ts:102-105`); tên branch validate bằng regex. |
 | Skill marketplace | Chỉ http(s) (git thêm `git@host:`), chặn zip-slip, giới hạn 10MB/500 file/50MB, timeout 30s, quét secret trước khi cài, validate manifest bằng loader (`marketplace.ts`). |
 | MCP registry | `verifyChecksum` SHA-256 + `timingSafeEqual` khi fetch registry (`registry.ts:130-140, 527, 570`). |
-| Update | Không tự cài update; chỉ mở link `https://github.com/hoangthuanreview20-boop/open-bot/releases/` đã kiểm tra prefix (`main.ts:2854-2858`); `checker.ts` ghi rõ autoUpdater cần code-signing mà project chưa có. |
+| Update | Không tự cài update; chỉ mở link `https://github.com/openbot1/open-bot/releases/` đã kiểm tra prefix (`main.ts:2854-2858`); `checker.ts` ghi rõ autoUpdater cần code-signing mà project chưa có. |
 | Guardrails | 3 lớp input/output/tool: injection (block), secret-output (block), PII (block), tool-path escape (block, gồm `~`, `../`, Windows, UNC, `file://`, symlink) — `guardrails/builtin.ts:255-267, 319, 468-527, 577-579`; redact không bao giờ in giá trị secret (masked preview 4 ký tự đầu, `builtin.ts:125-171`). |
 | Electron | `contextIsolation: true`, `nodeIntegration: false` cả hai cửa sổ; preload chỉ expose `window.openBot`, không expose `ipcRenderer`/`Node` (`preload.ts:4-5`); `shell.openExternal` chỉ http(s) (`main.ts:1180-1187`); dev mode `loadURL('http://localhost:5173')` chỉ khi `OPEN_BOT_DEV=1` (`main.ts:2955`). |
 | Embeddings | Chỉ gọi Ollama local `http://127.0.0.1:11434`, không tải model từ mạng trong code (`embeddings.ts:27, 108-171`); file index validate model/dims, sai định dạng thì lỗi rõ. |

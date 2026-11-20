@@ -1,71 +1,88 @@
-# Kiểm tra (Testing) — open-bot v0.1
+# Build, testing and production verification
 
-Ngày kiểm tra: 2026-11-08. Môi trường: Linux VM, Node v24.22.1, npm 10.9.4.
-Chưa test với API key thật của bất kỳ provider nào — muốn test provider thật
-(OpenAI / Anthropic / Gemini / xAI / Ollama) cần có key và endpoint thật.
+Cập nhật: 20/11/2026. Yêu cầu runtime/build: Node.js 24+ và npm.
 
-## Trạng thái hiện tại (đo 2026-11-11, HEAD v0.84 + sóng v0.85 đang chạy)
+## Quy tắc báo cáo trạng thái
 
-- **Full suite: 2.591 test — 2.509 pass, 8 fail, 1 cancelled, 73 skipped**
-  (log `/tmp/fullsuite-v085-docs.log`, `npm test`, chạy ~11 phút).
-  Tổng tăng từ 2.580 ở v0.84 (sóng v0.85 đang thêm test mới trong cùng
-  cây làm việc — 2 file test `*-v085.test.mjs` mới đã có mặt lúc chạy).
-- **8 fail đều là test computer-use** (`tests/computer-use-v06.test.mjs`):
-  lỗi `No X display available: the DISPLAY environment variable is not
-  set` — lần chạy này gọi `npm test` trực tiếp, không bọc `xvfb-run`
-  ở tầng ngoài (các test renderer/smoke tự bọc xvfb nên vẫn chạy).
-  Không phải regression code: chạy lại dưới `xvfb-run -a npm test`
-  thì nhóm này có display để chạy thật.
-- **1 cancelled: e2e live Ollama** (`qwen2.5:0.5b`, timeout 240s) —
-  model/dịch vụ Ollama không phản hồi kịp dưới tải; các sóng trước
-  cũng ghi nhận test này timeout khi máy tải nặng.
-- **73 skipped: phần lớn là test renderer/smoke** (`# SKIP`) — cao bất
-  thường so với 2 skipped ở v0.84. Nguyên nhân chưa xác định chắc chắn:
-  lần chạy này diễn ra cùng lúc sóng v0.85 đang chạy test Electron
-  trong cùng cây (có thể tranh chấp CDP/display), và máy đang tải nặng;
-  cần chạy lại dưới `xvfb-run -a npm test` khi máy rảnh để có baseline
-  sạch trước khi kết luận. Số skip không phản ánh code hỏng.
-- **Live test đã làm bằng key/tài khoản thật** (không còn "chưa test
-  với key thật" như dòng mở đầu v0.1 ở trên):
-  - **Gemini (v0.38):** key Gemini miễn phí của Huy, loop 3 vòng
-    471 in/41 out trong 2.7s qua proxy local (`OPENBOT_LIVE_GEMINI=1
-    node --test tests/gemini-live.test.mjs`); chi tiết
-    `docs/live-test-gemini.md`. Test tự skip khi không có key.
-  - **Composio phần ĐỌC (v0.72):** session thật, `SEARCH_TOOLS` +
-    `GET_TOOL_SCHEMAS` thật qua coordinator, sửa 3 lỗi wire shape;
-    báo cáo `scripts/composio-live-v072/report.json`; phần GHI vẫn
-    chờ Huy phê duyệt repo test + hộp thư/kênh test.
-  - **Ollama local (v0.6):** model `qwen2.5:0.5b` chạy thật, tool-call
-    hoạt động (xem mục v0.6 trong `docs/ROADMAP.md`).
-- **Ghi chú Bing redirect đã bỏ:** URL kết quả Bing từng là link
-  redirect `bing.com/ck/a?...` chưa unwrap (ghi nhận ở v0.1); đã sửa
-  ở v0.6 bằng `unwrapBingRedirect` (`packages/tools/src/tools.ts`)
-  cho dạng redirect mới `u=a1<base64>` của Bing.
+- Một kết quả test chỉ có giá trị khi ghi kèm **commit SHA, lệnh chính xác, môi trường/OS, thời điểm và summary do runner trả về**.
+- Không lấy test count trong log cũ hoặc từ một checkout khác làm bằng chứng cho commit hiện tại.
+- Không ghi “CI xanh” nếu chưa kiểm tra GitHub Actions của đúng SHA. Workflow CI hiện định nghĩa build, typecheck và test trên Ubuntu, Windows, macOS; trạng thái phải đọc ở trang Actions của commit/PR cụ thể.
+- PR release-gate này được tạo bằng GitHub web UI; tác giả không có checkout thực thi, nên **không chạy build, typecheck, unit test, full suite, signing hay notarization**.
+- Tại lúc cập nhật tài liệu, maintainer báo local main `dfd90beb` khác public GitHub main `9ecb82ed24aface43b4287ae8ffd81c484ea85ea`. PR #7/#8/#9 còn local-only và chưa được đưa vào base của release-gate. Coordinator đang xử lý nhóm 13 regression test fail riêng; release-gate không sửa các test đó và không tuyên bố full suite đã xanh. Chỉ land release-gate sau khi coordinator xác nhận full suite xanh trên source snapshot dự định phát hành và Muse hoàn thành kiểm chứng độc lập.
 
-Phần còn lại của file này là bản ghi kiểm tra gốc thời v0.1, giữ
-nguyên như lịch sử — đọc cùng mục trạng thái hiện tại ở trên.
+## Cài đặt, build và typecheck
 
-## Lệnh build / typecheck
+Tại repository root:
 
-| Lệnh | Kết quả |
-| --- | --- |
-| `npm install` (root, workspaces) | PASS — 138 packages, không lỗi native build (core dùng `node:sqlite` có sẵn, không có `better-sqlite3`). |
-| `npm run build` | PASS — core → tools → desktop, sạch. |
-| `npm run typecheck` | PASS — sạch, 0 lỗi. |
+```bash
+npm run version:sync
+npm ci
+npm run build
+npm run typecheck
+```
 
-Hai lỗi build có sẵn đã sửa trong đợt tích hợp (không phải do code mới):
+`package.json` ở root là nguồn version chuẩn. `version:sync` đồng bộ version sang các workspace manifests và `package-lock.json`; `version:check` xác minh metadata không bị lệch:
 
-1. `packages/tools/tsconfig.json` map `@open-bot/core` thẳng tới source của
-   core (`../core/src/index.ts`) nên `tsc` báo TS6059 (`rootDir` là
-   `packages/tools/src`). Đã bỏ map `paths` — tools dùng bản `dist` đã build
-   của core.
-2. `packages/tools/tsconfig.json` kế thừa `module: ESNext` từ
-   `tsconfig.base.json`, nên `dist` của tools là ESM với import không đuôi
-   `.js` (`export ... from './tools'`) — Node/Electron không load được
-   package này. Đã set `module: commonjs`, `moduleResolution: node` (như core).
-3. Script `build`/`typecheck` ở root dùng `npm run ... --workspaces`
-   chạy desktop trước khi core/tools có `dist`, nên `tsc` của desktop lỗi
-   resolve `@open-bot/*`. Đã đổi thành chạy tuần tự core → tools → desktop.
+```bash
+npm run version:check
+```
+
+Root build/typecheck/dev/dist và desktop workspace build/dist đều gọi script đồng bộ trước khi chạy. CLI đọc version từ root manifest trong monorepo; Electron lấy `app.getVersion()` từ desktop package đã được đồng bộ trước build/package.
+
+## Chạy test
+
+Trên Linux, nhóm test dùng display cần chạy dưới Xvfb:
+
+```bash
+xvfb-run -a npm test
+```
+
+Trên Windows/macOS:
+
+```bash
+npm test
+```
+
+Với thay đổi updater ở release-gate (sau khi build các workspace):
+
+```bash
+node --test tests/auth-update-v07.test.mjs tests/update-tracks-v054.test.mjs tests/update-feed-tracks-v059.test.mjs
+```
+
+Nếu một test cần API key, service ngoài, display hoặc binary hệ thống, hãy ghi rõ điều kiện đó và trạng thái skip. Skip không được tính là xác minh tích hợp thật. Khi báo cáo kết quả, đính kèm summary nguyên bản của `node --test` và không suy diễn test count.
+
+## CI
+
+Workflow `.github/workflows/ci.yml` khai báo:
+
+- Build + typecheck + full test trên `ubuntu-latest`, `windows-latest`, `macos-latest`.
+- Linux full test chạy bằng `xvfb-run -a npm test`.
+- Một job platform chạy `tests/platform.test.mjs` sau build trên cả ba OS.
+
+Cấu hình workflow không chứng minh một run cụ thể đã pass. Kiểm tra đúng commit SHA trên GitHub Actions trước khi gọi release gate là xanh. Không có CI status hoặc full-suite count mới nào được ghi trong tài liệu này.
+
+## Release readiness
+
+Release packaging, version tagging, signing, notarization và draft GitHub Releases được mô tả tại [docs/RELEASING.md](RELEASING.md). Lưu ý:
+
+- Updater hiện check GitHub Releases theo track và mở trang release để tải thủ công; nó **không tự tải/cài**.
+- Không có release artifact nào được publish tại lần kiểm tra khi soạn release-gate.
+- macOS release đòi Developer ID signing + notarization; Windows release đòi Authenticode signing. Linux AppImage hiện không được GPG-sign bởi cấu hình release.
+- Không chạy hoặc mô tả một release là signed/notarized cho tới khi artifact thật đã được tạo trên host phù hợp và xác minh trên OS đích.
+
+## Known gaps / môi trường chưa xác minh
+
+- Self-install/update verification end-to-end chưa được implement; xem `docs/unbuildable-gaps-v086.md` và `docs/update-tracks.md`.
+- Computer-use ngoài Linux + X11 chưa được xác minh trong môi trường tương ứng; xem `docs/unbuildable-gaps-v086.md`.
+- Build target macOS/Windows không thay thế test runtime thật trên Mac/Windows.
+- Provider live tests yêu cầu key/service thật; không có key thì test có thể skip. Không ghi live-provider pass dựa trên mock.
+- Signing/notarization requires external certificate and secrets; PR source changes do not constitute a signed release.
+
+---
+
+## Lịch sử kiểm thử cũ (chỉ tham khảo, không phải bằng chứng release hiện tại)
+
+Các ghi chép bên dưới được giữ lại để bảo toàn bối cảnh lịch sử của repository. Mọi kết quả, test count và kết luận bên dưới thuộc checkout/ngày chạy được ghi trong từng mục; **không được dùng để khẳng định trạng thái của HEAD hiện tại hoặc CI hiện tại**.
 
 ## Smoke test agent core (mock provider + tool thật)
 

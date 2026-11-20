@@ -210,7 +210,23 @@ import type {
   VisionAttachment,
 } from '@open-bot/core';
 
-const VERSION = '0.50.0';
+function readCanonicalVersion(): string {
+  // The CLI runs from apps/cli/dist in this monorepo. Read the root
+  // manifest so its --help output cannot drift from the desktop release.
+  try {
+    const rootManifestPath = path.resolve(__dirname, '../../../package.json');
+    const manifest = JSON.parse(fs.readFileSync(rootManifestPath, 'utf8')) as { version?: unknown };
+    if (typeof manifest.version === 'string' && manifest.version.trim() !== '') {
+      return manifest.version;
+    }
+  } catch {
+    // A packaged/relocated CLI may not carry the monorepo root. The
+    // synchronized workspace version supplied by npm is the safe fallback.
+  }
+  return process.env.npm_package_version?.trim() || 'unknown';
+}
+
+const VERSION = readCanonicalVersion();
 
 /** Text loop trả về khi approval bị từ chối (xem agent/loop.ts). */
 export const APPROVAL_DENIED_TEXT = 'đã hủy';
