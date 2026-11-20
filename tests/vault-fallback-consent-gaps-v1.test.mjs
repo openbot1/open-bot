@@ -75,3 +75,16 @@ test('legacy API-key migration does not clear settings when Vault is unavailable
   assert.match(body, /settings\.json values were preserved/);
   assert.match(body, /return;/);
 });
+
+test('the E2E consent bypass is restricted to NODE_ENV=test', () => {
+  const main = fs.readFileSync(MAIN_TS, 'utf8');
+  assert.match(
+    main,
+    /process\.env\.NODE_ENV === 'test' && process\.env\.OPENBOT_VAULT_ALLOW_LOCAL_FALLBACK === '1'/,
+  );
+  const harness = fs.readFileSync(
+    path.join(process.cwd(), 'tests/vault-confirm-l5-click.test.mjs'),
+    'utf8',
+  );
+  assert.match(harness, /NODE_ENV: 'test'/);
+});
