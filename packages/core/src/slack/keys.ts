@@ -27,7 +27,7 @@ export const SLACK_INBOUND_KEYS_NAMESPACE = 'slack-inbound-keys';
 /** Minimal Vault surface this module needs (the real Vault satisfies it). */
 export interface SlackInboundKeyVault {
   getSecret(namespace: string, key: string): string | null;
-  setSecret(namespace: string, key: string, value: string): void;
+  setSecret(namespace: string, key: string, value: string, opts?: { allowLocalFallback?: boolean }): void;
   deleteSecret(namespace: string, key: string): boolean;
   hasSecret(namespace: string, key: string): boolean;
 }
@@ -41,11 +41,12 @@ export function setSlackSigningSecret(
   vault: SlackInboundKeyVault,
   automationId: string,
   secretValue: string,
+  opts?: { allowLocalFallback?: boolean },
 ): void {
   if (typeof secretValue !== 'string' || secretValue.trim() === '') {
     throw new Error('Slack signing secret must not be empty.');
   }
-  vault.setSecret(SLACK_INBOUND_KEYS_NAMESPACE, automationId, secretValue.trim());
+  vault.setSecret(SLACK_INBOUND_KEYS_NAMESPACE, automationId, secretValue.trim(), opts);
 }
 
 /** Read the signing secret for an automation; null when missing. */
