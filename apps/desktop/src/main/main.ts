@@ -4378,7 +4378,7 @@ async function startOAuthLogin(
       id: subject,
       displayName,
       email,
-    });
+    }, { allowLocalFallback });
     // The connector's own identity row (used by
     // 'auth:identities-list' to report connector status): for
     // microsoft -> 'teams' and google -> 'gmail' this differs from
@@ -4388,7 +4388,7 @@ async function startOAuthLogin(
         id: subject,
         displayName,
         email,
-      });
+      }, { allowLocalFallback });
     }
     return { ok: true, providerId, displayName: identity.displayName };
   } catch (err) {
