@@ -516,7 +516,6 @@ import type {
   CreatePluginTemplateInput,
   DreamConfig,
   DetectedEnginesSnapshot,
-  Encryptor,
   AgUiEvent,
   AgUiEventFilter,
   HarnessEventsFilter,
@@ -965,8 +964,6 @@ function settingsForRenderer(): {
 const VAULT_FILE = 'vault.json';
 const USAGE_FILE = 'usage.json';
 let vault: Vault;
-/** Encryptor OS-backed — sibling secret stores use their own safe opener/migration. */
-let vaultEncryptor: Encryptor | undefined;
 let vaultStorageStatus: 'available' | 'degraded' | 'unavailable' = 'unavailable';
 let usageTracker: UsageTracker;
 
@@ -976,7 +973,6 @@ function initVaultAndUsage(userDataDir: string): void {
     safeStorage,
   });
   vault = opened.vault;
-  vaultEncryptor = opened.encryptor;
   vaultStorageStatus = opened.status;
   if (opened.status === 'degraded') {
     console.error('[open-bot] Vault đang ở degraded mode: LocalEncryptor fallback; persistent secret writes require user confirmation.');
