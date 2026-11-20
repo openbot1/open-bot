@@ -124,7 +124,7 @@ test('fleet v103 ui: new IPC channels are declared in preload, exposed, and hand
   for (const channel of NEW_CHANNELS) {
     assert.ok(preload.includes(`'${channel}'`), `preload interface must declare ${channel}`);
     assert.ok(preload.includes(`ipcRenderer.invoke('${channel}'`), `preload must expose ${channel}`);
-    assert.ok(main.includes(`ipcMain.handle('${channel}'`), `main.ts must handle ${channel}`);
+    assert.ok(main.includes(`registerMainWindowIpcHandler('${channel}'`), `main.ts must handle ${channel}`);
   }
 });
 

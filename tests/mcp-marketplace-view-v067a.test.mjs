@@ -242,7 +242,7 @@ test('wiring: preload + global.d.ts expose listMcpServerTools mirroring the othe
 
 test('wiring: main registers mcp-marketplace:tools with a session cache (ok/needs-key only)', () => {
   const main = read(path.join(repo, 'apps/desktop/src/main/main.ts'));
-  assert.match(main, /ipcMain\.handle\('mcp-marketplace:tools'/);
+  assert.match(main, /registerMainWindowIpcHandler\('mcp-marketplace:tools'/);
   assert.match(main, /probeMarketplaceServerTools\(id, app\.getPath\('userData'\)\)/);
   assert.match(main, /mcpMarketplaceToolsCache/);
   // v0.68a: the cache is keyed by server id + registry fingerprint, so

@@ -206,7 +206,7 @@ test('main: all memory-v11:* IPC channels registered', () => {
   );
   for (const channel of EXPECTED_IPC_CHANNELS) {
     assert.ok(
-      new RegExp(`ipcMain\\.handle\\(\\s*'${channel}'`).test(source),
+      new RegExp(`registerMainWindowIpcHandler\\(\\s*'${channel}'`).test(source),
       `main missing channel ${channel}`,
     );
   }

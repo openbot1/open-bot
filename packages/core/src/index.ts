@@ -5727,6 +5727,7 @@ export {
   Vault,
   LocalEncryptor,
   createSafeStorageEncryptor,
+  openVaultWithSafeStorage,
   loadOrCreateMachineKey,
   // v0.53 (P1-6): durable writes, session-only store, refusal taxonomy,
   // webhook key store, 1Password broker (out-of-process).
@@ -5747,6 +5748,10 @@ export {
 export type {
   Encryptor,
   SafeStorageLike,
+  VaultStorageStatus,
+  VaultWritePolicy,
+  OpenVaultWithSafeStorageOptions,
+  OpenVaultWithSafeStorageResult,
   VaultOptions,
   VaultEntryMeta,
   SetSecretOptions,

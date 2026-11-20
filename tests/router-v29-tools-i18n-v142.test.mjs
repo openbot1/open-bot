@@ -305,8 +305,11 @@ test('tools: provider config / cost forecast / policy', async () => {
   await runJson(tools, 'router_v29_cost_record', {
     modelId: 'gpt-live', sessionId: 's1', inputTokens: 1000, outputTokens: 500, minutes: 10,
   });
+  // endDay = hôm nay (cost record ghi ngày hiện tại; endDay cố định
+  // '2026-11-19' là time-bomb — sang 20/11 record rơi ngoài window).
+  const today = new Date().toISOString().slice(0, 10);
   const forecast = await runJson(tools, 'router_v29_cost_forecast', {
-    windowDays: 30, endDay: '2026-11-19', dailyBudgetUsd: 1, monthlyBudgetUsd: 30, modelId: 'gpt-live',
+    windowDays: 30, endDay: today, dailyBudgetUsd: 1, monthlyBudgetUsd: 30, modelId: 'gpt-live',
   });
   assert.equal(forecast.forecast.daysWithData, 1);
   assert.ok(Math.abs(forecast.forecast.windowTotalUsd - 0.62) < 1e-9);

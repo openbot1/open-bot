@@ -6,9 +6,20 @@ export {
   Vault,
   LocalEncryptor,
   createSafeStorageEncryptor,
+  openVaultWithSafeStorage,
   loadOrCreateMachineKey,
 } from './vault';
-export type { Encryptor, SafeStorageLike, VaultOptions, VaultEntryMeta, SetSecretOptions } from './vault';
+export type {
+  Encryptor,
+  SafeStorageLike,
+  VaultOptions,
+  VaultEntryMeta,
+  SetSecretOptions,
+  VaultStorageStatus,
+  VaultWritePolicy,
+  OpenVaultWithSafeStorageOptions,
+  OpenVaultWithSafeStorageResult,
+} from './vault';
 // v0.53 (P1-6): durable writes with bounded backup copies.
 export { writeDurableFileSync, readDurableFileSync, DEFAULT_DURABLE_COPIES } from './durableFile';
 export type { DurableWriteOptions } from './durableFile';

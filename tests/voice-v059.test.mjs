@@ -254,7 +254,7 @@ test('v059 1Password IPC: preload + global.d.ts expose set-enabled, types có c�
 
 test('v059 1Password main: set-enabled lưu settings + tắt thì không spawn worker, import-field từ chối', () => {
   const main = read('apps/desktop/src/main/main.ts');
-  assert.match(main, /ipcMain\.handle\(\n\s+'onepassword:set-enabled'/);
+  assert.match(main, /registerMainWindowIpcHandler\(\n\s+'onepassword:set-enabled'/);
   assert.match(main, /settings\.onePasswordEnabled = enabled;/);
   assert.match(main, /onePasswordBroker\.dispose\(\);/);
   assert.match(main, /onePasswordEnabled === false/);

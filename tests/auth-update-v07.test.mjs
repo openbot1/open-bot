@@ -491,7 +491,7 @@ test('update: newer release is reported available with its download link', async
     status: 200,
     json: async () => ({
       tag_name: 'v0.7.0',
-      html_url: 'https://github.com/hoangthuanreview20-boop/open-bot/releases/tag/v0.7.0',
+      html_url: 'https://github.com/openbot1/open-bot/releases/tag/v0.7.0',
     }),
   });
   const res = await checkForUpdate({ currentVersion: '0.2.0', fetchImpl: mockFetch });

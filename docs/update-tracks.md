@@ -1,5 +1,8 @@
 # Update theo track (P1-9, v0.54; feed track ngoài stable thật từ v0.59)
 
+**Cập nhật 2026-11-20:** release-gate Draft PR #10 bổ sung cấu hình electron-builder để publish artifact lên chính GitHub Releases của repo dưới dạng draft, cùng preflight signing/notarization cho macOS/Windows. Chưa có release/artifact nào được publish; luồng client vẫn chỉ check + mở trang tải thủ công, chưa tự cài. Xem [RELEASING.md](RELEASING.md).
+
+
 Tài liệu ngắn về cơ chế update của open-bot — track, lịch kiểm tra, và
 **giới hạn chưa có release thật** (đọc trước khi "hoàn thiện" cơ chế này).
 
@@ -69,7 +72,7 @@ nào được phát hành thật** (kể cả kênh stable). Hệ quả:
    `packages/core/src/update/checker.ts`). App không bao giờ tự ghi đè file
    của chính nó khi đang chạy. Khi có bản mới, banner + Settings chỉ mở
    trang release để tải tay (`update:open-download`, chỉ cho phép URL
-   `github.com/hoangthuanreview20-boop/open-bot/releases/`).
+   `github.com/openbot1/open-bot/releases/`).
 3. **`update_required` / `min_client_version` chưa có nguồn** (xem trên).
 
 ## Khi nào thì "xong" thật?

@@ -150,7 +150,7 @@ test('preload: expose đủ API router + subscribe router:changed', () => {
 
 test('main: đăng ký đủ IPC router:* + forward router.decision → router:changed', () => {
   for (const channel of EXPECTED_IPC_CHANNELS.slice(0, 6)) {
-    assert.ok(MAIN.includes(`ipcMain.handle(\n    '${channel}'`) || MAIN.includes(`ipcMain.handle('${channel}'`), `main thiếu IPC ${channel}`);
+    assert.ok(MAIN.includes(`registerMainWindowIpcHandler(\n    '${channel}'`) || MAIN.includes(`registerMainWindowIpcHandler('${channel}'`), `main thiếu IPC ${channel}`);
   }
   // router.decision là harness event (kind 'router.decision' trong
   // envelope 'harness.event'), KHÔNG phải AgentEvent — main forward nó

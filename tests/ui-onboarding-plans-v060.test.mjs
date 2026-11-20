@@ -386,7 +386,7 @@ test('UI-12: listStoredPlansForBots merges bots, newest first', () => {
 
 test('UI-12: plans:list is wired main -> preload -> types -> PlanReviewView', () => {
   const main = read(path.join(repo, 'apps/desktop/src/main/main.ts'));
-  assert.match(main, /ipcMain\.handle\(\s*'plans:list'/);
+  assert.match(main, /registerMainWindowIpcHandler\(\s*'plans:list'/);
   assert.match(main, /listStoredPlansForBots\(withDirs\)/);
   assert.match(main, /import \{ listStoredPlansForBots, type StoredPlan \} from '\.\/plans'/);
   const plansModule = read(path.join(repo, 'apps/desktop/src/main/plans.ts'));
@@ -417,7 +417,7 @@ test('W4 follow-up: chat:send passes the selected threadId into run()', () => {
   const main = read(path.join(repo, 'apps/desktop/src/main/main.ts'));
   // The handler already validates the thread from the payload and saves
   // both messages of the turn into it (v0.59 UI-5).
-  assert.match(main, /ipcMain\.handle\(\s*'chat:send'/);
+  assert.match(main, /registerMainWindowIpcHandler\(\s*'chat:send'/);
   assert.match(main, /const threadId =\s*\n\s*typeof payload\?\.threadId === 'string'/);
   // v0.65 (vision persistence): the user message is saved with its
   // attachments, so a reload shows the images again (not just the

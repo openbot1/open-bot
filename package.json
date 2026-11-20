@@ -11,7 +11,16 @@
     "dist": "npm run dist --workspace=@open-bot/desktop",
     "test": "node --test",
     "i18n:audit": "node scripts/i18n-audit",
-    "typecheck": "npm run typecheck --workspace=@open-bot/core && npm run typecheck --workspace=@open-bot/tools && npm run typecheck --workspace=@open-bot/desktop && npm run typecheck --workspace=@open-bot/cli"
+    "typecheck": "npm run typecheck --workspace=@open-bot/core && npm run typecheck --workspace=@open-bot/tools && npm run typecheck --workspace=@open-bot/desktop && npm run typecheck --workspace=@open-bot/cli",
+    "version:sync": "node scripts/sync-version.mjs",
+    "version:check": "node scripts/sync-version.mjs --check",
+    "prebuild": "npm run version:sync",
+    "pretypecheck": "npm run version:sync",
+    "predist": "npm run version:sync",
+    "predev": "npm run version:sync",
+    "release:mac": "node scripts/release-preflight.mjs mac && npm run dist:mac --workspace=@open-bot/desktop -- --publish always",
+    "release:win": "node scripts/release-preflight.mjs win && npm run dist:win --workspace=@open-bot/desktop -- --publish always",
+    "release:linux": "node scripts/release-preflight.mjs linux && npm run dist:linux --workspace=@open-bot/desktop -- --publish always"
   },
   "version": "0.2.0",
   "workspaces": [

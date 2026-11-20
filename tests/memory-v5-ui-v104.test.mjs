@@ -85,8 +85,8 @@ test('preload expose API memory-v5 + main đăng ký đủ 3 kênh IPC', () => {
   assert.ok(preload.includes('MemoryV5ConsolidationRunView'), 'preload thiếu type MemoryV5ConsolidationRunView');
   assert.ok(preload.includes('MemoryV5BiTemporalRowView'), 'preload thiếu type MemoryV5BiTemporalRowView');
   const main = read(['apps', 'desktop', 'src', 'main', 'main.ts']);
-  assert.ok(main.includes("ipcMain.handle('memory-v5:health'"), 'main thiếu handler memory-v5:health');
-  assert.ok(main.includes("ipcMain.handle(\n    'memory-v5:consolidate'"), 'main thiếu handler memory-v5:consolidate');
+  assert.ok(main.includes("registerMainWindowIpcHandler('memory-v5:health'"), 'main thiếu handler memory-v5:health');
+  assert.ok(main.includes("registerMainWindowIpcHandler(\n    'memory-v5:consolidate'"), 'main thiếu handler memory-v5:consolidate');
   assert.ok(main.includes("'memory-v5:bitemporal'"), 'main thiếu handler memory-v5:bitemporal');
   assert.ok(main.includes('computeMemoryHealth'), 'main chưa import computeMemoryHealth');
   assert.ok(main.includes('runConsolidationV2'), 'main chưa import runConsolidationV2');

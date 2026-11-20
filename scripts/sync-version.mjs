@@ -1,0 +1,80 @@
+#!/usr/bin/env node
+/**
+ * Keep npm workspace metadata aligned with the root package.json version.
+ *
+ * package.json at the repository root is the single source of truth.
+ * Workspace package.json files and package-lock.json are generated metadata
+ * mirrors required by npm/electron-builder, not independent release versions.
+ *
+ * Usage:
+ *   node scripts/sync-version.mjs        # synchronize manifests + lockfile
+ *   node scripts/sync-version.mjs --check # verify without writing
+ */
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const checkOnly = process.argv.includes('--check');
+const rootManifestPath = path.join(repoRoot, 'package.json');
+const lockfilePath = path.join(repoRoot, 'package-lock.json');
+const workspaceManifestPaths = [
+  'apps/cli/package.json',
+  'apps/desktop/package.json',
+  'packages/core/package.json',
+  'packages/tools/package.json',
+];
+
+function readJson(filePath) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch (error) {
+    throw new Error(`Cannot read ${path.relative(repoRoot, filePath)}: ${error.message}`);
+  }
+}
+
+function writeJson(filePath, value) {
+  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+}
+
+const rootManifest = readJson(rootManifestPath);
+if (typeof rootManifest.version !== 'string' || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(rootManifest.version)) {
+  throw new Error('Root package.json must contain a valid semver version.');
+}
+const version = rootManifest.version;
+const changed = [];
+
+for (const relativePath of workspaceManifestPaths) {
+  const filePath = path.join(repoRoot, relativePath);
+  const manifest = readJson(filePath);
+  if (manifest.version !== version) {
+    manifest.version = version;
+    changed.push(relativePath);
+    if (!checkOnly) writeJson(filePath, manifest);
+  }
+}
+
+const lockfile = readJson(lockfilePath);
+const lockEntries = ['', 'apps/cli', 'apps/desktop', 'packages/core', 'packages/tools'];
+for (const entry of lockEntries) {
+  const lockedPackage = lockfile.packages?.[entry];
+  if (!lockedPackage) {
+    throw new Error(`package-lock.json is missing workspace entry "${entry}". Run npm install after synchronizing versions.`);
+  }
+  if (lockedPackage.version !== version) {
+    lockedPackage.version = version;
+    changed.push(entry === '' ? 'package-lock.json (root)' : `package-lock.json (${entry})`);
+  }
+}
+if (changed.some(item => item.startsWith('package-lock.json')) && !checkOnly) {
+  writeJson(lockfilePath, lockfile);
+}
+
+if (changed.length > 0 && checkOnly) {
+  console.error(`Version metadata is out of sync with root version ${version}:\n- ${changed.join('\n- ')}\nRun "npm run version:sync" to update it.`);
+  process.exitCode = 1;
+} else if (changed.length > 0) {
+  console.log(`Synchronized workspace metadata to root version ${version}: ${changed.join(', ')}`);
+} else {
+  console.log(`Workspace version metadata is already aligned at ${version}.`);
+}

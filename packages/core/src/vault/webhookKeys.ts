@@ -20,7 +20,7 @@
  * LocalEncryptor is built from the sibling key file.
  */
 import * as path from 'node:path';
-import type { Encryptor } from './vault';
+import type { Encryptor, VaultWritePolicy } from './vault';
 import { Vault } from './vault';
 
 /** File name of the webhook key store inside its directory. */
@@ -44,6 +44,10 @@ export interface WebhookKeyStoreOptions {
   maxEntries?: number;
   /** Start in NO_STORAGE mode (memory only, passed to the Vault). */
   noStorage?: boolean;
+  /** Same durable-write policy as the main Vault. */
+  writePolicy?: VaultWritePolicy;
+  /** Reuse a Vault opened with the safeStorage migration/recovery policy. */
+  vault?: Vault;
 }
 
 export interface WebhookKeyOptions {
@@ -56,6 +60,8 @@ export interface WebhookKeyOptions {
    * Default true.
    */
   saveToVault?: boolean;
+  /** One-operation consent to persist this key with LocalEncryptor. */
+  allowLocalFallback?: boolean;
 }
 
 /**
@@ -68,13 +74,16 @@ export class WebhookKeyStore {
 
   constructor(options: WebhookKeyStoreOptions) {
     if (!options.dir) throw new Error('WebhookKeyStore needs a dir.');
-    this.vault = new Vault({
-      storePath: path.join(options.dir, WEBHOOK_KEYS_FILE),
-      ...(options.encryptor ? { encryptor: options.encryptor } : {}),
-      ...(options.keyFilePath ? { keyFilePath: options.keyFilePath } : {}),
-      ...(options.maxEntries !== undefined ? { maxEntries: options.maxEntries } : {}),
-      ...(options.noStorage !== undefined ? { noStorage: options.noStorage } : {}),
-    });
+    this.vault =
+      options.vault ??
+      new Vault({
+        storePath: path.join(options.dir, WEBHOOK_KEYS_FILE),
+        ...(options.encryptor ? { encryptor: options.encryptor } : {}),
+        ...(options.keyFilePath ? { keyFilePath: options.keyFilePath } : {}),
+        ...(options.maxEntries !== undefined ? { maxEntries: options.maxEntries } : {}),
+        ...(options.noStorage !== undefined ? { noStorage: options.noStorage } : {}),
+        ...(options.writePolicy ? { writePolicy: options.writePolicy } : {}),
+      });
   }
 
   /** Path of the webhook key store file. */
@@ -87,6 +96,7 @@ export class WebhookKeyStore {
     this.vault.setSecret('webhook', id, secret, {
       ...(opts?.maxAgeMs !== undefined ? { maxAgeMs: opts.maxAgeMs } : {}),
       ...(opts?.saveToVault !== undefined ? { saveToVault: opts.saveToVault } : {}),
+      ...(opts?.allowLocalFallback === true ? { allowLocalFallback: true } : {}),
     });
   }
 
@@ -102,6 +112,7 @@ export class WebhookKeyStore {
     return this.vault.trySetSecret('webhook', id, secret, {
       ...(opts?.maxAgeMs !== undefined ? { maxAgeMs: opts.maxAgeMs } : {}),
       ...(opts?.saveToVault !== undefined ? { saveToVault: opts.saveToVault } : {}),
+      ...(opts?.allowLocalFallback === true ? { allowLocalFallback: true } : {}),
     });
   }
 

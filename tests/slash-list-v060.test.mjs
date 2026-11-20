@@ -16,7 +16,7 @@
  * Static contract (không có harness Electron thật trong node:test —
  * ipcMain/preload chỉ kiểm chứng được bằng source, như các test IPC
  * khác trong repo):
- *   5. main.ts đăng ký `ipcMain.handle('slash:list', …)` và gọi
+ *   5. main.ts đăng ký `registerMainWindowIpcHandler('slash:list', …)` và gọi
  *      `getCoordinator().listSlashCommands(botId)`.
  *   6. preload.ts expose `listSlashCommands` (interface + object)
  *      gọi `ipcRenderer.invoke('slash:list', { botId })`.
@@ -222,9 +222,9 @@ test('listSlashCommands: bot lạ / botId rỗng → lỗi rõ ràng', async () 
 
 // --- Static contract: IPC wiring -----------------------------------------
 
-test('main.ts đăng ký ipcMain.handle("slash:list") gọi coordinator listSlashCommands', () => {
+test('main.ts đăng ký registerMainWindowIpcHandler("slash:list") gọi coordinator listSlashCommands', () => {
   const main = read(path.join(repo, 'apps/desktop/src/main/main.ts'));
-  assert.match(main, /ipcMain\.handle\('slash:list'/);
+  assert.match(main, /registerMainWindowIpcHandler\('slash:list'/);
   assert.match(main, /getCoordinator\(\)\.listSlashCommands\(botId\)/);
   assert.match(main, /Không tìm thấy bot\./);
 });

@@ -95,7 +95,7 @@ test('renderer: preload exposes all 9 acp-control channels + camelCase aliases',
 test('renderer: main registers all 9 acp-control handlers', () => {
   const main = read('apps/desktop/src/main/main.ts');
   for (const channel of CHANNELS) {
-    assert.ok(main.includes(`ipcMain.handle('${channel}'`), `main missing handler ${channel}`);
+    assert.ok(main.includes(`registerMainWindowIpcHandler('${channel}'`), `main missing handler ${channel}`);
   }
   assert.ok(main.includes('new AcpControlCenter({ stateDir: path.join(app.getPath(\'userData\'), \'acp-control\') })'));
   assert.ok(main.includes('buildAcpControlSnapshot'));

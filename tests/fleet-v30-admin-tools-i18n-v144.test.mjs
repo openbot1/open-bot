@@ -390,7 +390,12 @@ test('runnable tools: unbound says not configured; bound loop works', async () =
   const view = parse(await callTool(tools, 'fleet_v30_board_view', { taskId }));
   assert.equal(view.task.boardTask.task.id, taskId);
   parse(await callTool(tools, 'fleet_v30_board_priority', { taskId, priority: 'high', actor: 'admin' }));
-  parse(await callTool(tools, 'fleet_v30_board_due', { taskId, dueAt: '2026-11-20T00:00:00.000Z', slaMinutes: 60, actor: 'admin' }));
+  // Due date is relative to "now" (tomorrow): a fixed calendar date
+  // turns this into a time-bomb — once the date passes, the task is
+  // overdue and `board_overdue` no longer returns [] (failed 20/11
+  // when the suite ran past 2026-11-20T00:00:00Z).
+  const dueAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  parse(await callTool(tools, 'fleet_v30_board_due', { taskId, dueAt, slaMinutes: 60, actor: 'admin' }));
   const reassigned = parse(await callTool(tools, 'fleet_v30_board_reassign', { taskId, newPeerId: 'peer-2', actor: 'admin' }));
   assert.equal(reassigned.task.boardTask.peerId, 'peer-2');
   const ready = parse(await callTool(tools, 'fleet_v30_board_ready', {}));

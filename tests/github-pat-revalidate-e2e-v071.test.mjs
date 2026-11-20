@@ -193,6 +193,11 @@ async function launchApp(mockPort) {
       ...process.env,
       XDG_CONFIG_HOME: xdgDir,
       ELECTRON_DISABLE_SECURITY_WARNINGS: '1',
+      // PR #9: no OS keychain on this VM, so the vault runs degraded and
+      // `apps:set-token` would pop a native consent dialog nobody answers
+      // (the UI would never flip to connected). The launcher opts in here,
+      // so the harness consents in advance; the renderer cannot set this.
+      OPENBOT_VAULT_ALLOW_LOCAL_FALLBACK: '1',
       // Trỏ app tới mock GitHub local + rút TTL cache xác thực lại.
       OPENBOT_GITHUB_API_BASE: `http://127.0.0.1:${mockPort}`,
       OPENBOT_GITHUB_PAT_REVALIDATE_CACHE_MS: String(REVALIDATE_CACHE_MS),

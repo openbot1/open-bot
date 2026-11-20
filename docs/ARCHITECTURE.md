@@ -337,7 +337,7 @@ hiện tại.
   liệu lưu local" chỉ đúng ở v0.1. Hiện tại còn có: Composio
   (`https://backend.composio.dev/api/v3.1`, khi user bật Composio —
   xem `docs/composio-integration.md`); update-check (GitHub releases
-  repo `hoangthuanreview20-boop/open-bot`,
+  repo `openbot1/open-bot`,
   `packages/core/src/update/checker.ts`, chỉ khi user bấm kiểm tra);
   MCP server ngoài do user cấu hình (stdio/HTTP qua `connectMcp`);
   web search/fetch (`web_search`/`web_fetch`/`http_get`, qua tool đã

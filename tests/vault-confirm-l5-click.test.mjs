@@ -220,6 +220,12 @@ function launchApp() {
       ...process.env,
       XDG_CONFIG_HOME: xdgDir,
       ELECTRON_DISABLE_SECURITY_WARNINGS: '1',
+      // PR #9: no OS keychain on this VM, so the vault runs degraded and
+      // every vault:set would pop a native consent dialog nobody answers
+      // (the seed writes in `before` would hang until the CDP eval times
+      // out as `{ __blocked: true }`). The launcher opts in here, so the
+      // harness consents in advance; the renderer cannot set this itself.
+      OPENBOT_VAULT_ALLOW_LOCAL_FALLBACK: '1',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });

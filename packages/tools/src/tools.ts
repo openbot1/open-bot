@@ -555,8 +555,17 @@ function getStringArg(args: Record<string, unknown>, name: string, required = tr
   return value;
 }
 
-/** fetch() with a hard timeout. Throws on timeout / network error. */
-async function fetchWithTimeout(url: string, init: RequestInit = {}): Promise<Response> {
+/** fetch() with a hard timeout and the team egress policy when supplied. */
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit = {},
+  getEgressPolicy?: () => EgressPolicy | null | undefined,
+): Promise<Response> {
+  if (getEgressPolicy !== undefined) {
+    return fetchPublic(url, init, FETCH_TIMEOUT_MS, {
+      egressPolicy: getEgressPolicy() ?? null,
+    });
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
@@ -973,13 +982,14 @@ export function unwrapBingRedirect(href: string): string {
  * `<li class="b_algo"><h2><a href=...>title</a></h2><p>snippet</p>`.
  * Returns [] when Bing blocks the request or its layout changed.
  */
-export async function searchBing(
+async function searchBingWithPolicy(
   query: string,
+  getEgressPolicy?: () => EgressPolicy | null | undefined,
 ): Promise<Array<{ href: string; title: string; snippet: string }>> {
   const url = `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
   const res = await fetchWithTimeout(url, {
     headers: { 'User-Agent': BROWSER_USER_AGENT, Accept: 'text/html,application/xhtml+xml' },
-  });
+  }, getEgressPolicy);
   if (!res.ok) return [];
   const html = await res.text();
   const re =
@@ -996,6 +1006,13 @@ export async function searchBing(
     });
   }
   return out;
+}
+
+/** Public legacy helper retained with its original signature. */
+export async function searchBing(
+  query: string,
+): Promise<Array<{ href: string; title: string; snippet: string }>> {
+  return searchBingWithPolicy(query);
 }
 
 export function formatSearchResults(
@@ -1016,8 +1033,9 @@ export function formatSearchResults(
  * fallback. Returns null when neither engine yields usable results.
  * Used by `web_search` and by `x_search` (with a `site:x.com` prefix).
  */
-export async function searchWeb(
+async function searchWebWithPolicy(
   query: string,
+  getEgressPolicy?: () => EgressPolicy | null | undefined,
 ): Promise<{ source: string; results: Array<{ href: string; title: string; snippet: string }> } | null> {
   try {
     const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
@@ -1026,7 +1044,7 @@ export async function searchWeb(
         'User-Agent': BROWSER_USER_AGENT,
         Accept: 'text/html,application/xhtml+xml',
       },
-    });
+    }, getEgressPolicy);
     if (res.ok) {
       const results = parseDuckDuckGoResults(await res.text());
       if (results.length > 0) return { source: 'DuckDuckGo', results };
@@ -1034,108 +1052,127 @@ export async function searchWeb(
   } catch {
     // Fall through to the Bing fallback below.
   }
-  const bingResults = await searchBing(query);
+  const bingResults = await searchBingWithPolicy(query, getEgressPolicy);
   if (bingResults.length > 0) return { source: 'Bing', results: bingResults };
   return null;
 }
 
-const webSearchTool: Tool = {
-  definition: {
-    name: 'web_search',
-    description:
-      'Search the web via DuckDuckGo, falling back to Bing HTML if DuckDuckGo fails (no API key). Returns up to 8 results with title, URL and snippet.',
-    parameters: {
-      type: 'object',
-      properties: {
-        query: { type: 'string', description: 'Search query.' },
+/** Public legacy helper retained with its original signature. */
+export async function searchWeb(
+  query: string,
+): Promise<{ source: string; results: Array<{ href: string; title: string; snippet: string }> } | null> {
+  return searchWebWithPolicy(query);
+}
+
+function createWebSearchTool(
+  getEgressPolicy?: () => EgressPolicy | null | undefined,
+): Tool {
+  return {
+    definition: {
+      name: 'web_search',
+      description:
+        'Search the web via DuckDuckGo, falling back to Bing HTML if DuckDuckGo fails (no API key). Returns up to 8 results with title, URL and snippet.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Search query.' },
+        },
+        required: ['query'],
+        additionalProperties: false,
       },
-      required: ['query'],
-      additionalProperties: false,
     },
-  },
-  needsApproval: false,
-  async execute(args) {
-    try {
-      const query = getStringArg(args, 'query');
-      const found = await searchWeb(query);
-      if (!found) {
-        return errorResult(
-          'Web search failed: DuckDuckGo returned no usable results (blocked or layout changed) ' +
-            'and the Bing fallback also returned nothing. Try again later or use web_fetch on a search URL directly.',
-        );
+    needsApproval: false,
+    async execute(args) {
+      try {
+        const query = getStringArg(args, 'query');
+        const found = await searchWebWithPolicy(query, getEgressPolicy);
+        if (!found) {
+          return errorResult(
+            'Web search failed: DuckDuckGo returned no usable results (blocked or layout changed) ' +
+              'and the Bing fallback also returned nothing. Try again later or use web_fetch on a search URL directly.',
+          );
+        }
+        return formatSearchResults(query, found.source, found.results);
+      } catch (err) {
+        return errorResult((err as Error).message);
       }
-      return formatSearchResults(query, found.source, found.results);
-    } catch (err) {
-      return errorResult((err as Error).message);
-    }
-  }
-
-};
-
-const webFetchTool: Tool = {
-  definition: {
-    name: 'web_fetch',
-    description:
-      'Fetch a web page (http/https only) and return its readable text with HTML tags removed (max 20,000 chars). Internal/private URLs (localhost, private LAN, cloud metadata) are blocked.',
-    parameters: {
-      type: 'object',
-      properties: {
-        url: { type: 'string', description: 'Full http(s) URL to fetch.' },
-      },
-      required: ['url'],
-      additionalProperties: false,
     },
-  },
-  needsApproval: false,
-  async execute(args, ctx) {
-    try {
-      const url = assertHttpUrl(getStringArg(args, 'url'));
-      // v0.15 (H3 audit): chặn SSRF — không GET service nội bộ (loopback /
-      // private / link-local / metadata cloud), kể cả qua redirect.
-      const res = await fetchPublic(url.toString(), {
-        headers: { 'User-Agent': BROWSER_USER_AGENT, Accept: 'text/html,application/xhtml+xml,*/*' },
-      }, FETCH_TIMEOUT_MS);
-      if (!res.ok) return errorResult(`GET ${url} failed with HTTP ${res.status}`);
-      // v0.95 (Team D1): readable-text extraction — title + headings +
-      // paragraphs, boilerplate (nav/header/footer/scripts) removed,
-      // instead of the old flat tag strip.
-      const text = extractReadableText(await res.text());
-      return truncate(text, MAX_TOOL_RESULT_CHARS, ctx.workspaceDir);
-    } catch (err) {
-      return errorResult((err as Error).message);
-    }
-  },
-};
+  };
+}
 
-const httpGetTool: Tool = {
-  definition: {
-    name: 'http_get',
-    description:
-      'GET JSON or text from any public API endpoint (http/https only). Returns the response body (max 20,000 chars). Internal/private URLs (localhost, private LAN, cloud metadata) are blocked.',
-    parameters: {
-      type: 'object',
-      properties: {
-        url: { type: 'string', description: 'Full http(s) URL to GET.' },
+const webSearchTool: Tool = createWebSearchTool();
+
+function createLegacyHttpFetchTools(
+  getEgressPolicy?: () => EgressPolicy | null | undefined,
+): Tool[] {
+  // Resolver present but empty/off is fail-closed; no resolver preserves
+  // the historical public-only SSRF fallback for standalone consumers.
+  const fetchGuardOptions = () =>
+    getEgressPolicy === undefined ? {} : { egressPolicy: getEgressPolicy() ?? null };
+
+  const webFetchTool: Tool = {
+    definition: {
+      name: 'web_fetch',
+      description:
+        'Fetch a web page (http/https only) and return its readable text with HTML tags removed (max 20,000 chars). Internal/private URLs (localhost, private LAN, cloud metadata) are blocked by the SSRF and team egress policies.',
+      parameters: {
+        type: 'object',
+        properties: {
+          url: { type: 'string', description: 'Full http(s) URL to fetch.' },
+        },
+        required: ['url'],
+        additionalProperties: false,
       },
-      required: ['url'],
-      additionalProperties: false,
     },
-  },
-  needsApproval: false,
-  async execute(args, ctx) {
-    try {
-      const url = assertHttpUrl(getStringArg(args, 'url'));
-      // v0.15 (H3 audit): chặn SSRF — xem web_fetch.
-      const res = await fetchPublic(url.toString(), {
-        headers: { 'User-Agent': BROWSER_USER_AGENT, Accept: 'application/json, text/*, */*' },
-      }, FETCH_TIMEOUT_MS);
-      if (!res.ok) return errorResult(`GET ${url} failed with HTTP ${res.status}`);
-      return truncate(await res.text(), MAX_TOOL_RESULT_CHARS, ctx.workspaceDir);
-    } catch (err) {
-      return errorResult((err as Error).message);
-    }
-  },
-};
+    needsApproval: false,
+    async execute(args, ctx) {
+      try {
+        const url = assertHttpUrl(getStringArg(args, 'url'));
+        const res = await fetchPublic(url.toString(), {
+          headers: { 'User-Agent': BROWSER_USER_AGENT, Accept: 'text/html,application/xhtml+xml,*/*' },
+        }, FETCH_TIMEOUT_MS, fetchGuardOptions());
+        if (!res.ok) return errorResult(`GET ${url} failed with HTTP ${res.status}`);
+        const text = extractReadableText(await res.text());
+        return truncate(text, MAX_TOOL_RESULT_CHARS, ctx.workspaceDir);
+      } catch (err) {
+        return errorResult((err as Error).message);
+      }
+    },
+  };
+
+  const httpGetTool: Tool = {
+    definition: {
+      name: 'http_get',
+      description:
+        'GET JSON or text from a public API endpoint (http/https only). Returns the response body (max 20,000 chars). Internal/private URLs (localhost, private LAN, cloud metadata) are blocked by the SSRF and team egress policies.',
+      parameters: {
+        type: 'object',
+        properties: {
+          url: { type: 'string', description: 'Full http(s) URL to GET.' },
+        },
+        required: ['url'],
+        additionalProperties: false,
+      },
+    },
+    needsApproval: false,
+    async execute(args, ctx) {
+      try {
+        const url = assertHttpUrl(getStringArg(args, 'url'));
+        const res = await fetchPublic(url.toString(), {
+          headers: { 'User-Agent': BROWSER_USER_AGENT, Accept: 'application/json, text/*, */*' },
+        }, FETCH_TIMEOUT_MS, fetchGuardOptions());
+        if (!res.ok) return errorResult(`GET ${url} failed with HTTP ${res.status}`);
+        return truncate(await res.text(), MAX_TOOL_RESULT_CHARS, ctx.workspaceDir);
+      } catch (err) {
+        return errorResult((err as Error).message);
+      }
+    },
+  };
+
+  return [webFetchTool, httpGetTool];
+}
+
+const [webFetchTool, httpGetTool] = createLegacyHttpFetchTools();
 
 // ---------------------------------------------------------------------------
 // Git tools (read-only except git_commit, which needs approval)
@@ -1712,13 +1749,12 @@ export function createDefaultTools(opts?: {
    */
   getEgressPolicy?: () => EgressPolicy | null | undefined;
   /**
-   * v0.95 (Team D1): internet-data wiring. When any of these is
-   * given, the 10 internet-data placeholders in ALL_TOOLS are
-   * replaced by bound tools (same lazy pattern as http_request
-   * above) — never registered twice. `getInternetDataFile` resolves
-   * the `<userData>/internet-data.json` state file (undefined =
-   * memory-only store); `getBraveSearchApiKey` resolves the opt-in
-   * Brave key; `onWatchChanged` fires per changed watch.
+   * v0.95 (Team D1): internet-data wiring. When a state/key/watch
+   * resolver OR getEgressPolicy is given, the 10 internet-data
+   * placeholders in ALL_TOOLS are replaced by bound tools (same
+   * lazy policy pattern as http_request) — never registered twice.
+   * `getInternetDataFile` resolves the state file; `getBraveSearchApiKey`
+   * resolves the opt-in Brave key; `onWatchChanged` fires per changed watch.
    */
   getInternetDataFile?: () => string | null | undefined;
   getBraveSearchApiKey?: () => string | null;
@@ -2549,20 +2585,27 @@ export function createDefaultTools(opts?: {
   if (!opts?.getDaemon && !opts?.getCodingV19BaseDir && !opts?.getVoiceV28ToolOptions && !opts?.getProtocolV118ToolOptions && !opts?.getProtocolV119ToolOptions && !opts?.getEgressPolicy && !opts?.getInternetDataFile && !opts?.getBraveSearchApiKey && !opts?.onWatchChanged && !opts?.getFleetV103BaseDir && !opts?.getOpenmausbotV105BaseDir && !opts?.getEvalFleetV105BaseDir && !opts?.getPlatformV4BaseDir && !opts?.getMemoryV8WorkspaceDir && !opts?.getMemoryV9WorkspaceDir && !opts?.getMemoryV10WorkspaceDir && !opts?.getMemoryV11WorkspaceDir && !opts?.getMemoryV11BotId && !opts?.getMemoryV12WorkspaceDir && !opts?.getMemoryV12BotId && !opts?.getMemoryV14WorkspaceDir && !opts?.getMemoryV14BotId && !opts?.getMemoryV23WorkspaceDir && !opts?.getMemoryV23BotId && !opts?.getMemoryV24WorkspaceDir && !opts?.getMemoryV24BotId && !opts?.getMemoryV25WorkspaceDir && !opts?.getMemoryV25BotId && !opts?.getMemoryV26WorkspaceDir && !opts?.getMemoryV26BotId && !opts?.getMemoryV27WorkspaceDir && !opts?.getMemoryV27BotId && !opts?.getMemoryV28WorkspaceDir && !opts?.getMemoryV28BotId && !opts?.getA2aV11ToolOptions && !opts?.getSkillsPluginsV107Opts && !opts?.getFleetV4TeamsBaseDir && !opts?.getCodingV2WorkspaceDir && !opts?.getCodingV3WorkspaceDir && !opts?.getCodingV4WorkspaceDir && !opts?.getProvidersV108Opts && !opts?.getFleetV5BaseDir && !opts?.getAgentTeamsV109BaseDir && !opts?.getFleetV6BaseDir && !opts?.getFleetV7BaseDir && !opts?.getEvalV111BaseDir && !opts?.getConversationV112BaseDir && !opts?.getVoiceV10Manager && !opts?.hasVoiceV10LiveKey && !opts?.getVoiceV11Manager && !opts?.getFleetV8BaseDir && !opts?.getFleetV9BaseDir && !opts?.getCodingV6BaseDir && !opts?.getFleetV11BaseDir && !opts?.getCodingV7BaseDir && !opts?.getFleetV12BaseDir && !opts?.getCodingV9BaseDir && !opts?.getCodingV10BaseDir && !opts?.getCodingV14BaseDir && !opts?.getCodingV15BaseDir && !opts?.getCodingV16BaseDir && !opts?.getCodingV17BaseDir && !opts?.getCodingV18BaseDir && !opts?.getVoiceV19Manager && !opts?.getVoiceV19Prosody && !opts?.getVoiceV19TurnStore && !opts?.getVoiceV19ToolOptions && !opts?.getVoiceV20ToolOptions && !opts?.getVoiceV21ToolOptions && !opts?.getVoiceV22ToolOptions && !opts?.getVoiceV23ToolOptions && !opts?.getVoiceV24ToolOptions && !opts?.getVoiceV25ToolOptions && !opts?.getVoiceV26ToolOptions && !opts?.getVoiceV27ToolOptions && !opts?.getRouterV3State && !opts?.getRouterLocalV116State && !opts?.getRouterLocalV117State && !opts?.getRouterLocalV118State && !opts?.getRouterV29State && !opts?.getRouterV30State && !opts?.getComposioV129ToolOptions && !opts?.getInferenceBrokerV2State && !opts?.getFleetV21State && !opts?.getFleetV22State && !opts?.getFleetV23State && !opts?.getFleetV24State && !opts?.getFleetV25State && !opts?.getFleetV26State && !opts?.getFleetV27State && !opts?.getFleetV28State && !opts?.getFleetV29State && !opts?.getFleetV30State && !opts?.getEvalHarnessV2BaseDir && !opts?.getEvalHarnessV3BaseDir) return [...ALL_TOOLS];  let tools = [...ALL_TOOLS];  const idx = tools.indexOf(shellExecTool);  if (idx !== -1) {
     tools[idx] = createShellExecTool(opts.getDaemon, { getEgressPolicy: opts.getEgressPolicy });
   }
-  // v0.89 (worker F4): http_request bound to the team egress policy when
-  // one is configured (same lazy-resolver pattern as shell_exec above);
-  // without it the placeholder uses the SSRF guard (see httpTools.ts).
+  // Bind every generic web egress tool to the current team's policy.
+  // Each tool resolves the policy lazily when executed, then checks every
+  // redirect hop through the same checkEgress path as http_request.
   if (opts?.getEgressPolicy) {
     const httpIdx = tools.findIndex((t) => t.definition.name === 'http_request');
     if (httpIdx !== -1) {
       tools[httpIdx] = createHttpTools({ getEgressPolicy: opts.getEgressPolicy })[0] as Tool;
     }
+    const policyBoundWebTools = [
+      createWebSearchTool(opts.getEgressPolicy),
+      ...createLegacyHttpFetchTools(opts.getEgressPolicy),
+    ];
+    for (const boundTool of policyBoundWebTools) {
+      const index = tools.findIndex((tool) => tool.definition.name === boundTool.definition.name);
+      if (index !== -1) tools[index] = boundTool;
+    }
   }
-  // v0.95 (Team D1): bind the internet-data tools when the host wires
-  // them (state file / Brave key / watch-change callback). The bound
-  // set REPLACES the placeholders in place (same order, same 10
-  // names) so the registry never sees a duplicate.
-  if (opts?.getInternetDataFile || opts?.getBraveSearchApiKey || opts?.onWatchChanged) {
+  // v0.95 (Team D1): bind internet-data tools when the host wires them,
+  // or when a team egress resolver is present. The bound set replaces
+  // placeholders in place (same names/order, never duplicates).
+  if (opts?.getEgressPolicy || opts?.getInternetDataFile || opts?.getBraveSearchApiKey || opts?.onWatchChanged) {
     const bound = createInternetDataTools({
       stateFile: opts.getInternetDataFile?.() ?? undefined,
       getApiKey: (name: string) =>

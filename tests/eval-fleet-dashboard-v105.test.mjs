@@ -90,7 +90,7 @@ test('new IPC channels are declared in preload, exposed, and handled in main', (
       preload.includes(`ipcRenderer.invoke('${channel}'`),
       `preload does not expose an implementation for '${channel}'`,
     );
-    assert.ok(main.includes(`ipcMain.handle('${channel}'`), `main.ts does not handle '${channel}'`);
+    assert.ok(main.includes(`registerMainWindowIpcHandler('${channel}'`), `main.ts does not handle '${channel}'`);
   }
   for (const method of NEW_CAMEL_METHODS) {
     assert.ok(preload.includes(`${method}:`), `preload is missing the camelCase method ${method}`);

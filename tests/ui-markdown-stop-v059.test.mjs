@@ -244,7 +244,7 @@ test('UI-1/UI-2: new chat keys exist in vi + en, non-empty, same placeholders', 
 
 test('UI-2: chat:stop IPC exists and maps to coordinator.stopBot; chat:send returns stopped', () => {
   const main = read(path.join(repo, 'apps/desktop/src/main/main.ts'));
-  assert.match(main, /ipcMain\.handle\('chat:stop'/, 'main must handle chat:stop');
+  assert.match(main, /registerMainWindowIpcHandler\('chat:stop'/, 'main must handle chat:stop');
   assert.match(main, /return getCoordinator\(\)\.stopBot\(botId\)/, 'chat:stop must call stopBot');
   assert.match(main, /stopped = result\.stopped === true/, 'chat:send must read stopped from the run result');
   assert.match(main, /return \{ ok: true, text: replyText, stopped \}/, 'chat:send must return stopped');
