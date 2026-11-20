@@ -1394,7 +1394,7 @@ async function requestLocalFallbackConsent(
   purpose: string,
 ): Promise<boolean> {
   if (vaultStorageStatus !== 'degraded') return false;
-  if (process.env.OPENBOT_VAULT_ALLOW_LOCAL_FALLBACK === '1') return true;
+  if (process.env.NODE_ENV === 'test' && process.env.OPENBOT_VAULT_ALLOW_LOCAL_FALLBACK === '1') return true;
   // A renderer flag is a request, not proof of a user gesture. Keep the
   // native main-process confirmation authoritative for every degraded write.
   const requestedBySettings = suppliedConsent === true;
