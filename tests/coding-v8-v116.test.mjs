@@ -48,6 +48,7 @@ import {
   v8ContentHash,
   v8CountLineChanges,
   v8CoverageDeltaForFile,
+  v8DefaultBackupDir,
   v8DiffLines,
   v8FirstCommandToken,
   v8IsOutsideWorkspace,

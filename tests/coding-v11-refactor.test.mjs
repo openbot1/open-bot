@@ -298,6 +298,36 @@ test('applyPlan verify fail: rollback tự động, file trên đĩa không đ�
   assert.equal(readFile(dir, 'src/use.ts'), USE_TS);
 });
 
+test('applyPlan verify fail + concurrent edit: returns failure, preserves edit, and skips commit', async () => {
+  const dir = makeRepo();
+  initGitRepo(dir);
+  execSync('git add -A && git commit -qm "init"', { cwd: dir });
+  const engine = new V11RefactorEngine({ workingDir: dir });
+  const plan = engine.planRenameSymbol('add', 'sum', 'src/math.ts');
+  const concurrentUseEdit = '// concurrent edit during verification\\n';
+
+  const result = await engine.applyPlan(plan, {
+    commit: true,
+    commitMessage: 'must not commit incomplete rollback',
+    verify: () => {
+      // Simulate another actor changing a file after V8 applied the plan,
+      // but before automatic rollback processes the failed verification.
+      writeFile(dir, 'src/use.ts', concurrentUseEdit);
+      return { ok: false, output: 'verify failed after concurrent edit' };
+    },
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.error, /rollback incomplete/);
+  assert.equal(readFile(dir, 'src/math.ts'), MATH_TS);
+  assert.equal(readFile(dir, 'src/use.ts'), concurrentUseEdit);
+  assert.equal(
+    execSync('git log -1 --format=%s', { cwd: dir, encoding: 'utf8' }).trim(),
+    'init',
+    'an incomplete rollback must not proceed to commit',
+  );
+});
+
 test('applyPlan commit: rename + commit atomic, git log có message', async () => {
   const dir = makeRepo();
   initGitRepo(dir);
