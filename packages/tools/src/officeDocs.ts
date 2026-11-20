@@ -235,6 +235,8 @@ async function extractPdf(buffer: Buffer): Promise<string> {
     doc = await pdfjs
       .getDocument({
         data: new Uint8Array(buffer),
+        // CVE-2024-4367: untrusted PDF font data must not reach eval().
+        isEvalSupported: false,
         disableWorker: true,
         verbosity: pdfjs.VerbosityLevel.ERRORS,
       })
