@@ -31,10 +31,11 @@ test('setProviderIdentity forwards one-write LocalEncryptor consent to Vault', (
     );
 
     setProviderIdentity(vault, 'google', identity, { allowLocalFallback: true });
-    assert.deepEqual(
-      JSON.parse(vault.getSecret('identity', 'google')),
-      { ...identity, updatedAt: assert.anything },
-    );
+    const stored = JSON.parse(vault.getSecret('identity', 'google'));
+    assert.equal(stored.id, identity.id);
+    assert.equal(stored.displayName, identity.displayName);
+    assert.equal(stored.email, identity.email);
+    assert.equal(typeof stored.updatedAt, 'number');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
