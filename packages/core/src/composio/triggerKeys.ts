@@ -47,7 +47,7 @@ export function composioTriggerTokenKeyId(automationId: string): string {
 /** Minimal Vault surface this module needs (the real Vault satisfies it). */
 export interface ComposioTriggerKeyVault {
   getSecret(namespace: string, key: string): string | null;
-  setSecret(namespace: string, key: string, value: string): void;
+  setSecret(namespace: string, key: string, value: string, opts?: { allowLocalFallback?: boolean }): void;
   deleteSecret(namespace: string, key: string): boolean;
   hasSecret(namespace: string, key: string): boolean;
 }
@@ -71,11 +71,12 @@ export function setComposioTriggerSigningSecret(
   vault: ComposioTriggerKeyVault,
   automationId: string,
   secret: string,
+  opts?: { allowLocalFallback?: boolean },
 ): void {
   if (typeof secret !== 'string' || secret.trim() === '') {
     throw new Error('Composio webhook secret must not be empty.');
   }
-  vault.setSecret(COMPOSIO_TRIGGER_KEYS_NAMESPACE, automationId, secret.trim());
+  vault.setSecret(COMPOSIO_TRIGGER_KEYS_NAMESPACE, automationId, secret.trim(), opts);
 }
 
 /** Read the signing secret for an automation; null when missing. */
