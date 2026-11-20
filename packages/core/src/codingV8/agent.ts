@@ -234,11 +234,15 @@ export class CodingAgentV8 {
           verifyMs: verify.durationMs,
         });
       }
-      if (appliedPlan.status === 'rolled-back') {
-        this.log.append('v7.error', { message: `refactor rolled back: ${appliedPlan.statusNote ?? ''}`, source: 'coding-v8' });
+      if (appliedPlan.status !== 'verified') {
+        const rolledBack = appliedPlan.status === 'rolled-back';
+        this.log.append('v7.error', {
+          message: 'refactor ' + (rolledBack ? 'rolled back' : 'failed') + ': ' + (appliedPlan.statusNote ?? ''),
+          source: 'coding-v8',
+        });
         const report = this.finishReport(false, false, appliedPlan.statusNote);
         report.plan = appliedPlan;
-        report.rolledBack = true;
+        report.rolledBack = rolledBack;
         this.pendingPlan = null;
         this.pendingPreview = null;
         return { report, preview: preview ?? undefined };

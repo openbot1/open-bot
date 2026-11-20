@@ -313,6 +313,8 @@ test('refactor: plan + preview diff unified có -/+ đúng dòng', () => {
   ]);
   assert.equal(plan.status, 'planned');
   assert.equal(plan.changes.length, 2);
+  assert.match(plan.changes[0].baseHash, /^[a-f0-9]{64}$/);
+  assert.match(plan.changes[1].baseHash, /^[a-f0-9]{64}$/);
   assert.equal(plan.changes[0].linesRemoved, 1);
   assert.equal(plan.changes[0].linesAdded, 1);
   const preview = previewV8Diff(plan);
@@ -338,6 +340,25 @@ test('refactor: path thoát workspace + trùng path → throw lúc plan', () => 
   ]), /duplicate change/);
   assert.equal(v8IsOutsideWorkspace('/etc/passwd'), true);
   assert.equal(v8IsOutsideWorkspace('src/a.ts'), false);
+});
+
+test('refactor: base hash mismatch rejects the whole plan before any file is written', async () => {
+  const dir = makeRepoWithFiles({
+    'src/a.ts': 'const a = 1;\n',
+    'src/b.ts': 'const b = 1;\n',
+  });
+  const plan = v8PlanWithStatus(createV8RefactorPlan(dir, 'Change both', 'Change both files', [
+    { path: 'src/a.ts', newContent: 'const a = 2;\n', description: 'a' },
+    { path: 'src/b.ts', newContent: 'const b = 2;\n', description: 'b' },
+  ]), 'approved');
+  fs.writeFileSync(path.join(dir, 'src/b.ts'), 'concurrent edit\n');
+  await assert.rejects(
+    () => applyV8RefactorPlan(plan, { workingDir: dir }),
+    /base hash mismatch.*src\/b\.ts/,
+  );
+  assert.equal(fs.readFileSync(path.join(dir, 'src/a.ts'), 'utf8'), 'const a = 1;\n');
+  assert.equal(fs.readFileSync(path.join(dir, 'src/b.ts'), 'utf8'), 'concurrent edit\n');
+  assert.equal(fs.existsSync(v8DefaultBackupDir(dir, plan.id)), false);
 });
 
 test('refactor: apply khi chưa approved → throw; approve → apply ok + backup + verify ok', async () => {
@@ -387,16 +408,67 @@ test('refactor: verify fail → rollback tự động, file về nội dung cũ'
   assert.equal(fs.readFileSync(path.join(dir, 'src/b.ts'), 'utf8'), 'const y = 1;\n');
 });
 
-test('refactor: apply lỗi giữa chừng (path là thư mục) → rollback file đã ghi', async () => {
+test('refactor: automatic rollback leaves a later concurrent edit untouched', async () => {
+  const dir = makeRepoWithFiles({
+    'src/a.ts': 'const a = 1;\n',
+    'src/b.ts': 'const b = 1;\n',
+  });
+  const plan = v8PlanWithStatus(createV8RefactorPlan(dir, 'Change both', 'Change both files', [
+    { path: 'src/a.ts', newContent: 'const a = 2;\n', description: 'a' },
+    { path: 'src/b.ts', newContent: 'const b = 2;\n', description: 'b' },
+  ]), 'approved');
+  const { plan: result, verify } = await applyV8RefactorPlan(plan, {
+    workingDir: dir,
+    verify: () => {
+      fs.writeFileSync(path.join(dir, 'src/b.ts'), 'concurrent edit\n');
+      return { ok: false, output: 'verify failed' };
+    },
+  });
+  assert.equal(result.status, 'failed');
+  assert.equal(verify.ok, false);
+  assert.equal(verify.rolledBack, false);
+  assert.equal(fs.readFileSync(path.join(dir, 'src/a.ts'), 'utf8'), 'const a = 1;\n');
+  assert.equal(fs.readFileSync(path.join(dir, 'src/b.ts'), 'utf8'), 'concurrent edit\n');
+  assert.match(result.statusNote, /rollback incomplete/);
+});
+
+test('refactor: manual rollback leaves a modified applied file untouched', async () => {
+  const dir = makeRepoWithFiles({ 'src/a.ts': 'const a = 1;\n' });
+  const plan = v8PlanWithStatus(createV8RefactorPlan(dir, 'Change', 'Change a', [
+    { path: 'src/a.ts', newContent: 'const a = 2;\n', description: 'a' },
+  ]), 'approved');
+  const { plan: applied } = await applyV8RefactorPlan(plan, { workingDir: dir });
+  fs.writeFileSync(path.join(dir, 'src/a.ts'), 'human edit\n');
+  const rollback = rollbackV8Refactor(applied, { workingDir: dir });
+  assert.deepEqual(rollback.restored, []);
+  assert.equal(rollback.errors.length, 1);
+  assert.equal(fs.readFileSync(path.join(dir, 'src/a.ts'), 'utf8'), 'human edit\n');
+});
+
+test('refactor: rollback does not delete a new file modified after apply', async () => {
+  const dir = makeRepoWithFiles({});
+  const plan = v8PlanWithStatus(createV8RefactorPlan(dir, 'Add file', 'Add a generated file', [
+    { path: 'src/new.ts', newContent: 'export const generated = true;\n', description: 'new file' },
+  ]), 'approved');
+  const { plan: applied } = await applyV8RefactorPlan(plan, { workingDir: dir });
+  fs.writeFileSync(path.join(dir, 'src/new.ts'), 'human edit\n');
+  const rollback = rollbackV8Refactor(applied, { workingDir: dir });
+  assert.deepEqual(rollback.deleted, []);
+  assert.equal(rollback.errors.length, 1);
+  assert.equal(fs.readFileSync(path.join(dir, 'src/new.ts'), 'utf8'), 'human edit\n');
+});
+
+test('refactor: unreadable path during preflight prevents partial apply', async () => {
   const dir = makeRepoWithFiles({ 'src/a.ts': 'const x = 1;\n' });
   fs.mkdirSync(path.join(dir, 'adir'));
-  const plan = v8PlanWithStatus(createV8RefactorPlan(dir, 'Mixed', 'one ok, one fails', [
+  const plan = v8PlanWithStatus(createV8RefactorPlan(dir, 'Mixed', 'one valid file, one directory', [
     { path: 'src/a.ts', newContent: 'const x = 9;\n', description: 'x' },
-    { path: 'adir', newContent: 'nope', description: 'write into a directory' },
+    { path: 'adir', newContent: 'nope', description: 'directory is not a file' },
   ]), 'approved');
-  const { plan: result, apply } = await applyV8RefactorPlan(plan, { workingDir: dir });
-  assert.equal(apply.ok, false);
-  assert.equal(result.status, 'rolled-back');
+  await assert.rejects(
+    () => applyV8RefactorPlan(plan, { workingDir: dir }),
+    /base hash mismatch.*adir/,
+  );
   assert.equal(fs.readFileSync(path.join(dir, 'src/a.ts'), 'utf8'), 'const x = 1;\n');
 });
 
