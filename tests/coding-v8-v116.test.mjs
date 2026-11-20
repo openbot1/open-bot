@@ -65,6 +65,12 @@ import {
   summarizeV8Plan,
 } from '../packages/core/dist/codingV8/index.js';
 import { CodingV7Log } from '../packages/core/dist/codingV7/index.js';
+import { detectIsolation } from '../packages/core/dist/index.js';
+
+function hasStrongCodeActIsolation() {
+  const kind = detectIsolation().kind;
+  return kind === 'bwrap' || kind === 'sandbox-exec';
+}
 
 function tmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'open-bot-coding-v8-v116-'));
@@ -609,18 +615,29 @@ function makeExecutor(dir, policy) {
   return new V8CodeActExecutor({ workingDir: path.join(dir, 'ws'), policy });
 }
 
-test('codeact-v4: bash/python chạy thật; edit/read thật; policy allow', async () => {
+test('codeact-v4: bash/python qua BotBox; edit/read workspace; HOME không phải HOME host', async () => {
   const dir = tmpDir();
   const ex = makeExecutor(dir);
-  const bash = await ex.execute({ kind: 'bash', command: 'echo hello-v8 && pwd' });
-  assert.equal(bash.observation.ok, true);
-  assert.match(bash.observation.stdout, /hello-v8/);
-  assert.equal(bash.observation.policy, 'allow');
-  assert.equal(bash.observation.securityLevel, 'allow');
-  assert.equal(bash.policy, 'allow');
-  const py = await ex.execute({ kind: 'python', code: 'print(40 + 2)' });
-  assert.equal(py.observation.ok, true);
-  assert.match(py.observation.stdout, /42/);
+  if (hasStrongCodeActIsolation()) {
+    const bash = await ex.execute({ kind: 'bash', command: 'echo hello-v8 && pwd' });
+    assert.equal(bash.observation.ok, true);
+    assert.match(bash.observation.stdout, /hello-v8/);
+    assert.equal(bash.observation.policy, 'allow');
+    assert.equal(bash.observation.securityLevel, 'allow');
+    assert.equal(bash.policy, 'allow');
+    const py = await ex.execute({ kind: 'python', code: 'print(40 + 2)' });
+    assert.equal(py.observation.ok, true);
+    assert.match(py.observation.stdout, /42/);
+    const home = await ex.execute({ kind: 'bash', command: 'printf %s "$HOME"' });
+    assert.equal(home.observation.ok, true);
+    assert.notEqual(home.observation.stdout, process.env.HOME ?? '');
+    assert.match(home.observation.stdout, /open-bot-codeact-v8-/);
+  } else {
+    const denied = await ex.execute({ kind: 'bash', command: 'echo must-not-run' });
+    assert.equal(denied.observation.blocked, true);
+    assert.equal(denied.policy, 'deny');
+    assert.match(denied.observation.blockReason, /V8SEC-REQUIRE-ISOLATION/);
+  }
   const edit = await ex.execute({ kind: 'edit', path: 'sub/a.txt', content: 'line1\n', mode: 'write' });
   assert.equal(edit.observation.ok, true);
   assert.equal(edit.observation.fileWritten.path, 'sub/a.txt');
@@ -628,7 +645,6 @@ test('codeact-v4: bash/python chạy thật; edit/read thật; policy allow', as
   assert.equal(read.observation.stdout, 'line1');
   assert.equal(fs.readFileSync(path.join(dir, 'ws', 'sub', 'a.txt'), 'utf8'), 'line1\n');
 });
-
 test('codeact-v4: policy chặn curl|sh, rm -rf /, sudo, lệnh ngoài allowlist, mạng tắt', async () => {
   const dir = tmpDir();
   const ex = makeExecutor(dir);
@@ -651,25 +667,41 @@ test('codeact-v4: policy chặn curl|sh, rm -rf /, sudo, lệnh ngoài allowlist
   assert.equal(fs.existsSync(path.join(dir, 'escape.txt')), false);
 });
 
-test('codeact-v4: timeout kill + observation redact secret + split/token helpers', async () => {
+test('codeact-v4: timeout kill + output redaction + split/token helpers', async () => {
   const dir = tmpDir();
   const ex = makeExecutor(dir);
-  const slow = await ex.execute({ kind: 'bash', command: 'sleep 10', timeoutMs: 300 });
-  assert.equal(slow.observation.timedOut, true);
-  assert.equal(slow.observation.ok, false);
-  const leak = await ex.execute({ kind: 'bash', command: 'echo api_key=sk-abcdef1234567890' });
-  assert.equal(leak.observation.ok, true);
-  assert.equal(leak.observation.stdout.includes('sk-abcdef'), false);
-  assert.match(leak.observation.stdout, /\[REDACTED\]/);
+  if (hasStrongCodeActIsolation()) {
+    const slow = await ex.execute({ kind: 'bash', command: 'sleep 10', timeoutMs: 300 });
+    assert.equal(slow.observation.timedOut, true);
+    assert.equal(slow.observation.ok, false);
+    const leak = await ex.execute({ kind: 'bash', command: 'echo api_key=sk-abcdef1234567890' });
+    assert.equal(leak.observation.ok, true);
+    assert.equal(leak.observation.stdout.includes('sk-abcdef'), false);
+    assert.match(leak.observation.stdout, /\[REDACTED\]/);
+  } else {
+    const denied = await ex.execute({ kind: 'bash', command: 'sleep 10' });
+    assert.equal(denied.observation.blocked, true);
+    assert.equal(denied.policy, 'deny');
+  }
   assert.match(redactV8Text('token=abcdefgh1234'), /\[REDACTED\]/);
   assert.match(normalizeV8Output('x'.repeat(30000), 100), /truncated/);
   assert.equal(v8FirstCommandToken('FOO=1 echo hi'), 'echo');
   assert.deepEqual(v8SplitCommandSegments('echo a; echo b && echo c'), ['echo a', 'echo b', 'echo c']);
 });
-
-test('codeact-v4: script nhiều bước — dừng ở lỗi đầu, trả stepResults', async () => {
+test('codeact-v4: script nhiều bước — dừng ở lỗi đầu và giữ trạng thái deny', async () => {
   const dir = tmpDir();
   const ex = makeExecutor(dir);
+  if (!hasStrongCodeActIsolation()) {
+    const denied = await ex.execute({
+      kind: 'script',
+      steps: [{ kind: 'bash', code: 'echo must-not-run' }, { kind: 'python', code: 'print(2)' }],
+    });
+    assert.equal(denied.observation.blocked, true);
+    assert.equal(denied.observation.policy, 'deny');
+    assert.equal(denied.policy, 'deny');
+    assert.equal(denied.observation.stepResults.length, 1);
+    return;
+  }
   const ok = await ex.execute({
     kind: 'script',
     steps: [
@@ -691,7 +723,6 @@ test('codeact-v4: script nhiều bước — dừng ở lỗi đầu, trả step
   assert.equal(fail.observation.ok, false);
   assert.equal(fail.observation.stepResults.length, 2);
 });
-
 test('codeact-v4: permissive mode cho lệnh lạ chạy (fail 127, không blocked); allowNetwork bật cho curl', async () => {
   const dir = tmpDir();
   const permissive = new V8CodeActExecutor({
@@ -699,8 +730,13 @@ test('codeact-v4: permissive mode cho lệnh lạ chạy (fail 127, không block
     policy: defaultV8SandboxPolicy({ mode: 'permissive' }),
   });
   const unknown = await permissive.execute({ kind: 'bash', command: 'foobar123 --help' });
-  assert.equal(unknown.observation.blocked, false);
-  assert.equal(unknown.observation.ok, false); // command not found → exit 127
+  if (hasStrongCodeActIsolation()) {
+    assert.equal(unknown.observation.blocked, false);
+    assert.equal(unknown.observation.ok, false); // command not found → exit 127
+  } else {
+    assert.equal(unknown.observation.blocked, true);
+    assert.equal(unknown.policy, 'deny');
+  }
   // checkV8Policy trực tiếp: mạng bật thì curl không bị deny vì network.
   const policy = defaultV8SandboxPolicy({ allowNetwork: true });
   const check = checkV8Policy({ kind: 'bash', command: 'curl https://example.com/file' }, policy, dir);
@@ -719,8 +755,14 @@ test('codeact-v4: executeAll dừng ở lỗi đầu', async () => {
     { kind: 'bash', command: 'exit 1' },
     { kind: 'bash', command: 'echo never' },
   ]);
-  assert.equal(results.length, 2);
-  assert.equal(results[0].observation.stdout.trim(), 'one');
+  if (hasStrongCodeActIsolation()) {
+    assert.equal(results.length, 2);
+    assert.equal(results[0].observation.stdout.trim(), 'one');
+  } else {
+    assert.equal(results.length, 1);
+    assert.equal(results[0].observation.blocked, true);
+    assert.equal(results[0].policy, 'deny');
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -855,12 +897,16 @@ test('agent-v8: runCodeAct qua executor + ghi observation vào log v7', async ()
     changeProvider: () => [],
   });
   const result = await agent.runCodeAct({ kind: 'bash', command: 'echo codeact-v8' });
-  assert.equal(result.observation.ok, true);
-  assert.match(result.observation.stdout, /codeact-v8/);
+  if (hasStrongCodeActIsolation()) {
+    assert.equal(result.observation.ok, true);
+    assert.match(result.observation.stdout, /codeact-v8/);
+  } else {
+    assert.equal(result.observation.blocked, true);
+    assert.equal(result.policy, 'deny');
+  }
   assert.equal(log.verify().ok, true);
   assert.ok(log.all().some((e) => e.type === 'v7.observation'));
 });
-
 // ---------------------------------------------------------------------------
 // 8. i18n codingV8.* đủ 6 locale
 // ---------------------------------------------------------------------------

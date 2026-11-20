@@ -248,7 +248,7 @@ export interface RunInBoxOptions {
   vaultSecrets?: Record<string, string>;
   /** Ghi đè timeout lần chạy này (ms). */
   timeoutMs?: number;
-  /** Ghi đè cap ghi lần chạy này (bytes). */
+  /** Ghi đè cap ghi lần chạy này (bytes); Infinity tắt polling workspace. */
   maxWriteBytes?: number;
   /** Ghi đè cap output lần chạy này (ký tự). */
   maxOutputChars?: number;
@@ -256,6 +256,8 @@ export interface RunInBoxOptions {
   stdin?: string;
   /** Ép backend cách ly cho lần chạy này (mặc định theo box). */
   isolation?: 'auto' | IsolationKind;
+  /** Refuse host fallback when the selected isolation backend fails. */
+  requireIsolation?: boolean;
 }
 
 export class BotBoxManager {
@@ -311,7 +313,7 @@ export class BotBoxManager {
     const requested = opts.isolation ?? 'auto';
     const isolation: IsolationKind =
       requested === 'auto' ? detectIsolation().kind : requested;
-    const workspaceDir = path.join(dir, 'workspace');
+    const workspaceDir = opts.workspaceDir ? path.resolve(opts.workspaceDir) : path.join(dir, 'workspace');
     const authDir = path.join(dir, 'auth');
     fs.mkdirSync(workspaceDir, { recursive: true });
     fs.mkdirSync(path.join(dir, 'tmp'), { recursive: true });
@@ -413,6 +415,7 @@ export class BotBoxManager {
     const timeoutMs = opts.timeoutMs ?? box.limits.timeoutMs;
     const maxWriteBytes = opts.maxWriteBytes ?? box.limits.maxWriteBytes;
     const maxOutputChars = opts.maxOutputChars ?? box.limits.maxOutputChars;
+    const monitorWorkspace = Number.isFinite(maxWriteBytes);
     const env = buildBoxEnv(box, {
       allowlist: box.envAllowlist,
       ...(opts.envValues !== undefined ? { values: opts.envValues } : {}),
@@ -420,11 +423,14 @@ export class BotBoxManager {
     });
     const requested = opts.isolation ?? box.isolation;
     const { argv, isolation } = this.buildSpawnArgv(command, args, requested, box);
+    if (opts.requireIsolation && !isolation.isolated) {
+      throw new Error(`Sandbox isolation required for box "${box.id}" but unavailable: ${isolation.detail}`);
+    }
     // Sóng B: bọc prlimit khi box có giới hạn CPU/RAM/process.
     const prlimit = wrapWithPrlimit(argv, box.limits, this.warn);
     const spawnArgv = prlimit.argv;
     const limitsApplied = prlimit.limitsApplied;
-    return new Promise<BoxRunResult>((resolve) => {
+    return new Promise<BoxRunResult>((resolve, reject) => {
       let stdout = '';
       let stderr = '';
       let timedOut = false;
@@ -434,8 +440,8 @@ export class BotBoxManager {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
-        clearInterval(capPoll);
-        const workspaceBytes = dirSizeBytes(box.workspaceDir);
+        if (capPoll) clearInterval(capPoll);
+        const workspaceBytes = monitorWorkspace ? dirSizeBytes(box.workspaceDir) : 0;
         resolve({
           boxId: box.id,
           botId,
@@ -472,6 +478,13 @@ export class BotBoxManager {
       };
       const fallbackToPlain = (): void => {
         if (fellBack || settled) return;
+        if (opts.requireIsolation) {
+          settled = true;
+          clearTimeout(timer);
+          if (capPoll) clearInterval(capPoll);
+          reject(new Error(`Sandbox isolation required for box "${box.id}" but backend "${requested}" failed; refusing to run without isolation.`));
+          return;
+        }
         fellBack = true;
         if (limitsApplied !== undefined) {
           limitsApplied.enforced = false;
@@ -571,12 +584,12 @@ export class BotBoxManager {
         timedOut = true;
         if (child) killProcessGroup(child);
       }, timeoutMs);
-      const capPoll = setInterval(() => {
+      const capPoll = monitorWorkspace ? setInterval(() => {
         if (dirSizeBytes(box.workspaceDir) > maxWriteBytes) {
           writeCapExceeded = true;
           if (child) killProcessGroup(child);
         }
-      }, 200);
+      }, 200) : undefined;
       spawnAttempt();
     });
   }

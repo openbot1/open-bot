@@ -21,16 +21,17 @@
  *   chế độ `permissive` chỉ chặn blocklist (dùng cho repo tin cậy,
  *   phải bật tường minh).
  *
- * Giới hạn trung thực (giống v3, nhắc lại): chạy trên host với user
- * hiện tại — không phải VM/container cách ly; chặn lệnh nguy hiểm
- * dựa trên pattern + allowlist (không phải syscall sandbox); không
- * giới hạn CPU/RAM ngoài timeout + output cap. Dùng cho workspace
- * tin cậy / repo mẫu.
+ * Giới hạn trung thực: bash/python đi qua BotBoxManager; isolation
+ * none hoặc backend lỗi thì bị từ chối, không fallback về host. Đây
+ * không phải VM; unshare yếu hơn bwrap (không cô lập mount). edit/read
+ * vẫn thao tác trực tiếp trên workingDir được caller cấp.
  */
 
-import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
+import { BotBoxManager } from '../sandbox/box';
+import { detectIsolation } from '../sandbox/env';
 import { analyzeV8Taint, scanV8Secrets } from './securityV2';
 import type { V8CodeActAction, V8Observation, V8PolicyDenial, V8PolicyDecision, V8SecurityLevel } from './types';
 
@@ -228,61 +229,7 @@ interface ProcessResult {
   stderr: string;
   exitCode: number | null;
   timedOut: boolean;
-}
-
-/** Chạy process với timeout kill cả process group (giống v3). */
-function runV8Process(
-  command: string,
-  args: string[],
-  options: { cwd: string; timeoutMs: number; stdin?: string; env: NodeJS.ProcessEnv },
-): Promise<ProcessResult> {
-  return new Promise((resolve) => {
-    let stdout = '';
-    let stderr = '';
-    let timedOut = false;
-    let settled = false;
-    const child = spawn(command, args, {
-      cwd: options.cwd,
-      env: options.env,
-      detached: process.platform !== 'win32',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    const timer = setTimeout(() => {
-      timedOut = true;
-      try {
-        if (child.pid && process.platform !== 'win32') process.kill(-child.pid, 'SIGKILL');
-        else child.kill('SIGKILL');
-      } catch {
-        // Process đã thoát.
-      }
-    }, options.timeoutMs);
-    child.stdout?.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString('utf8');
-      if (stdout.length > V8_CODEACT_OUTPUT_LIMIT * 2) stdout = stdout.slice(0, V8_CODEACT_OUTPUT_LIMIT * 2);
-    });
-    child.stderr?.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString('utf8');
-      if (stderr.length > V8_CODEACT_OUTPUT_LIMIT * 2) stderr = stderr.slice(0, V8_CODEACT_OUTPUT_LIMIT * 2);
-    });
-    child.on('error', (err) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve({ stdout, stderr: err.message, exitCode: null, timedOut });
-    });
-    child.on('close', (code) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve({ stdout, stderr, exitCode: code, timedOut });
-    });
-    if (options.stdin !== undefined) {
-      child.stdin?.write(options.stdin);
-      child.stdin?.end();
-    } else {
-      child.stdin?.end();
-    }
-  });
+  writeCapExceeded: boolean;
 }
 
 /** Executor CodeAct v4: policy gate → security scan → chạy thật trong working dir bị nhốt. */
@@ -290,6 +237,10 @@ export class V8CodeActExecutor {
   readonly workingDir: string;
   readonly policy: V8SandboxPolicy;
   private readonly defaultTimeoutMs: number;
+  private readonly boxes: BotBoxManager;
+  private readonly boxId = 'coding-v8';
+  private readonly boxHomeDir: string;
+  private readonly forwardedEnvNames: string[];
 
   constructor(options: V8CodeActExecutorOptions) {
     this.workingDir = path.resolve(options.workingDir);
@@ -299,20 +250,66 @@ export class V8CodeActExecutor {
       this.policy.maxTimeoutMs,
     );
     fs.mkdirSync(this.workingDir, { recursive: true });
+
+    // Keep only explicitly allowed, non-secret extra variables. HOME is
+    // always replaced with a private directory inside the box's tmp mount.
+    const boxDefaultEnv = new Set([
+      'PATH', 'HOME', 'TMPDIR', 'LANG', 'LC_ALL', 'TERM', 'USER', 'SHELL',
+      'NO_COLOR', 'FORCE_COLOR', 'OPENBOT_BOX_ID', 'OPENBOT_BOT_ID',
+    ]);
+    const secretEnvName = /KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|PRIVATE|AUTH|BEARER|SESSION|COOKIE/i;
+    this.forwardedEnvNames = [...new Set(this.policy.allowedEnvVars.filter((name) =>
+      /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) &&
+      !boxDefaultEnv.has(name) &&
+      !secretEnvName.test(name),
+    ))];
+
+    const boxRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'open-bot-codeact-v8-'));
+    this.boxes = new BotBoxManager({ rootDir: boxRoot });
+    const detectedIsolation = detectIsolation().kind;
+    // unshare only provides user/pid namespaces, not mount confinement; do not
+    // treat it as sufficient isolation for untrusted CodeAct execution.
+    const requiredIsolation = detectedIsolation === 'bwrap' || detectedIsolation === 'sandbox-exec'
+      ? detectedIsolation
+      : 'none';
+    const box = this.boxes.createBox(this.boxId, {
+      workspaceDir: this.workingDir,
+      envAllowlist: ['HOME', ...this.forwardedEnvNames],
+      isolation: requiredIsolation,
+    });
+    this.boxHomeDir = path.join(box.dir, 'tmp', 'home');
+    fs.mkdirSync(this.boxHomeDir, { recursive: true, mode: 0o700 });
   }
 
-  /** Env đã lược: chỉ PATH/HOME/LANG + biến host cho phép (không forward secret). */
-  private scrubbedEnv(): NodeJS.ProcessEnv {
-    const env: NodeJS.ProcessEnv = {
-      PATH: process.env.PATH ?? '',
-      HOME: process.env.HOME ?? '',
-      LANG: process.env.LANG ?? 'C.UTF-8',
-      TERM: 'dumb',
-    };
-    for (const name of this.policy.allowedEnvVars) {
-      if (process.env[name] !== undefined) env[name] = process.env[name];
+  private sandboxEnvValues(): Record<string, string> {
+    const values: Record<string, string> = { HOME: this.boxHomeDir };
+    for (const name of this.forwardedEnvNames) {
+      const value = process.env[name];
+      if (typeof value === 'string') values[name] = value;
     }
-    return env;
+    return values;
+  }
+
+  private async runSandboxedProcess(
+    command: string,
+    args: string[],
+    options: { timeoutMs: number; stdin?: string },
+  ): Promise<ProcessResult> {
+    const result = await this.boxes.runInBox(this.boxId, command, args, {
+      timeoutMs: options.timeoutMs,
+      maxWriteBytes: Number.POSITIVE_INFINITY,
+      maxOutputChars: V8_CODEACT_OUTPUT_LIMIT * 2,
+      envValues: this.sandboxEnvValues(),
+      ...(options.stdin !== undefined ? { stdin: options.stdin } : {}),
+      requireIsolation: true,
+    });
+    return {
+      stdout: result.stdout,
+      stderr: result.stderr,
+      exitCode: result.exitCode,
+      timedOut: result.timedOut,
+      writeCapExceeded: result.writeCapExceeded,
+    };
   }
 
   private resolveInWorkspace(relPath: string): string | null {
@@ -372,33 +369,49 @@ export class V8CodeActExecutor {
     switch (action.kind) {
       case 'bash': {
         const timeoutMs = Math.min(action.timeoutMs ?? this.defaultTimeoutMs, this.policy.maxTimeoutMs);
-        const result = await runV8Process('bash', ['-c', action.command], { cwd: this.workingDir, timeoutMs, env: this.scrubbedEnv() });
-        return {
-          observation: finish({
-            ok: !result.timedOut && result.exitCode === 0,
-            stdout: normalizeV8Output(result.stdout),
-            stderr: normalizeV8Output(result.stderr),
-            exitCode: result.exitCode,
-            timedOut: result.timedOut,
-            blocked: false,
-          }),
-          policy: 'allow',
-        };
+        try {
+          const result = await this.runSandboxedProcess('bash', ['-c', action.command], { timeoutMs });
+          return {
+            observation: finish({
+              ok: !result.timedOut && !result.writeCapExceeded && result.exitCode === 0,
+              stdout: normalizeV8Output(result.stdout),
+              stderr: normalizeV8Output(result.stderr),
+              exitCode: result.exitCode,
+              timedOut: result.timedOut,
+              blocked: false,
+            }),
+            policy: 'allow',
+          };
+        } catch (err) {
+          const denial: V8PolicyDenial = {
+            ruleId: 'V8SEC-REQUIRE-ISOLATION',
+            message: err instanceof Error ? err.message : String(err),
+          };
+          return { observation: this.blockedObservation(action, denial, securityLevel), policy: 'deny' };
+        }
       }
       case 'python': {
         const timeoutMs = Math.min(action.timeoutMs ?? this.defaultTimeoutMs, this.policy.maxTimeoutMs);
-        const result = await runV8Process('python3', ['-'], { cwd: this.workingDir, timeoutMs, stdin: action.code, env: this.scrubbedEnv() });
-        return {
-          observation: finish({
-            ok: !result.timedOut && result.exitCode === 0,
-            stdout: normalizeV8Output(result.stdout),
-            stderr: normalizeV8Output(result.stderr),
-            exitCode: result.exitCode,
-            timedOut: result.timedOut,
-            blocked: false,
-          }),
-          policy: 'allow',
-        };
+        try {
+          const result = await this.runSandboxedProcess('python3', ['-'], { timeoutMs, stdin: action.code });
+          return {
+            observation: finish({
+              ok: !result.timedOut && !result.writeCapExceeded && result.exitCode === 0,
+              stdout: normalizeV8Output(result.stdout),
+              stderr: normalizeV8Output(result.stderr),
+              exitCode: result.exitCode,
+              timedOut: result.timedOut,
+              blocked: false,
+            }),
+            policy: 'allow',
+          };
+        } catch (err) {
+          const denial: V8PolicyDenial = {
+            ruleId: 'V8SEC-REQUIRE-ISOLATION',
+            message: err instanceof Error ? err.message : String(err),
+          };
+          return { observation: this.blockedObservation(action, denial, securityLevel), policy: 'deny' };
+        }
       }
       case 'edit': {
         const resolved = this.resolveInWorkspace(action.path);
@@ -495,6 +508,8 @@ export class V8CodeActExecutor {
       case 'script': {
         const stepResults: NonNullable<V8Observation['stepResults']> = [];
         let allOk = true;
+        let denied = false;
+        let denial: V8PolicyDenial | undefined;
         for (let i = 0; i < Math.min(action.steps.length, V8_CODEACT_MAX_SCRIPT_STEPS); i += 1) {
           const step = action.steps[i];
           if (!step) break;
@@ -510,22 +525,33 @@ export class V8CodeActExecutor {
             exitCode: result.observation.exitCode,
             timedOut: result.observation.timedOut,
           });
+          if (result.policy === 'deny') {
+            denied = true;
+            denial = result.observation.policyDenial ?? {
+              ruleId: 'V8SEC-REQUIRE-ISOLATION',
+              message: result.observation.blockReason ?? 'sandbox denied code execution',
+            };
+          }
           if (!result.observation.ok) {
             allOk = false;
             if (action.stopOnFailure !== false) break;
           }
         }
         return {
-          observation: finish({
+          observation: {
+            ...finish({
             ok: allOk,
             stdout: stepResults.map((s) => s.stdout).filter(Boolean).join('\n'),
             stderr: stepResults.map((s) => s.stderr).filter(Boolean).join('\n'),
             exitCode: allOk ? 0 : 1,
             timedOut: stepResults.some((s) => s.timedOut),
-            blocked: stepResults.length === 0,
+            blocked: denied || stepResults.length === 0,
+            ...(denial ? { blockReason: `${denial.ruleId}: ${denial.message}`, policyDenial: denial } : {}),
             stepResults,
-          }),
-          policy: 'allow',
+            }),
+            ...(denied ? { policy: 'deny' as const } : {}),
+          },
+          policy: denied ? 'deny' : 'allow',
         };
       }
       default:

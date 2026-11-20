@@ -198,6 +198,47 @@ test('M6 run: fallback none — trạng thái "không cách ly" rõ ràng', asyn
   assert.match(r.stdout, /plain-ok/);
 });
 
+test('M6 run: requireIsolation refuses none before spawn; external workspace remains caller-owned', async () => {
+  const root = makeTempDir();
+  const workspace = makeTempDir();
+  let spawnAttempts = 0;
+  const mgr = new BotBoxManager({
+    rootDir: root,
+    spawnProcess: () => {
+      spawnAttempts += 1;
+      throw new Error('unexpected host spawn');
+    },
+  });
+  const box = mgr.createBox('bot-required-none', { workspaceDir: workspace, isolation: 'none' });
+  assert.equal(box.workspaceDir, workspace);
+  await assert.rejects(
+    () => mgr.runInBox('bot-required-none', '/bin/sh', ['-c', 'touch must-not-run'], { requireIsolation: true }),
+    /Sandbox isolation required/,
+  );
+  assert.equal(spawnAttempts, 0);
+  assert.equal(fs.existsSync(path.join(workspace, 'must-not-run')), false);
+});
+
+test('M6 run: requireIsolation never falls back to a host spawn after backend failure', async () => {
+  const root = makeTempDir();
+  let spawnAttempts = 0;
+  const mgr = new BotBoxManager({
+    rootDir: root,
+    spawnProcess: () => {
+      spawnAttempts += 1;
+      throw new Error('simulated backend spawn failure');
+    },
+  });
+  mgr.createBox('bot-required-failure', { isolation: 'bwrap' });
+  await assert.rejects(
+    () => mgr.runInBox('bot-required-failure', '/bin/sh', ['-c', 'touch must-not-run'], { requireIsolation: true }),
+    /Sandbox isolation required/,
+  );
+  // On hosts without bwrap preflight rejects before spawn; otherwise only
+  // the requested backend may be attempted. The plain host command is never retried.
+  assert.ok(spawnAttempts <= 1);
+});
+
 test('M6 turn: resetPerTurn xoá workspace nhưng giữ auth', async () => {
   const root = makeTempDir();
   const mgr = new BotBoxManager({ rootDir: root });
