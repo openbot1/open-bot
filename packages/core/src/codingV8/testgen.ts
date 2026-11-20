@@ -50,6 +50,38 @@ import type {
 
 /** Giới hạn ký tự output test run giữ lại. */
 export const V8_TESTGEN_OUTPUT_LIMIT = 8000;
+
+/**
+ * Only pass environment values needed for a normal Node test process.
+ * Generated tests execute repository code and must not inherit credentials,
+ * preload hooks, module search overrides, or other arbitrary parent settings.
+ */
+const V8_TESTGEN_CHILD_ENV_KEYS = [
+  'PATH',
+  'HOME',
+  'USERPROFILE',
+  'TMP',
+  'TEMP',
+  'TMPDIR',
+  'SystemRoot',
+  'WINDIR',
+  'ComSpec',
+  'PATHEXT',
+  'LANG',
+  'LC_ALL',
+  'LC_CTYPE',
+  'TZ',
+  'NODE_ENV',
+] as const;
+
+function buildV8TestgenChildEnv(parentEnv: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const childEnv: NodeJS.ProcessEnv = {};
+  for (const key of V8_TESTGEN_CHILD_ENV_KEYS) {
+    const value = parentEnv[key];
+    if (typeof value === 'string') childEnv[key] = value;
+  }
+  return childEnv;
+}
 /** Timeout mặc định chạy test sinh ra, ms. */
 export const V8_TESTGEN_DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -379,14 +411,10 @@ export function runV8GeneratedTests(
   const timeoutMs = options.timeoutMs ?? V8_TESTGEN_DEFAULT_TIMEOUT_MS;
   const startedAt = Date.now();
   return new Promise((resolve) => {
-    // Lược NODE_TEST_CONTEXT / NODE_TEST_WORKER_ID: khi file test này
-    // tự nó đang chạy dưới `node --test`, child `node <file>` thừa
-    // hưởng 2 biến đó sẽ chạy dạng test-runner worker (xuất event
-    // stream nhị phân thay vì summary) — lược đi để child in TAP/spec
-    // bình thường và đếm pass/fail được.
-    const childEnv = { ...process.env };
-    delete childEnv.NODE_TEST_CONTEXT;
-    delete childEnv.NODE_TEST_WORKER_ID;
+    // Build a small allowlisted environment instead of cloning the parent.
+    // In particular, do not pass credentials, NODE_OPTIONS/NODE_PATH, or
+    // NODE_TEST_* runner internals to code generated from repository files.
+    const childEnv = buildV8TestgenChildEnv(process.env);
     execFile(
       process.execPath,
       [testAbsPath],
