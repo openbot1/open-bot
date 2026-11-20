@@ -85,7 +85,7 @@ test('PDF sample: text extraction works with PDF.js eval disabled', async () => 
     copyFixture(dir, 'read-file-v087-sample.pdf');
     const out = await read('read-file-v087-sample.pdf', dir);
     assert.ok(!out.startsWith('Error:'), `expected success, got: ${out.slice(0, 200)}`);
-    assert.match(out, /Format: PDF, 2 page\\(s\\)/);
+    assert.match(out, /Format: PDF, 2 page\(s\)/);
     assert.match(out, /--- Page 1 of 2 ---/);
     assert.match(out, /--- Page 2 of 2 ---/);
     assert.ok(out.includes('Hello from the DOCX fixture.'));
