@@ -214,6 +214,51 @@ test('webhook ssrf: dispatch tới tên miền public vẫn gửi được (look
   assert.equal(fetchCalls, 1);
 });
 
+test('webhook ssrf: dispatch does not follow a redirect to a private destination', async () => {
+  let redirectRequests = 0;
+  let privateRequests = 0;
+  const privateTarget = http.createServer((_req, res) => {
+    privateRequests += 1;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end('{}');
+  });
+  await new Promise((resolve) => privateTarget.listen(0, '127.0.0.1', resolve));
+  const privatePort = privateTarget.address().port;
+
+  const publicEndpoint = http.createServer((_req, res) => {
+    redirectRequests += 1;
+    res.writeHead(302, {
+      Location: `http://127.0.0.1:${privatePort}/metadata`,
+    });
+    res.end('redirect');
+  });
+  await new Promise((resolve) => publicEndpoint.listen(0, '127.0.0.1', resolve));
+  const publicPort = publicEndpoint.address().port;
+
+  try {
+    const dir = makeTempDir();
+    // This test opts into loopback only for the initial local test server.
+    // The production behavior under test is that Fetch must not follow its
+    // redirect to the second (private) server.
+    const d = new WebhookDispatcher({
+      storePath: path.join(dir, 'webhooks.json'),
+      hmacSecret: 'secret-test',
+      allowInternalUrls: true,
+    });
+    d.add(`http://127.0.0.1:${publicPort}/hook`, ['run.done']);
+
+    const results = await d.dispatch(EVENT);
+    assert.equal(results.length, 1);
+    assert.equal(results[0].ok, false, 'a redirect response is not a successful delivery');
+    assert.equal(results[0].status, 302, 'report the redirect status without following it');
+    assert.equal(redirectRequests, 1, 'the registered endpoint receives the POST once');
+    assert.equal(privateRequests, 0, 'the private redirect target must never receive a request');
+  } finally {
+    await new Promise((resolve) => publicEndpoint.close(resolve));
+    await new Promise((resolve) => privateTarget.close(resolve));
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Opt-in allowInternalUrls: webhook local vẫn chạy như cũ
 // ---------------------------------------------------------------------------
