@@ -711,9 +711,14 @@ test('sleepConsolidation: dedupe archival trùng lặp trong sleep pass', () => 
 test('sleepConsolidation: phiên mới (dưới 7 ngày) không bị trích fact', () => {
   const dir = makeTempDir();
   const recall = new RecallStore(dir);
+  // Ngày tương đối (không hardcode): phiên bắt đầu 1 ngày trước vẫn "mới"
+  // so với ngưỡng 7 ngày (V9_LETTA_SESSION_FACT_AGE_DAYS). Ngày cố định
+  // 2026-11-14 đã thành time-bomb khi suite chạy qua 2026-11-21T08:00Z.
+  const freshStart = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const freshEnd = new Date(freshStart.getTime() + 2 * 60 * 60 * 1000);
   recall.recordSession({
     sessionId: 's-fresh', botId: BOT,
-    startedAt: '2026-11-14T08:00:00.000Z', endedAt: '2026-11-14T10:00:00.000Z',
+    startedAt: freshStart.toISOString(), endedAt: freshEnd.toISOString(),
     episodes: [{ role: 'user', text: 'Người dùng vừa nói về dự án open-bot hôm nay.' }],
   });
   const report = runLettaSleepPass(dir, BOT, { skipProposals: true });
