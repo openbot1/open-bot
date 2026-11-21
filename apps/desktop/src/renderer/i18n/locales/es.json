@@ -6018,6 +6018,8 @@
   "pluginMarketplace.riskHigh": "Riesgo alto",
   "pluginMarketplace.riskLow": "Riesgo bajo",
   "pluginMarketplace.riskMedium": "Riesgo medio",
+  "pluginMarketplace.securityWarningBody": "Un plugin puede ejecutarse en un proceso separado, pero eso no constituye un límite de seguridad del sistema operativo: sigue usando los permisos de tu cuenta y puede leer o modificar archivos, credenciales y recursos de red a los que esa cuenta tenga acceso. Instala o activa solo plugins de fuentes confiables; revisa los permisos de archivos, shell, red y MCP.",
+  "pluginMarketplace.securityWarningTitle": "Los plugins no están aislados por el sistema operativo",
   "pluginMarketplace.subtitle": "Explora los plugins instalados y las plantillas. Revisa los permisos antes de instalar.",
   "pluginMarketplace.title": "Mercado de plugins",
   "pluginMarketplace.toggleError": "No se pudo cambiar este plugin.",

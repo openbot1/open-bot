@@ -6018,6 +6018,8 @@
   "pluginMarketplace.riskHigh": "Rủi ro cao",
   "pluginMarketplace.riskLow": "Rủi ro thấp",
   "pluginMarketplace.riskMedium": "Rủi ro vừa",
+  "pluginMarketplace.securityWarningBody": "Plugin có thể chạy trong tiến trình riêng, nhưng đó không phải ranh giới bảo mật của hệ điều hành: plugin vẫn dùng quyền của tài khoản OS hiện tại và có thể đọc hoặc sửa tệp, thông tin xác thực hay truy cập tài nguyên mạng mà tài khoản đó được phép. Chỉ cài hoặc bật plugin từ nguồn bạn tin tưởng; hãy kiểm tra kỹ quyền hệ thống tệp, shell, mạng và MCP.",
+  "pluginMarketplace.securityWarningTitle": "Plugin không được cô lập ở cấp hệ điều hành",
   "pluginMarketplace.subtitle": "Duyệt plugin đã cài và mẫu plugin. Kiểm tra quyền trước khi cài.",
   "pluginMarketplace.title": "Chợ plugin",
   "pluginMarketplace.toggleError": "Không đổi được trạng thái plugin này.",

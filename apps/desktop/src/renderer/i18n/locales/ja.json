@@ -6018,6 +6018,8 @@
   "pluginMarketplace.riskHigh": "リスク高",
   "pluginMarketplace.riskLow": "リスク低",
   "pluginMarketplace.riskMedium": "リスク中",
+  "pluginMarketplace.securityWarningBody": "プラグインは別プロセスで実行される場合がありますが、それは OS のセキュリティ境界ではありません。現在の OS アカウントの権限で動作するため、そのアカウントからアクセスできるファイル、認証情報、ネットワークリソースを読み取ったり変更したりする可能性があります。信頼できる提供元のプラグインだけをインストールまたは有効化し、ファイル、シェル、ネットワーク、MCP の権限を確認してください。",
+  "pluginMarketplace.securityWarningTitle": "プラグインは OS レベルで隔離されていません",
   "pluginMarketplace.subtitle": "インストール済みプラグインとテンプレートを閲覧。インストール前に権限を確認できます。",
   "pluginMarketplace.title": "プラグインマーケット",
   "pluginMarketplace.toggleError": "このプラグインを変更できませんでした。",
