@@ -189,7 +189,7 @@ function hasSafeSkillPromptMetadata(skill: Skill): boolean {
 
 function assertSkillBodyHasNoPromptInjection(skill: Skill): void {
   if (!skill.bodyLoaded || skill.body.length === 0) return;
-  const findings = promptInjectionFindings(`${skillPromptMetadata(skill)}\\n${skill.body}`);
+  const findings = promptInjectionFindings([skillPromptMetadata(skill), skill.body].join('\n'));
   if (findings.length === 0) return;
   const codes = findings.map((finding) => finding.code).join(', ');
   throw new SkillLoadError(
