@@ -172,15 +172,28 @@ export function applySkills(systemPrompt: string, skills: Skill[], opts: ApplySk
  * contain a credential is rejected here, not injected).
  * Throws SkillLoadError when there is no source to load the body from.
  */
+function promptInjectionFindings(text: string) {
+  return INJECTION_PATTERNS.filter((pattern) =>
+    new RegExp(pattern.source, 'i').test(text),
+  );
+}
+
+/** Text fields that are rendered directly into the tier-1/tier-2 system prompt. */
+function skillPromptMetadata(skill: Skill): string {
+  return [skill.name, skill.version, skill.description, ...skill.allowedTools].join('\\n');
+}
+
+function hasSafeSkillPromptMetadata(skill: Skill): boolean {
+  return promptInjectionFindings(skillPromptMetadata(skill)).length === 0;
+}
+
 function assertSkillBodyHasNoPromptInjection(skill: Skill): void {
   if (!skill.bodyLoaded || skill.body.length === 0) return;
-  const findings = INJECTION_PATTERNS.filter((pattern) =>
-    new RegExp(pattern.source, 'i').test(skill.body),
-  );
+  const findings = promptInjectionFindings(`${skillPromptMetadata(skill)}\\n${skill.body}`);
   if (findings.length === 0) return;
   const codes = findings.map((finding) => finding.code).join(', ');
   throw new SkillLoadError(
-    `Skill "${skill.name}" contains prompt-injection markers (${codes}); its body was blocked before prompt injection.`,
+    `Skill "${skill.name}" contains prompt-injection markers (${codes}); its prompt content was blocked before injection.`,
     skill.filePath,
   );
 }
@@ -671,7 +684,12 @@ export class SkillRegistry {
   skillIndex(exclude?: Iterable<string>): SkillIndexEntry[] {
     const excluded = excludeSet(exclude);
     return this.listEnabled()
-      .filter((s) => !s.disableModelInvocation && !excluded.has(s.name))
+      .filter(
+        (s) =>
+          !s.disableModelInvocation &&
+          !excluded.has(s.name) &&
+          hasSafeSkillPromptMetadata(s),
+      )
       .map((s) => ({
         name: s.name,
         description: s.description,
@@ -780,7 +798,11 @@ export class SkillRegistry {
     // silently hide every scoped skill — see the v1.07 regression
     // test in skills-scope-v107.test.mjs).
     const dir = resolveWorkingDir(workingDir, workspaceDir);
-    return buildDirectorySkillIndex(this.list(), { workspaceDir, workingDir: dir }, exclude);
+    return buildDirectorySkillIndex(
+      this.list().filter(hasSafeSkillPromptMetadata),
+      { workspaceDir, workingDir: dir },
+      exclude,
+    );
   }
 
   /** The directory-aware tier-1 index as compact prompt text. */
