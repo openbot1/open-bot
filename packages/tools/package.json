@@ -2,7 +2,7 @@
   "dependencies": {
     "@open-bot/core": "*",
     "mammoth": "^1.13.0",
-    "pdfjs-dist": "^3.11.174",
+    "pdfjs-dist": "^4.10.38",
     "playwright": "^1.65.0",
     "tree-sitter-javascript": "^0.25.0",
     "tree-sitter-python": "^0.25.0",

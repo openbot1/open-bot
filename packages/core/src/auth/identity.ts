@@ -286,12 +286,13 @@ export function setProviderIdentity(
   vault: Vault,
   providerId: string,
   identity: Omit<ProviderIdentity, 'updatedAt'> & { updatedAt?: number },
+  opts?: { allowLocalFallback?: boolean },
 ): ProviderIdentity {
   const valid = validateProviderIdentity({
     ...identity,
     updatedAt: identity.updatedAt ?? Date.now(),
   });
-  vault.setSecret(IDENTITY_NAMESPACE, providerId, JSON.stringify(valid));
+  vault.setSecret(IDENTITY_NAMESPACE, providerId, JSON.stringify(valid), opts);
   return valid;
 }
 

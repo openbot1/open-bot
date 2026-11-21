@@ -217,6 +217,8 @@ export interface V8FileChange {
   newContent: string;
   /** Nội dung cũ (đọc lúc plan; null = file mới). */
   oldContent: string | null;
+  /** SHA-256 of the file contents at plan time (null means it did not exist). */
+  baseHash: string | null;
   /** Mô tả đổi gì ở file này (một dòng). */
   description: string;
   /** Số dòng thêm / xóa so với nội dung cũ (tính lúc plan). */

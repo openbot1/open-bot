@@ -615,16 +615,21 @@ export class V11RefactorEngine {
       verify: options.verify,
       verifyStep: 'v11-refactor-verify',
     });
-    if (finalPlan.status === 'rolled-back' || !apply.ok) {
+    if (finalPlan.status !== 'verified' || !apply.ok) {
+      const error = finalPlan.status === 'failed'
+        ? `rollback incomplete — ${verify ? `verify fail: ${verify.output.slice(0, 300)}` : 'apply/rollback chưa hoàn tất'}`
+        : finalPlan.status === 'rolled-back'
+          ? verify
+            ? `verify fail — đã rollback: ${verify.output.slice(0, 300)}`
+            : 'apply lỗi giữa chừng — đã rollback'
+          : `refactor apply chưa verified (status: ${finalPlan.status})`;
       return {
         planId: plan.id,
         kind: plan.kind,
         ok: false,
         filesChanged: [],
         backupDir,
-        error: verify
-          ? `verify fail — đã rollback: ${verify.output.slice(0, 300)}`
-          : 'apply lỗi giữa chừng — đã rollback',
+        error,
       };
     }
     let commitSha: string | undefined;

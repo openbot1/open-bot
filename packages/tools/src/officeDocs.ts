@@ -7,8 +7,8 @@
  * garbage. Each format is extracted with a small, well-known,
  * permissively licensed library — no hand-written PDF/OOXML parser:
  *
- *   PDF  — `pdfjs-dist` 3.11.174 (Apache-2.0), legacy CJS build, text
- *          layer only, one worker-less `getDocument` per file.
+ *   PDF  — `pdfjs-dist` 4.10.38 (Apache-2.0), legacy ESM Node build,
+ *          text layer only, one `getDocument` per file.
  *   DOCX — `mammoth` 1.13.0 (BSD-2-Clause): `convertToHtml` + a small
  *          HTML-to-plain-text formatter below (headings, paragraphs,
  *          tables as `cell | cell` rows, lists). The formatter only
@@ -43,14 +43,12 @@
  *  - legacy binary Office formats (.doc/.xls, OLE compound files):
  *    rejected with a clear error — only modern OOXML is supported.
  *
- * pdf.js note: the legacy build tries to `require('canvas')` at load
- * time and prints a "Cannot polyfill DOMMatrix/Path2D" warning when
- * the optional package is absent. `canvas` is only needed to render
- * pages to images; text extraction never uses it, so it is NOT a
- * dependency here. The module is therefore lazy-loaded inside
- * `extractPdf` with `console.log`/`console.warn` muted for the single
- * `require` call (pdf.js `warn()` writes via `console.log`), so the
- * host log stays clean.
+ * pdf.js note: the legacy ESM build attempts to load optional
+ * `@napi-rs/canvas` at module load for rendering-only DOMMatrix/Path2D
+ * support. Text extraction never renders pages, so no canvas API is
+ * used here. The module is lazy-loaded inside `extractPdf`; console
+ * output is muted while the ESM import initializes so an absent
+ * optional canvas polyfill does not pollute the host log.
  */
 import * as mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
@@ -181,9 +179,9 @@ function htmlToPlainText(html: string): string {
 // PDF (pdfjs-dist, text layer only — no OCR)
 // ---------------------------------------------------------------------------
 
-// pdfjs-dist ships no typed subpath for the legacy CJS build that this
-// package (CommonJS) can require, so the module is loaded lazily via
-// require and typed loosely. Only the small surface used here is typed.
+// PDF.js 4.x ships ESM-only `.mjs` builds. The tools package
+// remains CommonJS, so TypeScript's Node16 module mode preserves this
+// native dynamic import rather than rewriting it to require().
 interface PdfjsTextItem {
   str?: string;
 }
@@ -203,33 +201,39 @@ interface PdfjsModule {
   VerbosityLevel: { ERRORS: number; WARNINGS: number; INFOS: number };
 }
 
-let pdfjsModule: PdfjsModule | null = null;
+let pdfjsModulePromise: Promise<PdfjsModule> | null = null;
 
-function loadPdfjs(): PdfjsModule {
-  if (pdfjsModule) return pdfjsModule;
-  // Mute console output for this one require: pdf.js warns about the
-  // missing optional `canvas` package (rendering only — see the header
-  // comment). Without muting, every process that loads this module
-  // prints two "Cannot polyfill" warnings into the host log.
+function loadPdfjs(): Promise<PdfjsModule> {
+  if (pdfjsModulePromise) return pdfjsModulePromise;
+
+  // Mute console output while this one ESM import initializes: PDF.js
+  // warns when the optional canvas polyfill is unavailable. Extraction
+  // only reads the text layer, so canvas is not required.
   const originalLog = console.log;
   const originalWarn = console.warn;
   console.log = () => undefined;
   console.warn = () => undefined;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    pdfjsModule = require('pdfjs-dist/legacy/build/pdf') as PdfjsModule;
-  } finally {
-    console.log = originalLog;
-    console.warn = originalWarn;
-  }
-  return pdfjsModule;
+
+  pdfjsModulePromise = import('pdfjs-dist/legacy/build/pdf.mjs')
+    .then((loaded) => loaded as unknown as PdfjsModule)
+    .catch((error: unknown) => {
+      // Let a later call retry if module loading failed.
+      pdfjsModulePromise = null;
+      throw error;
+    })
+    .finally(() => {
+      console.log = originalLog;
+      console.warn = originalWarn;
+    });
+
+  return pdfjsModulePromise;
 }
 
 async function extractPdf(buffer: Buffer): Promise<string> {
   if (!startsWith(buffer, PDF_MAGIC)) {
     throw new Error('Not a valid PDF file (missing the %PDF header; the file may be corrupted).');
   }
-  const pdfjs = loadPdfjs();
+  const pdfjs = await loadPdfjs();
   let doc: PdfjsDocument;
   try {
     doc = await pdfjs
@@ -237,7 +241,8 @@ async function extractPdf(buffer: Buffer): Promise<string> {
         data: new Uint8Array(buffer),
         // CVE-2024-4367: untrusted PDF font data must not reach eval().
         isEvalSupported: false,
-        disableWorker: true,
+        // PDF.js 4.x removed the deprecated disableWorker getDocument option;
+        // its legacy Node build selects the appropriate Node worker strategy.
         verbosity: pdfjs.VerbosityLevel.ERRORS,
       })
       .promise;

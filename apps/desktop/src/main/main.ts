@@ -1167,6 +1167,12 @@ function getOnePasswordBroker(): OnePasswordBroker {
  * đã rỗng.
  */
 function migrateApiKeysToVault(): void {
+  // Never clear legacy plaintext settings while any existing Vault entry is
+  // unreadable; the old value may be the only recoverable copy.
+  if (vaultStorageStatus === 'unavailable') {
+    console.error('[open-bot] Deferred legacy API-key migration because Vault cannot decrypt every existing entry; settings.json values were preserved.');
+    return;
+  }
   let moved = false;
   for (const [id, p] of Object.entries(settings.providers)) {
     const key = p.apiKey?.trim();
@@ -1375,20 +1381,18 @@ function getWebhookDispatcher(): WebhookDispatcher {
  * Every degraded-mode write requires a fresh native main-process prompt;
  * a renderer boolean is only a request hint and never proof of consent.
  *
- * Automation escape: when the app itself is launched with
- * OPENBOT_VAULT_ALLOW_LOCAL_FALLBACK=1, the launcher (the operator, not
- * the renderer — a renderer cannot set the main process's env) has
- * consented in advance, so no dialog is shown. Real-app E2E tests run
- * the app with this flag because no human is there to answer the
- * prompt; without it every degraded-mode write would hang forever.
- * Default (flag unset) still prompts for every write.
+ * Test-only automation escape: E2E launchers may set both
+ * NODE_ENV=test and OPENBOT_VAULT_ALLOW_LOCAL_FALLBACK=1 so unattended
+ * tests do not wait for a native dialog. The flag is ignored outside
+ * NODE_ENV=test; normal app launches still require a fresh confirmation
+ * for every degraded-mode write. A renderer cannot set the main process env.
  */
 async function requestLocalFallbackConsent(
   suppliedConsent: boolean | undefined,
   purpose: string,
 ): Promise<boolean> {
   if (vaultStorageStatus !== 'degraded') return false;
-  if (process.env.OPENBOT_VAULT_ALLOW_LOCAL_FALLBACK === '1') return true;
+  if (process.env.NODE_ENV === 'test' && process.env.OPENBOT_VAULT_ALLOW_LOCAL_FALLBACK === '1') return true;
   // A renderer flag is a request, not proof of a user gesture. Keep the
   // native main-process confirmation authoritative for every degraded write.
   const requestedBySettings = suppliedConsent === true;
@@ -4394,7 +4398,7 @@ async function startOAuthLogin(
       id: subject,
       displayName,
       email,
-    });
+    }, { allowLocalFallback });
     // The connector's own identity row (used by
     // 'auth:identities-list' to report connector status): for
     // microsoft -> 'teams' and google -> 'gmail' this differs from
@@ -4404,7 +4408,7 @@ async function startOAuthLogin(
         id: subject,
         displayName,
         email,
-      });
+      }, { allowLocalFallback });
     }
     return { ok: true, providerId, displayName: identity.displayName };
   } catch (err) {
@@ -9400,7 +9404,7 @@ function registerIpc(): void {
   // này từ Composio. Lưu vào Vault, không bao giờ trả lại qua IPC.
   registerMainWindowIpcHandler(
     'automations:composio-trigger-secret:set',
-    (_event: unknown, payload: { id: string; secret: string }) => {
+    async (_event: unknown, payload: { id: string; secret: string }) => {
       if (!automationScheduler) throw new Error('Scheduler chưa khởi động.');
       const id = requireId(payload?.id, 'id');
       const automation = automationScheduler.get(id);
@@ -9409,7 +9413,8 @@ function registerIpc(): void {
         throw new Error('Automation này không dùng trigger Composio.');
       }
       if (typeof payload?.secret !== 'string') throw new Error('Secret phải là string.');
-      setComposioTriggerSigningSecret(vault, id, payload.secret);
+      const allowLocalFallback = await requestLocalFallbackConsent(undefined, 'Composio trigger signing secret');
+      setComposioTriggerSigningSecret(vault, id, payload.secret, { allowLocalFallback });
       return { ok: true as const };
     },
   );
@@ -9429,7 +9434,7 @@ function registerIpc(): void {
   // automation nghe app đó.
   registerMainWindowIpcHandler(
     'automations:slack-signing-secret:set',
-    (_event: unknown, payload: { id: string; secret: string }) => {
+    async (_event: unknown, payload: { id: string; secret: string }) => {
       if (!automationScheduler) throw new Error('Scheduler chưa khởi động.');
       const id = requireId(payload?.id, 'id');
       const automation = automationScheduler.get(id);
@@ -9438,7 +9443,8 @@ function registerIpc(): void {
         throw new Error('Automation này không nghe tin nhắn Slack.');
       }
       if (typeof payload?.secret !== 'string') throw new Error('Secret phải là string.');
-      setSlackSigningSecret(vault, id, payload.secret);
+      const allowLocalFallback = await requestLocalFallbackConsent(undefined, 'Slack signing secret');
+      setSlackSigningSecret(vault, id, payload.secret, { allowLocalFallback });
       return { ok: true as const };
     },
   );
@@ -12083,7 +12089,8 @@ function registerIpc(): void {
       // Key Composio thường < 200 ký tự; cho tối đa 500 để không chặn
       // key dài bất thường. Key chỉ vào Vault, không log, không trả về.
       const apiKey = requireString(payload?.apiKey, 'apiKey', 500);
-      setComposioApiKey(vault, apiKey);
+      const allowLocalFallback = await requestLocalFallbackConsent(undefined, 'Composio API key');
+      setComposioApiKey(vault, apiKey, { allowLocalFallback });
       // v0.59: seed key mới cho coordinator ngay (xoay key không cần
       // tạo lại bot — con ghi đè key đã seed, huỷ session cũ).
       await seedComposioKeyToCoordinator().catch(() => undefined);
@@ -12126,7 +12133,8 @@ function registerIpc(): void {
       // tối đa 200 ký tự, không khoảng trắng). Giá trị chỉ vào Vault,
       // không log, không trả về.
       const userId = requireString(payload?.userId, 'userId', 500);
-      setComposioUserId(vault, userId);
+      const allowLocalFallback = await requestLocalFallbackConsent(undefined, 'Composio user id');
+      setComposioUserId(vault, userId, { allowLocalFallback });
       await seedComposioUserIdToCoordinator().catch(() => undefined);
       // v0.98: đổi user id → poll manager đồng bộ id (session cũ huỷ)
       // rồi đồng bộ chạy/dừng poll nền theo trạng thái mới.
@@ -12217,7 +12225,8 @@ function registerIpc(): void {
       // Key media thường < 200 ký tự; cho tối đa 500 để không chặn
       // key dài bất thường. Key chỉ vào Vault, không log, không trả về.
       const apiKey = requireString(payload?.apiKey, 'apiKey', 500);
-      setMediaApiKey(vault, providerId, apiKey);
+      const allowLocalFallback = await requestLocalFallbackConsent(undefined, `${providerId} media API key`);
+      setMediaApiKey(vault, providerId, apiKey, { allowLocalFallback });
       await seedMediaKeyToCoordinator(providerId).catch(() => undefined);
       return getMediaKeyStatus(vault);
     },

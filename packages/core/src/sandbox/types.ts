@@ -94,6 +94,8 @@ export interface AppliedResourceLimits {
 }
 
 export interface BotBoxOptions {
+  /** Existing caller-owned workspace to mount into this box. */
+  workspaceDir?: string;
   /** Box theo bot: reset workspace đầu mỗi turn (mặc định false). */
   resetPerTurn?: boolean;
   /** Tên biến env cho phép (ngoài biến mặc định an toàn, xem env.ts). */
@@ -142,7 +144,7 @@ export interface BoxRunResult {
   timedOut: boolean;
   /** True khi bị kill vì vượt cap ghi. */
   writeCapExceeded: boolean;
-  /** Dung lượng workspace đo được sau khi chạy (bytes). */
+  /** Dung lượng workspace đo được sau khi chạy (bytes; 0 khi caller tắt accounting). */
   workspaceBytes: number;
   durationMs: number;
   /** Giới hạn CPU/RAM/process đã áp dụng (hay chưa) cho lần chạy này. */

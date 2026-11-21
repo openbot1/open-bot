@@ -48,6 +48,7 @@ import {
   v8ContentHash,
   v8CountLineChanges,
   v8CoverageDeltaForFile,
+  v8DefaultBackupDir,
   v8DiffLines,
   v8FirstCommandToken,
   v8IsOutsideWorkspace,
@@ -65,6 +66,12 @@ import {
   summarizeV8Plan,
 } from '../packages/core/dist/codingV8/index.js';
 import { CodingV7Log } from '../packages/core/dist/codingV7/index.js';
+import { detectIsolation } from '../packages/core/dist/index.js';
+
+function hasStrongCodeActIsolation() {
+  const kind = detectIsolation().kind;
+  return kind === 'bwrap' || kind === 'sandbox-exec';
+}
 
 function tmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'open-bot-coding-v8-v116-'));
@@ -313,6 +320,8 @@ test('refactor: plan + preview diff unified có -/+ đúng dòng', () => {
   ]);
   assert.equal(plan.status, 'planned');
   assert.equal(plan.changes.length, 2);
+  assert.match(plan.changes[0].baseHash, /^[a-f0-9]{64}$/);
+  assert.match(plan.changes[1].baseHash, /^[a-f0-9]{64}$/);
   assert.equal(plan.changes[0].linesRemoved, 1);
   assert.equal(plan.changes[0].linesAdded, 1);
   const preview = previewV8Diff(plan);
@@ -338,6 +347,25 @@ test('refactor: path thoát workspace + trùng path → throw lúc plan', () => 
   ]), /duplicate change/);
   assert.equal(v8IsOutsideWorkspace('/etc/passwd'), true);
   assert.equal(v8IsOutsideWorkspace('src/a.ts'), false);
+});
+
+test('refactor: base hash mismatch rejects the whole plan before any file is written', async () => {
+  const dir = makeRepoWithFiles({
+    'src/a.ts': 'const a = 1;\n',
+    'src/b.ts': 'const b = 1;\n',
+  });
+  const plan = v8PlanWithStatus(createV8RefactorPlan(dir, 'Change both', 'Change both files', [
+    { path: 'src/a.ts', newContent: 'const a = 2;\n', description: 'a' },
+    { path: 'src/b.ts', newContent: 'const b = 2;\n', description: 'b' },
+  ]), 'approved');
+  fs.writeFileSync(path.join(dir, 'src/b.ts'), 'concurrent edit\n');
+  await assert.rejects(
+    () => applyV8RefactorPlan(plan, { workingDir: dir }),
+    /base hash mismatch.*src\/b\.ts/,
+  );
+  assert.equal(fs.readFileSync(path.join(dir, 'src/a.ts'), 'utf8'), 'const a = 1;\n');
+  assert.equal(fs.readFileSync(path.join(dir, 'src/b.ts'), 'utf8'), 'concurrent edit\n');
+  assert.equal(fs.existsSync(v8DefaultBackupDir(dir, plan.id)), false);
 });
 
 test('refactor: apply khi chưa approved → throw; approve → apply ok + backup + verify ok', async () => {
@@ -387,16 +415,67 @@ test('refactor: verify fail → rollback tự động, file về nội dung cũ'
   assert.equal(fs.readFileSync(path.join(dir, 'src/b.ts'), 'utf8'), 'const y = 1;\n');
 });
 
-test('refactor: apply lỗi giữa chừng (path là thư mục) → rollback file đã ghi', async () => {
+test('refactor: automatic rollback leaves a later concurrent edit untouched', async () => {
+  const dir = makeRepoWithFiles({
+    'src/a.ts': 'const a = 1;\n',
+    'src/b.ts': 'const b = 1;\n',
+  });
+  const plan = v8PlanWithStatus(createV8RefactorPlan(dir, 'Change both', 'Change both files', [
+    { path: 'src/a.ts', newContent: 'const a = 2;\n', description: 'a' },
+    { path: 'src/b.ts', newContent: 'const b = 2;\n', description: 'b' },
+  ]), 'approved');
+  const { plan: result, verify } = await applyV8RefactorPlan(plan, {
+    workingDir: dir,
+    verify: () => {
+      fs.writeFileSync(path.join(dir, 'src/b.ts'), 'concurrent edit\n');
+      return { ok: false, output: 'verify failed' };
+    },
+  });
+  assert.equal(result.status, 'failed');
+  assert.equal(verify.ok, false);
+  assert.equal(verify.rolledBack, false);
+  assert.equal(fs.readFileSync(path.join(dir, 'src/a.ts'), 'utf8'), 'const a = 1;\n');
+  assert.equal(fs.readFileSync(path.join(dir, 'src/b.ts'), 'utf8'), 'concurrent edit\n');
+  assert.match(result.statusNote, /rollback incomplete/);
+});
+
+test('refactor: manual rollback leaves a modified applied file untouched', async () => {
+  const dir = makeRepoWithFiles({ 'src/a.ts': 'const a = 1;\n' });
+  const plan = v8PlanWithStatus(createV8RefactorPlan(dir, 'Change', 'Change a', [
+    { path: 'src/a.ts', newContent: 'const a = 2;\n', description: 'a' },
+  ]), 'approved');
+  const { plan: applied } = await applyV8RefactorPlan(plan, { workingDir: dir });
+  fs.writeFileSync(path.join(dir, 'src/a.ts'), 'human edit\n');
+  const rollback = rollbackV8Refactor(applied, { workingDir: dir });
+  assert.deepEqual(rollback.restored, []);
+  assert.equal(rollback.errors.length, 1);
+  assert.equal(fs.readFileSync(path.join(dir, 'src/a.ts'), 'utf8'), 'human edit\n');
+});
+
+test('refactor: rollback does not delete a new file modified after apply', async () => {
+  const dir = makeRepoWithFiles({});
+  const plan = v8PlanWithStatus(createV8RefactorPlan(dir, 'Add file', 'Add a generated file', [
+    { path: 'src/new.ts', newContent: 'export const generated = true;\n', description: 'new file' },
+  ]), 'approved');
+  const { plan: applied } = await applyV8RefactorPlan(plan, { workingDir: dir });
+  fs.writeFileSync(path.join(dir, 'src/new.ts'), 'human edit\n');
+  const rollback = rollbackV8Refactor(applied, { workingDir: dir });
+  assert.deepEqual(rollback.deleted, []);
+  assert.equal(rollback.errors.length, 1);
+  assert.equal(fs.readFileSync(path.join(dir, 'src/new.ts'), 'utf8'), 'human edit\n');
+});
+
+test('refactor: unreadable path during preflight prevents partial apply', async () => {
   const dir = makeRepoWithFiles({ 'src/a.ts': 'const x = 1;\n' });
   fs.mkdirSync(path.join(dir, 'adir'));
-  const plan = v8PlanWithStatus(createV8RefactorPlan(dir, 'Mixed', 'one ok, one fails', [
+  const plan = v8PlanWithStatus(createV8RefactorPlan(dir, 'Mixed', 'one valid file, one directory', [
     { path: 'src/a.ts', newContent: 'const x = 9;\n', description: 'x' },
-    { path: 'adir', newContent: 'nope', description: 'write into a directory' },
+    { path: 'adir', newContent: 'nope', description: 'directory is not a file' },
   ]), 'approved');
-  const { plan: result, apply } = await applyV8RefactorPlan(plan, { workingDir: dir });
-  assert.equal(apply.ok, false);
-  assert.equal(result.status, 'rolled-back');
+  await assert.rejects(
+    () => applyV8RefactorPlan(plan, { workingDir: dir }),
+    /base hash mismatch.*adir/,
+  );
   assert.equal(fs.readFileSync(path.join(dir, 'src/a.ts'), 'utf8'), 'const x = 1;\n');
 });
 
@@ -482,6 +561,65 @@ test('testgen: chạy test sinh ra thật — pass hết; coverage delta 0→3',
   assert.equal(delta.coveredAfter, 3);
   assert.equal(delta.delta, 3);
   assert.equal(delta.coverageAfter, 1);
+});
+
+test('testgen: child process gets runtime env only, never parent credentials or Node injection settings', async () => {
+  const dir = tmpDir();
+  const testAbs = path.join(dir, 'env-isolation.test.mjs');
+  const safeTempDir = path.join(dir, 'safe-temp');
+  fs.mkdirSync(safeTempDir);
+  const inheritedKeys = [
+    'OPENAI_API_KEY',
+    'AWS_SECRET_ACCESS_KEY',
+    'GITHUB_TOKEN',
+    'OPENBOT_VAULT_MASTER_KEY',
+    'NODE_OPTIONS',
+    'NODE_PATH',
+    'NODE_TEST_CONTEXT',
+    'NODE_TEST_WORKER_ID',
+    'NODE_ENV',
+    'TMPDIR',
+  ];
+  const previous = new Map(inheritedKeys.map((key) => [key, process.env[key]]));
+  const expectedPath = process.env.PATH;
+
+  try {
+    process.env.OPENAI_API_KEY = 'test-parent-openai-secret';
+    process.env.AWS_SECRET_ACCESS_KEY = 'test-parent-aws-secret';
+    process.env.GITHUB_TOKEN = 'test-parent-github-token';
+    process.env.OPENBOT_VAULT_MASTER_KEY = 'test-parent-vault-secret';
+    process.env.NODE_OPTIONS = '--trace-warnings';
+    process.env.NODE_PATH = path.join(dir, 'untrusted-node-modules');
+    process.env.NODE_TEST_CONTEXT = 'parent-test-context';
+    process.env.NODE_TEST_WORKER_ID = 'parent-worker';
+    process.env.NODE_ENV = 'production';
+    process.env.TMPDIR = safeTempDir;
+
+    fs.writeFileSync(testAbs, [
+      "import test from 'node:test';",
+      "import assert from 'node:assert/strict';",
+      "test('generated test process receives only allowlisted environment', () => {",
+      ...inheritedKeys
+        .filter((key) => !['NODE_ENV', 'TMPDIR'].includes(key))
+        .map((key) => `  assert.equal(process.env[${JSON.stringify(key)}], undefined, ${JSON.stringify(key + ' must not leak')});`),
+      `  assert.equal(process.env.NODE_ENV, 'production');`,
+      `  assert.equal(process.env.TMPDIR, ${JSON.stringify(safeTempDir)});`,
+      `  assert.equal(process.env.PATH, ${JSON.stringify(expectedPath)});`,
+      '});',
+      '',
+    ].join('\n'));
+
+    const run = await runV8GeneratedTests(testAbs, { cwd: dir });
+    assert.equal(run.passed, true, run.output);
+    assert.equal(run.total, 1);
+    assert.equal(run.passedCount, 1);
+    assert.equal(run.failedCount, 0);
+  } finally {
+    for (const [key, value] of previous) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
 });
 
 test('testgen: method trong class không sinh test (cần instance) + ghi lý do', () => {
@@ -609,18 +747,29 @@ function makeExecutor(dir, policy) {
   return new V8CodeActExecutor({ workingDir: path.join(dir, 'ws'), policy });
 }
 
-test('codeact-v4: bash/python chạy thật; edit/read thật; policy allow', async () => {
+test('codeact-v4: bash/python qua BotBox; edit/read workspace; HOME không phải HOME host', async () => {
   const dir = tmpDir();
   const ex = makeExecutor(dir);
-  const bash = await ex.execute({ kind: 'bash', command: 'echo hello-v8 && pwd' });
-  assert.equal(bash.observation.ok, true);
-  assert.match(bash.observation.stdout, /hello-v8/);
-  assert.equal(bash.observation.policy, 'allow');
-  assert.equal(bash.observation.securityLevel, 'allow');
-  assert.equal(bash.policy, 'allow');
-  const py = await ex.execute({ kind: 'python', code: 'print(40 + 2)' });
-  assert.equal(py.observation.ok, true);
-  assert.match(py.observation.stdout, /42/);
+  if (hasStrongCodeActIsolation()) {
+    const bash = await ex.execute({ kind: 'bash', command: 'echo hello-v8 && pwd' });
+    assert.equal(bash.observation.ok, true);
+    assert.match(bash.observation.stdout, /hello-v8/);
+    assert.equal(bash.observation.policy, 'allow');
+    assert.equal(bash.observation.securityLevel, 'allow');
+    assert.equal(bash.policy, 'allow');
+    const py = await ex.execute({ kind: 'python', code: 'print(40 + 2)' });
+    assert.equal(py.observation.ok, true);
+    assert.match(py.observation.stdout, /42/);
+    const home = await ex.execute({ kind: 'bash', command: 'printf %s "$HOME"' });
+    assert.equal(home.observation.ok, true);
+    assert.notEqual(home.observation.stdout, process.env.HOME ?? '');
+    assert.match(home.observation.stdout, /open-bot-codeact-v8-/);
+  } else {
+    const denied = await ex.execute({ kind: 'bash', command: 'echo must-not-run' });
+    assert.equal(denied.observation.blocked, true);
+    assert.equal(denied.policy, 'deny');
+    assert.match(denied.observation.blockReason, /V8SEC-REQUIRE-ISOLATION/);
+  }
   const edit = await ex.execute({ kind: 'edit', path: 'sub/a.txt', content: 'line1\n', mode: 'write' });
   assert.equal(edit.observation.ok, true);
   assert.equal(edit.observation.fileWritten.path, 'sub/a.txt');
@@ -628,7 +777,6 @@ test('codeact-v4: bash/python chạy thật; edit/read thật; policy allow', as
   assert.equal(read.observation.stdout, 'line1');
   assert.equal(fs.readFileSync(path.join(dir, 'ws', 'sub', 'a.txt'), 'utf8'), 'line1\n');
 });
-
 test('codeact-v4: policy chặn curl|sh, rm -rf /, sudo, lệnh ngoài allowlist, mạng tắt', async () => {
   const dir = tmpDir();
   const ex = makeExecutor(dir);
@@ -651,25 +799,41 @@ test('codeact-v4: policy chặn curl|sh, rm -rf /, sudo, lệnh ngoài allowlist
   assert.equal(fs.existsSync(path.join(dir, 'escape.txt')), false);
 });
 
-test('codeact-v4: timeout kill + observation redact secret + split/token helpers', async () => {
+test('codeact-v4: timeout kill + output redaction + split/token helpers', async () => {
   const dir = tmpDir();
   const ex = makeExecutor(dir);
-  const slow = await ex.execute({ kind: 'bash', command: 'sleep 10', timeoutMs: 300 });
-  assert.equal(slow.observation.timedOut, true);
-  assert.equal(slow.observation.ok, false);
-  const leak = await ex.execute({ kind: 'bash', command: 'echo api_key=sk-abcdef1234567890' });
-  assert.equal(leak.observation.ok, true);
-  assert.equal(leak.observation.stdout.includes('sk-abcdef'), false);
-  assert.match(leak.observation.stdout, /\[REDACTED\]/);
+  if (hasStrongCodeActIsolation()) {
+    const slow = await ex.execute({ kind: 'bash', command: 'sleep 10', timeoutMs: 300 });
+    assert.equal(slow.observation.timedOut, true);
+    assert.equal(slow.observation.ok, false);
+    const leak = await ex.execute({ kind: 'bash', command: 'echo api_key=sk-abcdef1234567890' });
+    assert.equal(leak.observation.ok, true);
+    assert.equal(leak.observation.stdout.includes('sk-abcdef'), false);
+    assert.match(leak.observation.stdout, /\[REDACTED\]/);
+  } else {
+    const denied = await ex.execute({ kind: 'bash', command: 'sleep 10' });
+    assert.equal(denied.observation.blocked, true);
+    assert.equal(denied.policy, 'deny');
+  }
   assert.match(redactV8Text('token=abcdefgh1234'), /\[REDACTED\]/);
   assert.match(normalizeV8Output('x'.repeat(30000), 100), /truncated/);
   assert.equal(v8FirstCommandToken('FOO=1 echo hi'), 'echo');
   assert.deepEqual(v8SplitCommandSegments('echo a; echo b && echo c'), ['echo a', 'echo b', 'echo c']);
 });
-
-test('codeact-v4: script nhiều bước — dừng ở lỗi đầu, trả stepResults', async () => {
+test('codeact-v4: script nhiều bước — dừng ở lỗi đầu và giữ trạng thái deny', async () => {
   const dir = tmpDir();
   const ex = makeExecutor(dir);
+  if (!hasStrongCodeActIsolation()) {
+    const denied = await ex.execute({
+      kind: 'script',
+      steps: [{ kind: 'bash', code: 'echo must-not-run' }, { kind: 'python', code: 'print(2)' }],
+    });
+    assert.equal(denied.observation.blocked, true);
+    assert.equal(denied.observation.policy, 'deny');
+    assert.equal(denied.policy, 'deny');
+    assert.equal(denied.observation.stepResults.length, 1);
+    return;
+  }
   const ok = await ex.execute({
     kind: 'script',
     steps: [
@@ -691,7 +855,6 @@ test('codeact-v4: script nhiều bước — dừng ở lỗi đầu, trả step
   assert.equal(fail.observation.ok, false);
   assert.equal(fail.observation.stepResults.length, 2);
 });
-
 test('codeact-v4: permissive mode cho lệnh lạ chạy (fail 127, không blocked); allowNetwork bật cho curl', async () => {
   const dir = tmpDir();
   const permissive = new V8CodeActExecutor({
@@ -699,8 +862,13 @@ test('codeact-v4: permissive mode cho lệnh lạ chạy (fail 127, không block
     policy: defaultV8SandboxPolicy({ mode: 'permissive' }),
   });
   const unknown = await permissive.execute({ kind: 'bash', command: 'foobar123 --help' });
-  assert.equal(unknown.observation.blocked, false);
-  assert.equal(unknown.observation.ok, false); // command not found → exit 127
+  if (hasStrongCodeActIsolation()) {
+    assert.equal(unknown.observation.blocked, false);
+    assert.equal(unknown.observation.ok, false); // command not found → exit 127
+  } else {
+    assert.equal(unknown.observation.blocked, true);
+    assert.equal(unknown.policy, 'deny');
+  }
   // checkV8Policy trực tiếp: mạng bật thì curl không bị deny vì network.
   const policy = defaultV8SandboxPolicy({ allowNetwork: true });
   const check = checkV8Policy({ kind: 'bash', command: 'curl https://example.com/file' }, policy, dir);
@@ -719,8 +887,14 @@ test('codeact-v4: executeAll dừng ở lỗi đầu', async () => {
     { kind: 'bash', command: 'exit 1' },
     { kind: 'bash', command: 'echo never' },
   ]);
-  assert.equal(results.length, 2);
-  assert.equal(results[0].observation.stdout.trim(), 'one');
+  if (hasStrongCodeActIsolation()) {
+    assert.equal(results.length, 2);
+    assert.equal(results[0].observation.stdout.trim(), 'one');
+  } else {
+    assert.equal(results.length, 1);
+    assert.equal(results[0].observation.blocked, true);
+    assert.equal(results[0].policy, 'deny');
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -855,12 +1029,16 @@ test('agent-v8: runCodeAct qua executor + ghi observation vào log v7', async ()
     changeProvider: () => [],
   });
   const result = await agent.runCodeAct({ kind: 'bash', command: 'echo codeact-v8' });
-  assert.equal(result.observation.ok, true);
-  assert.match(result.observation.stdout, /codeact-v8/);
+  if (hasStrongCodeActIsolation()) {
+    assert.equal(result.observation.ok, true);
+    assert.match(result.observation.stdout, /codeact-v8/);
+  } else {
+    assert.equal(result.observation.blocked, true);
+    assert.equal(result.policy, 'deny');
+  }
   assert.equal(log.verify().ok, true);
   assert.ok(log.all().some((e) => e.type === 'v7.observation'));
 });
-
 // ---------------------------------------------------------------------------
 // 8. i18n codingV8.* đủ 6 locale
 // ---------------------------------------------------------------------------

@@ -175,7 +175,7 @@ export function validateMediaApiKey(apiKey: unknown): string {
 /** Minimal Vault API this key store needs (the real Vault matches). */
 export interface MediaKeyVault {
   getSecret(namespace: string, key: string): string | null;
-  setSecret(namespace: string, key: string, value: string): void;
+  setSecret(namespace: string, key: string, value: string, opts?: { allowLocalFallback?: boolean }): void;
   deleteSecret(namespace: string, key: string): boolean;
   listSecrets(namespace: string): string[];
 }
@@ -207,11 +207,11 @@ export function hasMediaApiKey(vault: MediaKeyVault, providerId: string): boolea
  * and empty keys throw a clear error and write nothing. The key is
  * never logged.
  */
-export function setMediaApiKey(vault: MediaKeyVault, providerId: string, apiKey: string): void {
+export function setMediaApiKey(vault: MediaKeyVault, providerId: string, apiKey: string, opts?: { allowLocalFallback?: boolean }): void {
   if (!isMediaProviderId(providerId)) {
     throw new Error(`Unknown media provider "${providerId}".`);
   }
-  vault.setSecret(MEDIA_VAULT_NAMESPACE, providerId, validateMediaApiKey(apiKey));
+  vault.setSecret(MEDIA_VAULT_NAMESPACE, providerId, validateMediaApiKey(apiKey), opts);
 }
 
 /** Delete a provider's media key from the Vault. True when one existed. */

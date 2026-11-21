@@ -41,6 +41,50 @@ export const V8_DIFF_CONTEXT_LINES = 3;
 /** Giới hạn ký tự của unified diff preview (tránh log phình). */
 export const V8_DIFF_PREVIEW_LIMIT = 200_000;
 
+/** Hash the exact UTF-8 content captured by a refactor plan. */
+function hashV8RefactorContent(content: string): string {
+  return crypto.createHash('sha256').update(content, 'utf8').digest('hex');
+}
+
+/** Return null only when the target does not exist; other read errors fail closed. */
+function hashV8RefactorFile(absPath: string): string | null {
+  try {
+    return crypto.createHash('sha256').update(fs.readFileSync(absPath)).digest('hex');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw err;
+  }
+}
+
+/** Replace one file atomically from a temporary file in the same directory. */
+function writeV8RefactorFileAtomic(absPath: string, content: string): void {
+  const dir = path.dirname(absPath);
+  fs.mkdirSync(dir, { recursive: true });
+  let mode = 0o666;
+  try {
+    mode = fs.statSync(absPath).mode & 0o777;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+  }
+  const tempPath = path.join(dir, '.' + path.basename(absPath) + '.open-bot-' + crypto.randomBytes(8).toString('hex') + '.tmp');
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(tempPath, 'wx', mode | 0o200);
+    fs.writeFileSync(fd, content, 'utf8');
+    fs.fchmodSync(fd, mode);
+    fs.fsyncSync(fd);
+    fs.closeSync(fd);
+    fd = undefined;
+    fs.renameSync(tempPath, absPath);
+  } catch (err) {
+    if (fd !== undefined) {
+      try { fs.closeSync(fd); } catch { /* best-effort close */ }
+    }
+    try { fs.rmSync(tempPath, { force: true }); } catch { /* best-effort cleanup */ }
+    throw err;
+  }
+}
+
 /** Tạo id plan duy nhất (`v8ref-<hex>`). */
 export function v8NewPlanId(): string {
   return `v8ref-${crypto.randomBytes(6).toString('hex')}`;
@@ -114,10 +158,19 @@ export function createV8RefactorPlan(
     try {
       oldContent = fs.readFileSync(abs, 'utf8');
     } catch {
-      oldContent = null; // file mới
+      oldContent = null; // file mới or unreadable; apply preflight rejects unreadable paths.
     }
+    const baseHash = oldContent === null ? null : hashV8RefactorContent(oldContent);
     const { added, removed } = v8CountLineChanges(oldContent, input.newContent);
-    changes.push({ path: relPath, newContent: input.newContent, oldContent, description: input.description, linesAdded: added, linesRemoved: removed });
+    changes.push({
+      path: relPath,
+      newContent: input.newContent,
+      oldContent,
+      baseHash,
+      description: input.description,
+      linesAdded: added,
+      linesRemoved: removed,
+    });
   }
   return {
     id: planId,
@@ -318,40 +371,80 @@ export async function applyV8RefactorPlan(
   const backupDir = options.backupDir ?? v8DefaultBackupDir(workingDir, plan.id);
   const onEvent = options.onEvent ?? ((): void => undefined);
   if (plan.status !== 'approved') {
-    throw new Error(`V8 refactor: plan ${plan.id} chưa approved (status=${plan.status}) — không được apply`);
+    throw new Error('V8 refactor: plan ' + plan.id + ' chưa approved (status=' + plan.status + ') — không được apply');
   }
+
+  // Validate every planned file before writing any of them.
+  const conflicts: string[] = [];
+  for (const change of plan.changes) {
+    const plannedHash = change.oldContent === null ? null : hashV8RefactorContent(change.oldContent);
+    if (change.baseHash !== plannedHash) {
+      conflicts.push(change.path + ' (invalid plan base hash)');
+      continue;
+    }
+    try {
+      if (hashV8RefactorFile(path.join(workingDir, change.path)) !== change.baseHash) conflicts.push(change.path);
+    } catch (err) {
+      conflicts.push(change.path + ' (' + (err instanceof Error ? err.message : String(err)) + ')');
+    }
+  }
+  if (conflicts.length > 0) {
+    throw new Error(
+      'V8 refactor: base hash mismatch — files changed or unreadable since plan: ' +
+      conflicts.join(', ') + '; create a new plan',
+    );
+  }
+
   fs.mkdirSync(backupDir, { recursive: true });
   const files: V8ApplyFileResult[] = [];
-  const appliedPaths: string[] = [];
   let ok = true;
   for (const change of plan.changes) {
     const abs = path.join(workingDir, change.path);
     const backupPath = change.oldContent === null ? null : path.join(backupDir, change.path);
     try {
-      if (change.oldContent !== null && backupPath) {
-        fs.mkdirSync(path.dirname(backupPath), { recursive: true });
-        fs.writeFileSync(backupPath, change.oldContent, 'utf8');
+      if (hashV8RefactorFile(abs) !== change.baseHash) {
+        throw new Error('base hash mismatch for ' + change.path + '; file changed after preflight');
       }
-      fs.mkdirSync(path.dirname(abs), { recursive: true });
-      fs.writeFileSync(abs, change.newContent, 'utf8');
-      files.push({ path: change.path, applied: true, backupPath: backupPath ? path.relative(workingDir, backupPath) : null });
-      appliedPaths.push(change.path);
+      if (change.oldContent !== null && backupPath) {
+        if (hashV8RefactorContent(change.oldContent) !== change.baseHash) {
+          throw new Error('invalid stored base content for ' + change.path);
+        }
+        writeV8RefactorFileAtomic(backupPath, change.oldContent);
+      }
+      // Re-check after backup creation and immediately before replacing the target.
+      if (hashV8RefactorFile(abs) !== change.baseHash) {
+        throw new Error('base hash mismatch for ' + change.path + '; file changed before write');
+      }
+      writeV8RefactorFileAtomic(abs, change.newContent);
+      files.push({
+        path: change.path,
+        applied: true,
+        backupPath: backupPath ? path.relative(workingDir, backupPath) : null,
+      });
       onEvent('v8.refactor.file-applied', { planId: plan.id, path: change.path });
     } catch (err) {
       ok = false;
-      files.push({ path: change.path, applied: false, backupPath: backupPath ? path.relative(workingDir, backupPath) : null, error: err instanceof Error ? err.message : String(err) });
+      files.push({
+        path: change.path,
+        applied: false,
+        backupPath: backupPath ? path.relative(workingDir, backupPath) : null,
+        error: err instanceof Error ? err.message : String(err),
+      });
       break;
     }
   }
   const apply: V8ApplyResult = { planId: plan.id, files, ok, backupDir };
   if (!ok) {
-    // Ghi lỗi giữa chừng → rollback ngay các file đã ghi.
-    rollbackV8Refactor(plan, { workingDir, backupDir });
-    const failedPlan = v8PlanWithStatus(plan, 'rolled-back', `apply lỗi giữa chừng ở ${files.find((f) => !f.applied)?.path ?? 'unknown'} — đã rollback`);
-    onEvent('v8.refactor.rolled-back', { planId: plan.id, reason: 'apply-failed' });
+    const rollback = rollbackV8Refactor(plan, { workingDir, backupDir });
+    const rollbackOk = rollback.errors.length === 0;
+    const status = rollbackOk ? 'rolled-back' : 'failed';
+    const note = 'apply failed at ' + (files.find((file) => !file.applied)?.path ?? 'unknown') +
+      '; ' + (rollbackOk ? 'rollback completed' : 'rollback incomplete: ' + rollback.errors.map((item) => item.path).join(', '));
+    const failedPlan = v8PlanWithStatus(plan, status, note);
+    onEvent(rollbackOk ? 'v8.refactor.rolled-back' : 'v8.refactor.rollback-incomplete', { planId: plan.id, reason: 'apply-failed' });
     return { plan: failedPlan, apply };
   }
-  // Verify sau apply.
+
   const verifyStep = options.verifyStep ?? 'verify';
   const startedAt = Date.now();
   let verifyOutcome: { ok: boolean; output: string };
@@ -362,18 +455,30 @@ export async function applyV8RefactorPlan(
       verifyOutcome = { ok: false, output: err instanceof Error ? err.message : String(err) };
     }
   } else {
-    // Verify mặc định: mọi file trong plan còn đọc được sau khi ghi.
     const unreadable: string[] = [];
     for (const change of plan.changes) {
-      try {
-        fs.readFileSync(path.join(workingDir, change.path), 'utf8');
-      } catch {
-        unreadable.push(change.path);
-      }
+      try { fs.readFileSync(path.join(workingDir, change.path), 'utf8'); }
+      catch { unreadable.push(change.path); }
     }
     verifyOutcome = unreadable.length === 0
-      ? { ok: true, output: `${plan.changes.length} file(s) readable after apply` }
-      : { ok: false, output: `unreadable after apply: ${unreadable.join(', ')}` };
+      ? { ok: true, output: plan.changes.length + ' file(s) readable after apply' }
+      : { ok: false, output: 'unreadable after apply: ' + unreadable.join(', ') };
+  }
+  // A successful verifier must not mask edits made while verification was running.
+  if (verifyOutcome.ok) {
+    const changedDuringVerify: string[] = [];
+    for (const change of plan.changes) {
+      try {
+        if (hashV8RefactorFile(path.join(workingDir, change.path)) !== hashV8RefactorContent(change.newContent)) {
+          changedDuringVerify.push(change.path);
+        }
+      } catch {
+        changedDuringVerify.push(change.path);
+      }
+    }
+    if (changedDuringVerify.length > 0) {
+      verifyOutcome = { ok: false, output: 'files changed or became unreadable during verify: ' + changedDuringVerify.join(', ') };
+    }
   }
   const verify: V8VerifyResult = {
     planId: plan.id,
@@ -384,22 +489,25 @@ export async function applyV8RefactorPlan(
     rolledBack: false,
   };
   if (!verifyOutcome.ok) {
-    rollbackV8Refactor(plan, { workingDir, backupDir });
-    verify.rolledBack = true;
-    const rolledBackPlan = v8PlanWithStatus(plan, 'rolled-back', `verify "${verifyStep}" fail — đã rollback: ${verifyOutcome.output.slice(0, 200)}`);
-    onEvent('v8.refactor.rolled-back', { planId: plan.id, reason: `verify-failed:${verifyStep}` });
+    const rollback = rollbackV8Refactor(plan, { workingDir, backupDir });
+    verify.rolledBack = rollback.errors.length === 0;
+    const status = verify.rolledBack ? 'rolled-back' : 'failed';
+    const note = verify.rolledBack
+      ? 'verify "' + verifyStep + '" fail — rollback completed: ' + verifyOutcome.output.slice(0, 160)
+      : 'verify "' + verifyStep + '" fail — rollback incomplete; files changed after apply: ' + rollback.errors.map((item) => item.path).join(', ');
+    const rolledBackPlan = v8PlanWithStatus(plan, status, note);
+    onEvent(verify.rolledBack ? 'v8.refactor.rolled-back' : 'v8.refactor.rollback-incomplete', {
+      planId: plan.id,
+      reason: 'verify-failed:' + verifyStep,
+    });
     return { plan: rolledBackPlan, apply, verify };
   }
-  const verifiedPlan = v8PlanWithStatus(plan, 'verified', `verify "${verifyStep}" ok`);
+  const verifiedPlan = v8PlanWithStatus(plan, 'verified', 'verify "' + verifyStep + '" ok');
   onEvent('v8.refactor.verified', { planId: plan.id, step: verifyStep });
   return { plan: verifiedPlan, apply, verify };
 }
 
-/**
- * Rollback plan về nội dung cũ từ backup: file cũ được khôi phục,
- * file mới (oldContent null) bị xóa. Trả danh sách path đã rollback.
- * Không throw khi một file rollback lỗi — ghi vào danh sách lỗi.
- */
+/** Roll back only if the current file still matches this plan's applied content. */
 export function rollbackV8Refactor(
   plan: V8RefactorPlan,
   options: { workingDir: string; backupDir?: string },
@@ -412,20 +520,32 @@ export function rollbackV8Refactor(
   for (const change of plan.changes) {
     const abs = path.join(workingDir, change.path);
     try {
+      const currentHash = hashV8RefactorFile(abs);
+      if (currentHash === change.baseHash) continue;
+      const appliedHash = hashV8RefactorContent(change.newContent);
+      if (currentHash !== appliedHash) {
+        errors.push({
+          path: change.path,
+          error: 'file changed since this plan was applied; refusing to overwrite it during rollback',
+        });
+        continue;
+      }
       if (change.oldContent === null) {
-        // File mới → xóa.
-        if (fs.existsSync(abs)) fs.unlinkSync(abs);
+        fs.unlinkSync(abs);
         deleted.push(change.path);
       } else {
-        const backupPath = path.join(backupDir, change.path);
-        if (fs.existsSync(backupPath)) {
-          fs.mkdirSync(path.dirname(abs), { recursive: true });
-          fs.copyFileSync(backupPath, abs);
-        } else {
-          // Không có file backup (vd backup dir bị xóa) → ghi lại oldContent từ plan.
-          fs.mkdirSync(path.dirname(abs), { recursive: true });
-          fs.writeFileSync(abs, change.oldContent, 'utf8');
+        if (hashV8RefactorContent(change.oldContent) !== change.baseHash) {
+          throw new Error('stored base content does not match the plan base hash');
         }
+        const backupPath = path.join(backupDir, change.path);
+        let restoreContent = change.oldContent;
+        try {
+          const backupContent = fs.readFileSync(backupPath, 'utf8');
+          if (hashV8RefactorContent(backupContent) === change.baseHash) restoreContent = backupContent;
+        } catch {
+          // The plan's original content is the fallback when backup is missing/unreadable.
+        }
+        writeV8RefactorFileAtomic(abs, restoreContent);
         restored.push(change.path);
       }
     } catch (err) {
