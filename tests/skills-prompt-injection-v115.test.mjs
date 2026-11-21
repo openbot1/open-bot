@@ -53,6 +53,7 @@ test('already-loaded inline/plugin skill is blocked before its body can be injec
 
   assert.ok(skill, 'fixture skill should parse and register');
   assert.equal(skill.bodyLoaded, true, 'inline plugin skills are already loaded at registration');
+  assert.equal(registry.loadBody('hostile-plugin-skill'), undefined, 'blocked skills must not be active for a run');
   assert.throws(
     () => ensureSkillBody(skill),
     /prompt-injection markers.*injection\.ignore-instructions/,
@@ -102,6 +103,7 @@ test('prompt-injection metadata is excluded from both global and directory skill
 
   assert.ok(unsafe);
   assert.ok(safe);
+  assert.equal(registry.loadBody('unsafe-description-skill'), undefined);
   const globalIndex = registry.formatSkillIndex();
   assert.doesNotMatch(globalIndex, /unsafe-description-skill/);
   assert.match(globalIndex, /safe-indexed-skill/);
