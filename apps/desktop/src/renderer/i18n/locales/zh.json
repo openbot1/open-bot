@@ -6018,6 +6018,8 @@
   "pluginMarketplace.riskHigh": "高风险",
   "pluginMarketplace.riskLow": "低风险",
   "pluginMarketplace.riskMedium": "中风险",
+  "pluginMarketplace.securityWarningBody": "插件可能在独立进程中运行，但这并不构成操作系统安全边界：它仍使用当前操作系统账户的权限，可能读取或修改该账户可访问的文件、凭据和网络资源。只安装或启用来自可信来源的插件，并检查文件系统、Shell、网络和 MCP 权限。",
+  "pluginMarketplace.securityWarningTitle": "插件并未受到操作系统级隔离",
   "pluginMarketplace.subtitle": "浏览已安装的插件和模板。安装前请检查权限。",
   "pluginMarketplace.title": "插件市场",
   "pluginMarketplace.toggleError": "无法更改此插件。",

@@ -177,6 +177,16 @@ export default function PluginMarketplaceView({ onBack }: Props) {
       </div>
       <p style={{ color: '#666', marginTop: 4 }}>{t('pluginMarketplace.subtitle')}</p>
 
+      <div
+        className="plugin-security-warning"
+        role="alert"
+        data-testid="plugin-security-warning"
+        style={{ border: '1px solid #c80', borderRadius: 8, padding: 12, margin: '12px 0' }}
+      >
+        <strong>{t('pluginMarketplace.securityWarningTitle')}</strong>
+        <p style={{ margin: '4px 0 0' }}>{t('pluginMarketplace.securityWarningBody')}</p>
+      </div>
+
       <div className="row" style={{ gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <input
           value={query}
