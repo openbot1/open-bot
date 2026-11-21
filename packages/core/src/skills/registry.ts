@@ -180,7 +180,7 @@ function promptInjectionFindings(text: string) {
 
 /** Text fields that are rendered directly into the tier-1/tier-2 system prompt. */
 function skillPromptMetadata(skill: Skill): string {
-  return [skill.name, skill.version, skill.description, ...skill.allowedTools].join('\\n');
+  return [skill.name, skill.version, skill.description, ...skill.allowedTools].join('\n');
 }
 
 function hasSafeSkillPromptMetadata(skill: Skill): boolean {
