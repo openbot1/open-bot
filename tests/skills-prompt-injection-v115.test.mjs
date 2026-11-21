@@ -78,7 +78,8 @@ test('file-backed user skill is rescanned at use and blocked from the system pro
   );
 
   const registry = new SkillRegistry({ userSkillsDir: skillsDir });
-  const [skill] = registry.load();
+  const skill = registry.load().find((s) => s.name === 'hostile-user-skill');
+  assert.ok(skill, 'hostile file-backed fixture skill should be loaded');
 
   assert.ok(skill);
   assert.equal(skill.bodyLoaded, false, 'disk skills are metadata-only until use');
