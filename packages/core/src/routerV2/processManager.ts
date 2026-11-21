@@ -11,6 +11,7 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
+import { safeEnvForHookScript } from '../hooks/scriptRunner';
 
 import type { PerModelFlags, RouterV2ModelState } from './types';
 import { buildLlamaServerArgs } from './presets';
@@ -25,7 +26,7 @@ export interface ManagedChildProcess {
 }
 
 /** Ham spawn mot child process (injectable). */
-export type ModelProcessSpawner = (binary: string, args: string[], opts: { port: number }) => ManagedChildProcess;
+export type ModelProcessSpawner = (binary: string, args: string[], opts: { port: number; env: NodeJS.ProcessEnv }) => ManagedChildProcess;
 
 /** Ham kiem tra health mot model qua HTTP loopback (injectable). */
 export type HealthChecker = (port: number) => Promise<boolean>;
@@ -63,8 +64,8 @@ export interface ManagedModelProcess {
 /** Delay (ms) sau khi start thi coi la "chay on dinh" (reset crash count). */
 export const STABLE_RUN_MS = 10_000;
 
-function defaultSpawner(binary: string, args: string[]): ManagedChildProcess {
-  const child: ChildProcess = spawn(binary, args, { stdio: 'ignore', windowsHide: true });
+function defaultSpawner(binary: string, args: string[], opts: { port: number; env: NodeJS.ProcessEnv }): ManagedChildProcess {
+  const child: ChildProcess = spawn(binary, args, { stdio: 'ignore', windowsHide: true, env: opts.env });
   return child as unknown as ManagedChildProcess;
 }
 
@@ -143,7 +144,7 @@ export class ModelProcessManager {
     if (existing?.restartTimer) clearTimeout(existing.restartTimer);
     let child: ManagedChildProcess;
     try {
-      child = this.spawner(binary, args, { port });
+      child = this.spawner(binary, args, { port, env: safeEnvForHookScript() });
     } catch (error) {
       this.emit({
         type: 'failed',

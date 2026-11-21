@@ -59,7 +59,7 @@ function makeFakeSpawner(log) {
         listeners[event].push(fn);
       },
     };
-    log.push({ binary, args, port: opts.port, child });
+    log.push({ binary, args, port: opts.port, env: { ...opts.env }, child });
     return child;
   };
 }
@@ -138,6 +138,38 @@ function makeRouter(spawnLog, opts = {}) {
 }
 
 // ---- ModelProcessManager ----
+
+test('process manager: child receives safe allowlisted env, not parent secrets', () => {
+  const previousPath = process.env.PATH;
+  const previousSecret = process.env.OPEN_BOT_OB020_SECRET;
+  process.env.PATH = '/ob020-safe-path';
+  process.env.OPEN_BOT_OB020_SECRET = 'must-not-leak';
+
+  try {
+    const log = [];
+    const mgr = new ModelProcessManager({
+      spawner: makeFakeSpawner(log),
+      autoRestart: false,
+    });
+
+    assert.equal(mgr.start('m-env', 'llama-server', ['--version'], 18102), true);
+    assert.equal(log.length, 1);
+    assert.equal(log[0].env.PATH, '/ob020-safe-path');
+    assert.equal(log[0].env.OPEN_BOT_OB020_SECRET, undefined);
+    assert.ok(
+      Object.keys(log[0].env).every(
+        (key) => !/(KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|PRIVATE|AUTH|BEARER|SESSION|COOKIE)/i.test(key),
+      ),
+      'child environment must not contain secret-looking variable names',
+    );
+    assert.equal(mgr.stop('m-env'), true);
+  } finally {
+    if (previousPath === undefined) delete process.env.PATH;
+    else process.env.PATH = previousPath;
+    if (previousSecret === undefined) delete process.env.OPEN_BOT_OB020_SECRET;
+    else process.env.OPEN_BOT_OB020_SECRET = previousSecret;
+  }
+});
 
 test('process manager: start/stop, backoff doubles and caps', () => {
   const log = [];
