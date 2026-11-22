@@ -48,7 +48,7 @@ import {
   type InstallResult,
   type MarketplaceServer,
 } from './marketplace';
-import { loadMcpConfig, MCP_CONFIG_REL_PATH } from './config';
+import { loadMcpConfig, MCP_CONFIG_REL_PATH, writeMcpConfigAtomic } from './config';
 import type { McpServerConfig } from './types';
 
 export const MARKETPLACE_INSTALLED_VERSIONS_REL_PATH = path.join(
@@ -476,8 +476,7 @@ function writeServerToMcpJson(
   const servers = parsed['servers'] as Record<string, unknown>;
   servers[key] = { ...config, [MCP_JSON_VERSION_FIELD]: version };
   parsed['servers'] = servers;
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(parsed, null, 2) + '\n', 'utf8');
+  writeMcpConfigAtomic(workspaceDir, JSON.stringify(parsed, null, 2) + '\n');
   loadMcpConfig(workspaceDir);
 }
 

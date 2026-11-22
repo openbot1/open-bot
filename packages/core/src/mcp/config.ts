@@ -140,6 +140,44 @@ export function loadMcpConfig(workspaceDir: string): McpConfig {
 }
 
 /**
+ * Atomically write credential-bearing MCP config with owner-only permissions.
+ * The unique exclusive temp file avoids inheriting permissions from a stale
+ * predictable .tmp file; no backup is created because it would duplicate secrets.
+ */
+export function writeMcpConfigAtomic(workspaceDir: string, content: string): void {
+  const filePath = path.join(workspaceDir, MCP_CONFIG_REL_PATH);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const tmp = `${filePath}.tmp-${process.pid}-${randomBytes(8).toString('hex')}`;
+  let fd: number | undefined;
+  let tmpCreated = false;
+  try {
+    fd = fs.openSync(tmp, 'wx', 0o600);
+    tmpCreated = true;
+    fs.writeFileSync(fd, content, 'utf8');
+    fs.fsyncSync(fd);
+    fs.closeSync(fd);
+    fd = undefined;
+    fs.renameSync(tmp, filePath);
+  } catch (err) {
+    if (fd !== undefined) {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        // Ignore cleanup errors; preserve the original write error.
+      }
+    }
+    if (tmpCreated) {
+      try {
+        fs.rmSync(tmp);
+      } catch {
+        // Ignore cleanup errors; preserve the original write error.
+      }
+    }
+    throw err;
+  }
+}
+
+/**
  * v0.14: add one MCP server to `<workspaceDir>/.open-bot/mcp.json` when
  * it is not there yet (plugin bundles declare their MCP server in the
  * bundle manifest; installing the bundle wires it in like a user editing
@@ -175,41 +213,8 @@ export function ensureMcpServer(
   // liệt. Validate ở đây chặn ngay từ đầu; config đã validate cũng
   // được chuẩn hoá (bỏ field lạ) trước khi ghi.
   const validated = validateServer(name, config);
-  const filePath = path.join(workspaceDir, MCP_CONFIG_REL_PATH);
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const next: McpConfig = { servers: { ...current.servers, [name]: validated } };
   const content = JSON.stringify(next, null, 2) + '\n';
-  // mcp.json may contain static Authorization headers. Use a unique,
-  // exclusively-created owner-only temp file so a stale predictable
-  // .tmp cannot retain broader permissions; rename it over the config.
-  // No backup copies: they would duplicate credential-bearing content.
-  const tmp = `${filePath}.tmp-${process.pid}-${randomBytes(8).toString('hex')}`;
-  let fd: number | undefined;
-  let tmpCreated = false;
-  try {
-    fd = fs.openSync(tmp, 'wx', 0o600);
-    tmpCreated = true;
-    fs.writeFileSync(fd, content, 'utf8');
-    fs.fsyncSync(fd);
-    fs.closeSync(fd);
-    fd = undefined;
-    fs.renameSync(tmp, filePath);
-  } catch (err) {
-    if (fd !== undefined) {
-      try {
-        fs.closeSync(fd);
-      } catch {
-        // Ignore cleanup errors; preserve the original write error.
-      }
-    }
-    if (tmpCreated) {
-      try {
-        fs.rmSync(tmp);
-      } catch {
-        // Ignore cleanup errors; preserve the original write error.
-      }
-    }
-    throw err;
-  }
+  writeMcpConfigAtomic(workspaceDir, content);
   return { added: true };
 }

@@ -26,7 +26,9 @@ import { join } from 'node:path';
 
 import { McpServer, resolveWorkspacePath } from '../packages/core/dist/mcp/server.js';
 import { ensureMcpServer, loadMcpConfig } from '../packages/core/dist/mcp/config.js';
-import { mergePluginMcpServers } from '../packages/core/dist/mcp/pluginServers.js';
+import { mergePluginMcpServers, removePluginMcpServers, saveMcpConfig } from '../packages/core/dist/mcp/pluginServers.js';
+import { install as installMarketplaceServer } from '../packages/core/dist/mcp/marketplace.js';
+import { installVersion } from '../packages/core/dist/mcp/marketplaceVersions.js';
 import {
   assertCommandAllowed,
   resolveWithin,
@@ -350,6 +352,99 @@ test('DEFENSE MCP config: auto-merge keeps credential-bearing mcp.json owner-onl
     if (process.platform !== 'win32') {
       assert.equal(statSync(file).mode & 0o077, 0, 'mcp.json must have no group/world permissions');
     }
+  } finally {
+    process.umask(previousUmask);
+    cleanup(ws);
+  }
+});
+
+
+function assertMcpConfigOwnerOnly(workspaceDir) {
+  const file = join(workspaceDir, '.open-bot', 'mcp.json');
+  // POSIX mode bits are meaningful here; Windows ACLs are separate.
+  if (process.platform !== 'win32') {
+    assert.equal(statSync(file).mode & 0o077, 0, 'mcp.json must have no group/world permissions');
+  }
+}
+
+test('DEFENSE MCP config: plugin uninstall keeps mcp.json owner-only', () => {
+  const ws = tempDir('mcp-audit-ws-');
+  const pluginsDir = tempDir('mcp-audit-plugins-');
+  const previousUmask = process.umask(0o022);
+  try {
+    const merged = mergePluginMcpServers(ws, pluginsDir, 'owner-mode-plugin', {
+      pluginServer: {
+        name: 'pluginServer',
+        command: 'node',
+        headers: { Authorization: 'Bearer plugin-secret' },
+      },
+    });
+    assert.deepEqual(merged.added, ['pluginServer']);
+
+    const removed = removePluginMcpServers(ws, pluginsDir, 'owner-mode-plugin');
+    assert.deepEqual(removed.removed, ['pluginServer']);
+    assert.deepEqual(loadMcpConfig(ws).servers, {});
+    assertMcpConfigOwnerOnly(ws);
+  } finally {
+    process.umask(previousUmask);
+    cleanup(ws);
+    cleanup(pluginsDir);
+  }
+});
+
+test('DEFENSE MCP config: marketplace install creates owner-only mcp.json', () => {
+  const ws = tempDir('mcp-audit-ws-');
+  const previousUmask = process.umask(0o022);
+  try {
+    const result = installMarketplaceServer('filesystem', ws);
+    assert.equal(result.config.name, 'filesystem');
+    assert.ok(loadMcpConfig(ws).servers.filesystem);
+    assertMcpConfigOwnerOnly(ws);
+  } finally {
+    process.umask(previousUmask);
+    cleanup(ws);
+  }
+});
+
+test('DEFENSE MCP config: installVersion creates owner-only mcp.json', () => {
+  const ws = tempDir('mcp-audit-ws-');
+  const previousUmask = process.umask(0o022);
+  try {
+    const catalog = [{
+      id: 'owner-mode-versioned',
+      name: 'Owner Mode Versioned',
+      description: 'Local fixture for MCP config permission regression.',
+      transport: 'stdio',
+      command: 'node',
+      args: [],
+      tags: [],
+      version: '1.2.3',
+    }];
+    const result = installVersion('owner-mode-versioned', ws, undefined, { catalog });
+    assert.equal(result.version, '1.2.3');
+    assert.ok(loadMcpConfig(ws).servers['owner-mode-versioned']);
+    assertMcpConfigOwnerOnly(ws);
+  } finally {
+    process.umask(previousUmask);
+    cleanup(ws);
+  }
+});
+
+test('DEFENSE MCP config: direct saveMcpConfig creates owner-only mcp.json', () => {
+  const ws = tempDir('mcp-audit-ws-');
+  const previousUmask = process.umask(0o022);
+  try {
+    saveMcpConfig(ws, {
+      servers: {
+        saved: {
+          name: 'saved',
+          command: 'node',
+          headers: { Authorization: 'Bearer direct-save-secret' },
+        },
+      },
+    });
+    assert.equal(loadMcpConfig(ws).servers.saved.headers.Authorization, 'Bearer direct-save-secret');
+    assertMcpConfigOwnerOnly(ws);
   } finally {
     process.umask(previousUmask);
     cleanup(ws);
