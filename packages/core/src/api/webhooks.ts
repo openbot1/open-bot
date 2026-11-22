@@ -5,7 +5,8 @@
  *   'run.done'          — an API / chat run finished (data: { botId, runId?, text? })
  *   'run.error'         — an API / chat run failed (data: { botId, runId?, error })
  *   'approval.needed'   — an agent run is waiting for approval
- *                         (data: { botId, callId, call })
+ *                         (data: { botId, callId, call: { name } }; tool args are
+ *                         deliberately omitted from outbound webhook payloads)
  *   'automation.notify' — an automation wants to notify the outside world
  *                         (data: { message, at? } — same shape as the
  *                         automation `notify` handler)
@@ -37,6 +38,12 @@
  * (loopback, link-local, private, CGNAT, TEST-NET, multicast, ...).
  * Host nào thật sự cần webhook nội bộ (receiver chạy trên localhost)
  * thì bật `allowInternalUrls: true` khi tạo dispatcher — mặc định tắt.
+ *
+ * Data minimization (M5): the internal `approval.needed` event can carry
+ * file contents, credentials, or other tool arguments. Before serialization,
+ * outbound deliveries keep only `botId`, `callId`, and `call.name`; the
+ * original event remains unchanged. HMAC, when configured, signs these exact
+ * minimized bytes.
  *
  * Persistence: registrations live in `<userData>/webhooks.json`
  * (plain JSON, URLs only — no secrets). Writes are atomic
@@ -250,6 +257,31 @@ function isEventKind(value: unknown): value is WebhookEventKind {
   );
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Keep approval notifications useful without sending the tool's input.
+ * Arguments may contain file contents, tokens, or other workspace data.
+ */
+function serializeWebhookEvent(event: WebhookEvent): string {
+  if (event.kind !== 'approval.needed') {
+    return JSON.stringify(event);
+  }
+
+  // Treat malformed/legacy approval payloads as empty data, never fall
+  // back to serializing an untrusted shape that may contain tool inputs.
+  const source = isRecord(event.data) ? event.data : {};
+  const call = isRecord(source['call']) ? source['call'] : undefined;
+  const data: Record<string, unknown> = {};
+  if (typeof source['botId'] === 'string') data['botId'] = source['botId'];
+  if (typeof source['callId'] === 'string') data['callId'] = source['callId'];
+  if (typeof call?.['name'] === 'string') data['call'] = { name: call['name'] };
+
+  return JSON.stringify({ kind: event.kind, at: event.at, data });
+}
+
 export class WebhookDispatcher {
   private readonly storePath: string;
   private webhooks: WebhookRegistration[];
@@ -343,7 +375,7 @@ export class WebhookDispatcher {
       throw new Error(`Unknown webhook event kind: ${String(event.kind)}`);
     }
     const targets = this.webhooks.filter((w) => w.events.includes(event.kind));
-    const body = JSON.stringify(event);
+    const body = serializeWebhookEvent(event);
     return Promise.all(targets.map((w) => this.deliverOne(w, body)));
   }
 

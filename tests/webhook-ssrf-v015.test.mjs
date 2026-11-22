@@ -20,6 +20,7 @@ import {
   WebhookDispatcher,
   assertWebhookUrlPublic,
   isPrivateIp,
+  verifyWebhookSignature,
 } from '../packages/core/dist/api/webhooks.js';
 
 const realFetch = globalThis.fetch;
@@ -374,3 +375,107 @@ test('webhook unsigned: có secret thì gửi có ký và KHÔNG cảnh báo uns
     await new Promise((r) => mock.close(r));
   }
 });
+
+// ---------------------------------------------------------------------------
+// approval.needed data minimization (M5)
+// ---------------------------------------------------------------------------
+
+test('webhook approval.needed: omits tool arguments before sending and signs the minimized body', async () => {
+  const received = [];
+  globalThis.fetch = async (_url, init) => {
+    const headers = init.headers;
+    received.push({
+      body: String(init.body),
+      signature: headers['X-Open-Bot-Signature'],
+      timestamp: headers['X-Open-Bot-Timestamp'],
+    });
+    return new Response('{}', { status: 200 });
+  };
+
+  const dir = makeTempDir();
+  const d = new WebhookDispatcher({
+    storePath: path.join(dir, 'webhooks.json'),
+    hmacSecret: 'secret-test',
+    allowInternalUrls: true,
+  });
+  d.add('http://127.0.0.1:8080/hook', ['approval.needed']);
+
+  const sensitiveArgs = {
+    path: '/workspace/private.txt',
+    content: 'DO_NOT_SEND_FILE_CONTENT_7d9a',
+    apiKey: 'DO_NOT_SEND_TOKEN_31c2',
+  };
+  const event = {
+    kind: 'approval.needed',
+    at: '2026-11-22T01:00:00.000Z',
+    data: {
+      botId: 'bot-1',
+      callId: 'call-1',
+      call: {
+        id: 'call-1',
+        name: 'write_file',
+        args: sensitiveArgs,
+        input: 'DO_NOT_SEND_RAW_INPUT_91af',
+      },
+      argsSummary: 'DO_NOT_SEND_SUMMARY_8be1',
+      extra: 'DO_NOT_SEND_EXTRA_2f10',
+    },
+    privateMetadata: 'DO_NOT_SEND_TOP_LEVEL_5f71',
+  };
+
+  const results = await d.dispatch(event);
+  assert.equal(results.length, 1);
+  assert.equal(results[0].ok, true);
+  assert.equal(received.length, 1);
+
+  const sent = JSON.parse(received[0].body);
+  assert.deepEqual(sent, {
+    kind: 'approval.needed',
+    at: event.at,
+    data: {
+      botId: 'bot-1',
+      callId: 'call-1',
+      call: { name: 'write_file' },
+    },
+  });
+  for (const secret of [
+    'DO_NOT_SEND_FILE_CONTENT_7d9a',
+    'DO_NOT_SEND_TOKEN_31c2',
+    'DO_NOT_SEND_RAW_INPUT_91af',
+    'DO_NOT_SEND_SUMMARY_8be1',
+    'DO_NOT_SEND_EXTRA_2f10',
+    'DO_NOT_SEND_TOP_LEVEL_5f71',
+    '/workspace/private.txt',
+  ]) {
+    assert.equal(received[0].body.includes(secret), false, `outbound body leaked ${secret}`);
+  }
+
+  assert.equal(event.data.call.args, sensitiveArgs, 'internal event must not be mutated');
+  assert.equal(event.data.call.args.content, 'DO_NOT_SEND_FILE_CONTENT_7d9a');
+  assert.ok(
+    verifyWebhookSignature(
+      'secret-test',
+      Number(received[0].timestamp),
+      received[0].body,
+      received[0].signature,
+    ),
+    'HMAC must authenticate the exact minimized body sent over the wire',
+  );
+
+  // Even a malformed array payload must not fall back to raw serialization.
+  const malformed = {
+    kind: 'approval.needed',
+    at: event.at,
+    data: ['DO_NOT_SEND_ARRAY_DATA_0ad4'],
+  };
+  const malformedResults = await d.dispatch(malformed);
+  assert.equal(malformedResults.length, 1);
+  assert.equal(malformedResults[0].ok, true);
+  assert.deepEqual(JSON.parse(received[1].body), {
+    kind: 'approval.needed',
+    at: event.at,
+    data: {},
+  });
+  assert.equal(received[1].body.includes('DO_NOT_SEND_ARRAY_DATA_0ad4'), false);
+});
+
