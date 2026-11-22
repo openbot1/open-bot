@@ -6018,6 +6018,8 @@
   "pluginMarketplace.riskHigh": "High risk",
   "pluginMarketplace.riskLow": "Low risk",
   "pluginMarketplace.riskMedium": "Medium risk",
+  "pluginMarketplace.securityWarningBody": "A plugin may run in a separate process, but that is not an OS security boundary: it still runs with your OS account's permissions and may read or modify files, credentials, and network resources available to that account. Only install or enable plugins from sources you trust; review file-system, shell, network, and MCP permissions.",
+  "pluginMarketplace.securityWarningTitle": "Plugins are not isolated by the OS",
   "pluginMarketplace.subtitle": "Browse installed plugins and templates. Check permissions before you install.",
   "pluginMarketplace.title": "Plugin marketplace",
   "pluginMarketplace.toggleError": "Could not change this plugin.",
