@@ -55,6 +55,70 @@ export type ProcessSpawner = (
   opts?: { env?: NodeJS.ProcessEnv },
 ) => SpawnedProcess;
 
+/**
+ * Environment variables that local model runtimes need, without exposing
+ * provider credentials or unrelated application configuration.
+ *
+ * Keep this allowlist intentionally narrow. GPU device selectors are
+ * preserved so users can still choose which accelerator a local runtime sees.
+ */
+const LOCAL_MODEL_PROCESS_ENV_ALLOWLIST = new Set([
+  'PATH',
+  'HOME',
+  'USERPROFILE',
+  'TEMP',
+  'TMP',
+  'TMPDIR',
+  'LANG',
+  'LC_ALL',
+  'LC_CTYPE',
+  'USER',
+  'USERNAME',
+  'HOMEDRIVE',
+  'HOMEPATH',
+  'SYSTEMROOT',
+  'SystemRoot',
+  'COMSPEC',
+  'ComSpec',
+  'APPDATA',
+  'LOCALAPPDATA',
+  'PROGRAMFILES',
+  'PROGRAMFILES(X86)',
+  'PATHEXT',
+  'PROCESSOR_ARCHITECTURE',
+  'NUMBER_OF_PROCESSORS',
+  'OS',
+  'TERM',
+  'SHELL',
+  'NODE_ENV',
+  'CUDA_VISIBLE_DEVICES',
+  'HIP_VISIBLE_DEVICES',
+  'ROCR_VISIBLE_DEVICES',
+  'GPU_DEVICE_ORDINAL',
+  'NVIDIA_VISIBLE_DEVICES',
+]);
+
+const LOCAL_MODEL_SECRET_ENV_PATTERN =
+  /KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|PRIVATE|AUTH|BEARER|SESSION|COOKIE/i;
+
+/**
+ * Build a minimal environment for Ollama / llama-server child processes.
+ * An explicit caller env may be passed to defaultSpawner, but the implicit
+ * default must never inherit the full application process.env.
+ */
+export function buildLocalModelProcessEnv(
+  source: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const [key, value] of Object.entries(source)) {
+    if (value === undefined) continue;
+    if (!LOCAL_MODEL_PROCESS_ENV_ALLOWLIST.has(key)) continue;
+    if (LOCAL_MODEL_SECRET_ENV_PATTERN.test(key)) continue;
+    env[key] = value;
+  }
+  return env;
+}
+
 export function defaultSpawner(
   command: string,
   args: string[],
@@ -63,7 +127,7 @@ export function defaultSpawner(
   const child: ChildProcess = spawn(command, args, {
     stdio: 'ignore',
     detached: false,
-    env: opts?.env ?? process.env,
+    env: opts?.env ?? buildLocalModelProcessEnv(),
   });
   return {
     get pid() {
@@ -540,7 +604,7 @@ export class LocalModelRegistry {
     return new Promise((resolve, reject) => {
       let proc: SpawnedProcess;
       try {
-        proc = this.opts.spawner(this.opts.ollamaBin, ['pull', tag]);
+        proc = this.opts.spawner(this.opts.ollamaBin, ['pull', tag], { env: buildLocalModelProcessEnv() });
       } catch (err) {
         reject(new Error(`Khong spawn duoc "${this.opts.ollamaBin} pull ${tag}": ${(err as Error).message}`));
         return;
@@ -588,7 +652,7 @@ export class LocalModelRegistry {
         '127.0.0.1',
         '-c',
         String(entry.contextTokens),
-      ]);
+      ], { env: buildLocalModelProcessEnv() });
     } catch (err) {
       throw new Error(`Khong spawn duoc llama-server cho "${entry.id}": ${(err as Error).message}`);
     }
