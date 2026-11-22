@@ -24,6 +24,7 @@
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { randomBytes } from 'node:crypto';
 import type { McpConfig, McpServerConfig } from './types';
 
 export const MCP_CONFIG_REL_PATH = path.join('.open-bot', 'mcp.json');
@@ -177,8 +178,38 @@ export function ensureMcpServer(
   const filePath = path.join(workspaceDir, MCP_CONFIG_REL_PATH);
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const next: McpConfig = { servers: { ...current.servers, [name]: validated } };
-  const tmp = filePath + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(next, null, 2) + '\n', 'utf8');
-  fs.renameSync(tmp, filePath);
+  const content = JSON.stringify(next, null, 2) + '\n';
+  // mcp.json may contain static Authorization headers. Use a unique,
+  // exclusively-created owner-only temp file so a stale predictable
+  // .tmp cannot retain broader permissions; rename it over the config.
+  // No backup copies: they would duplicate credential-bearing content.
+  const tmp = `${filePath}.tmp-${process.pid}-${randomBytes(8).toString('hex')}`;
+  let fd: number | undefined;
+  let tmpCreated = false;
+  try {
+    fd = fs.openSync(tmp, 'wx', 0o600);
+    tmpCreated = true;
+    fs.writeFileSync(fd, content, 'utf8');
+    fs.fsyncSync(fd);
+    fs.closeSync(fd);
+    fd = undefined;
+    fs.renameSync(tmp, filePath);
+  } catch (err) {
+    if (fd !== undefined) {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        // Ignore cleanup errors; preserve the original write error.
+      }
+    }
+    if (tmpCreated) {
+      try {
+        fs.rmSync(tmp);
+      } catch {
+        // Ignore cleanup errors; preserve the original write error.
+      }
+    }
+    throw err;
+  }
   return { added: true };
 }

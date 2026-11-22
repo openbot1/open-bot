@@ -17,6 +17,7 @@ import {
   mkdtempSync,
   mkdirSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -307,6 +308,50 @@ test('ATTACK config poisoning: ensureMcpServer rejects invalid server configs', 
     assert.ok(loaded.servers['good-server']);
     assert.equal(loaded.servers['bad-server'], undefined);
   } finally {
+    cleanup(ws);
+  }
+});
+
+test('DEFENSE MCP config: auto-merge keeps credential-bearing mcp.json owner-only', () => {
+  const ws = tempDir('mcp-audit-ws-');
+  // Fix the test umask so the regression fails on the pre-hardening writer
+  // even when the developer's shell normally uses a restrictive umask.
+  const previousUmask = process.umask(0o022);
+  try {
+    const dir = join(ws, '.open-bot');
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, 'mcp.json');
+    writeFileSync(
+      file,
+      JSON.stringify({
+        servers: {
+          existing: {
+            name: 'existing',
+            command: 'node',
+            headers: { Authorization: 'Bearer retained-secret' },
+          },
+        },
+      }),
+      { encoding: 'utf8', mode: 0o644 },
+    );
+
+    const result = ensureMcpServer(ws, 'added', {
+      name: 'added',
+      command: 'node',
+      headers: { Authorization: 'Bearer new-secret' },
+    });
+    assert.equal(result.added, true);
+    const loaded = loadMcpConfig(ws);
+    assert.equal(loaded.servers['existing'].headers.Authorization, 'Bearer retained-secret');
+    assert.equal(loaded.servers['added'].headers.Authorization, 'Bearer new-secret');
+
+    // POSIX permission bits must not expose the static bearer credentials
+    // to other users. Windows does not expose equivalent mode semantics.
+    if (process.platform !== 'win32') {
+      assert.equal(statSync(file).mode & 0o077, 0, 'mcp.json must have no group/world permissions');
+    }
+  } finally {
+    process.umask(previousUmask);
     cleanup(ws);
   }
 });
