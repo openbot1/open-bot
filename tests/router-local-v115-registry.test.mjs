@@ -94,6 +94,13 @@ test('local model child env is allowlisted and excludes application credentials'
     const sourceEnv = {
       PATH: process.env.PATH ?? '',
       HOME: process.env.HOME ?? '',
+      USERPROFILE: process.env.USERPROFILE ?? '',
+      TEMP: process.env.TEMP ?? '',
+      TMP: process.env.TMP ?? '',
+      SYSTEMROOT: process.env.SYSTEMROOT ?? process.env.SystemRoot ?? '',
+      SystemRoot: process.env.SystemRoot ?? process.env.SYSTEMROOT ?? '',
+      COMSPEC: process.env.COMSPEC ?? process.env.ComSpec ?? '',
+      ComSpec: process.env.ComSpec ?? process.env.COMSPEC ?? '',
       CUDA_VISIBLE_DEVICES: '2',
       HIP_VISIBLE_DEVICES: '1',
       OPENAI_API_KEY: 'provider-secret',
