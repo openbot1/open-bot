@@ -274,6 +274,22 @@ test('egress: extractNetworkTargets bắt host trần làm operand curl/wget, b�
     extractNetworkTargets('curl --url=bare.example.test').map((t) => `${t.scheme}://${t.host}`),
     ['https://bare.example.test'],
   );
+  assert.deepEqual(
+    extractNetworkTargets('curl user:pass@evil.com').map((t) => `${t.scheme}://${t.host}`),
+    ['https://evil.com'],
+    'curl bare operands with username and password must still expose the destination host',
+  );
+  assert.deepEqual(
+    extractNetworkTargets('curl user@evil.com').map((t) => `${t.scheme}://${t.host}`),
+    ['https://evil.com'],
+    'curl bare operands with username-only userinfo must still expose the destination host',
+  );
+  assert.deepEqual(
+    extractNetworkTargets('curl --proxy user:pass@proxy:8080 https://public.example/x')
+      .map((t) => t.host).sort(),
+    ['proxy', 'public.example'],
+    'proxy credentials must not hide the proxy destination host',
+  );
 
   assert.deepEqual(
     extractNetworkTargets(

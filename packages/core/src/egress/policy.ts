@@ -449,7 +449,7 @@ function parseHttpClientTarget(value: string): EgressTarget | undefined {
   try {
     const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(cleaned) ? cleaned : 'https://' + cleaned;
     const url = new URL(candidate);
-    if (url.username || url.password || !url.hostname) return undefined;
+    if (!url.hostname) return undefined;
     return parseEgressTarget(url);
   } catch {
     return undefined;
