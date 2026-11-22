@@ -261,6 +261,52 @@ test('egress: extractNetworkTargets bắt URL + git scp-like, dedupe, bỏ lện
   assert.deepEqual(extractNetworkTargets('echo hello; ls -la; git checkout main'), []);
 });
 
+test('egress: extractNetworkTargets bắt host trần làm operand curl/wget, bỏ qua option values', () => {
+  const targets = extractNetworkTargets(
+    'curl -fsSL example.com/path; wget --header "Host: intranet.local" -q example.org/file',
+  );
+  assert.deepEqual(
+    targets.map((t) => `${t.scheme}://${t.host}`).sort(),
+    ['https://example.com', 'https://example.org'],
+  );
+
+  assert.deepEqual(
+    extractNetworkTargets('curl --url=bare.example.test').map((t) => `${t.scheme}://${t.host}`),
+    ['https://bare.example.test'],
+  );
+
+  assert.deepEqual(
+    extractNetworkTargets(
+      'curl --user-agent agent.example -H "Host: intranet.local" https://allowed.example/x',
+    ).map((t) => `${t.scheme}://${t.host}`),
+    ['https://allowed.example'],
+  );
+
+  assert.deepEqual(
+    extractNetworkTargets('curl --proxy 127.0.0.1:8080 https://public.example/x')
+      .map((t) => t.host).sort(),
+    ['127.0.0.1', 'public.example'],
+    'proxy destinations must be checked as well as the requested URL',
+  );
+  assert.deepEqual(
+    extractNetworkTargets('curl --resolve public.example:443:127.0.0.1 https://public.example/x')
+      .map((t) => t.host).sort(),
+    ['127.0.0.1', 'public.example'],
+    'curl DNS overrides must expose the actual connect address',
+  );
+  assert.deepEqual(
+    extractNetworkTargets('curl --connect-to public.example:443:127.0.0.2:443 https://public.example/x')
+      .map((t) => t.host).sort(),
+    ['127.0.0.2', 'public.example'],
+    'curl connect-to overrides must expose the replacement host',
+  );
+  assert.ok(
+    extractNetworkTargets('curl --resolve public.example:443:[::1] https://public.example/x')
+      .some((t) => t.host === '::1'),
+    'bracketed IPv6 resolve destinations must be recognized',
+  );
+});
+
 // ---------------------------------------------------------------------------
 // Team allowlist override
 // ---------------------------------------------------------------------------
