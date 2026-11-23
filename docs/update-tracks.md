@@ -51,10 +51,19 @@ nào được phát hành thật** (kể cả kênh stable). Hệ quả:
    `stable` qua GitHub releases API latest; `dogfood`/`nightly`/`lab`
    qua `checkForTrackUpdate` (`packages/core/src/update/checker.ts`) —
    lấy danh sách releases (`/releases?per_page=20`, mới nhất trước)
-   và chọn prerelease đầu tiên có tag mang hậu tố kênh, vd
-   `v0.59.0-dogfood.1`, `v0.59.0-nightly.20261109`, `v0.59.0-lab.1`,
-   rồi so semver với bản đang chạy. Code đã test bằng feed giả local
-   (`tests/update-feed-tracks-v059.test.mjs`, không gọi mạng thật).
+   và chọn prerelease có channel identifier chính xác ở đầu đoạn
+   prerelease; sau đó kiểm tra metadata feed-to-artifact trước khi báo
+   có bản mới: canonical release/download URLs thuộc đúng repo/tag,
+   release đã publish, installer asset thuộc một trong các target
+   AppImage/DMG/NSIS EXE, state `uploaded`, kích thước dương và digest
+   SHA-256 hợp lệ do GitHub API cung cấp.
+   Lưu ý: digest là metadata do cùng GitHub feed trả về; việc này không
+   tải file để tính lại hash, không xác minh code signature/Authenticode,
+   không kiểm tra Apple notarization, và không chứng minh publisher
+   identity. Không coi nó là bằng chứng artifact đã được ký hoặc an toàn.
+   Code có regression tests dùng
+   feed giả (`tests/update-feed-tracks-v059.test.mjs` và
+   `tests/update-artifact-trust-v1.test.mjs`), không gọi mạng thật.
    **Nhưng chưa có release nào cho các kênh đó tồn tại thật**, nên tới
    khi release được phát hành theo quy ước tag trên, lần kiểm tra sẽ
    trả `available: false` một cách trung thực (không có release cho
