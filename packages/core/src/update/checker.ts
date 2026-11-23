@@ -124,8 +124,8 @@ export async function checkForUpdate(opts: {
       if (!tag) {
         return { ...base, checkFailed: true, error: 'Release stable thiếu tag_name hợp lệ.' };
       }
-      if (data['prerelease'] !== false) {
-        return { ...base, checkFailed: true, error: 'Feed stable trỏ tới release không được xác nhận là stable.' };
+      if (data['prerelease'] !== false || tag.includes('-')) {
+        return { ...base, checkFailed: true, error: 'Feed stable trỏ tới release có prerelease flag/tag.' };
       }
       const artifactTrust = verifyGitHubReleaseArtifactMetadata(data, tag);
       if (!artifactTrust.verified || !artifactTrust.releaseUrl) {
