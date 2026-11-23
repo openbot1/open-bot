@@ -9,7 +9,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
+import { openVaultWithSafeStorage } from '../packages/core/dist/vault/index.js';
 
 const ROOT = process.cwd();
 const MAIN = fs.readFileSync(path.join(ROOT, 'apps/desktop/src/main/main.ts'), 'utf8');
@@ -67,6 +69,28 @@ test('safeStorage probe and no-create Vault open avoid fallback key creation bef
   assert.ok(core.includes('if (options.createLocalFallbackKey === false)'));
   assert.ok(core.includes('encryptor: new LocalEncryptor(machineKey)'));
   assert.ok(core.includes('Creating a LocalEncryptor fallback machine key requires explicit consent.'));
+});
+
+test('no-consent fallback open refuses before creating a machine-key file', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'open-bot-webhook-vault-'));
+  try {
+    assert.throws(
+      () =>
+        openVaultWithSafeStorage({
+          storePath: path.join(dir, 'automation-webhook-keys.json'),
+          safeStorage: {
+            isEncryptionAvailable: () => false,
+            encryptString: () => Buffer.alloc(0),
+            decryptString: () => '',
+          },
+          createLocalFallbackKey: false,
+        }),
+      /explicit consent/,
+    );
+    assert.deepEqual(fs.readdirSync(dir), []);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('Settings surfaces the separate webhook store and both unsafe storage states', () => {
