@@ -78,7 +78,11 @@ function parseSemverDetails(version: string): ParsedSemver | null {
 
   const coreParts = [match[1], match[2] ?? '0', match[3] ?? '0'];
   if (coreParts.some((part) => part.length > 1 && part.startsWith('0'))) return null;
-  const core = coreParts.map(Number) as [number, number, number];
+  const core: [number, number, number] = [
+    Number(coreParts[0]),
+    Number(coreParts[1]),
+    Number(coreParts[2]),
+  ];
   if (core.some((part) => !Number.isSafeInteger(part))) return null;
 
   const prerelease = match[4] ? match[4].split('.') : null;
