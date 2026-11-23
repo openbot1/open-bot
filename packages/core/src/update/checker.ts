@@ -147,7 +147,7 @@ export interface GitHubReleaseSummary {
  */
 function firstPrereleaseIdentifier(tagName: string): string | null {
   const match =
-    /^v?(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$/.exec(
+    /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.exec(
       tagName,
     );
   if (!match) return null;
@@ -159,7 +159,7 @@ function firstPrereleaseIdentifier(tagName: string): string | null {
   if (
     identifiers.some(
       (identifier) =>
-        /^\\d+$/.test(identifier) && identifier.length > 1 && identifier.startsWith('0'),
+        /^\d+$/.test(identifier) && identifier.length > 1 && identifier.startsWith('0'),
     )
   ) {
     return null;
