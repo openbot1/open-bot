@@ -4,9 +4,9 @@ Cập nhật: 23/11/2026, 20:00 +07. Yêu cầu runtime/build: Node.js 24+ và n
 
 ## Snapshot production được maintainer xác nhận
 
-- Local `main` được maintainer xác nhận tại `1fb2cded` (23/11/2026 ~20:00 +07).
+- Snapshot local `main` `1fb2cded` được kiểm thử full suite ngày 23/11/2026 từ 19:03 đến 19:33 +07; land commit được tạo lúc 19:34 +07. Mốc 20:00 +07 là thời điểm viết báo cáo, không phải thời gian chạy suite.
 - Full suite trên đúng local SHA đó: **12,804 passed / 0 failed / 19 skipped** (12,823 test cases được runner báo cáo). Điều kiện bắt buộc để land: **0 test fail** trên đúng head SHA được kiểm chứng. Báo cáo skip riêng, xem xét lý do và không tính skip là pass.
-- Public GitHub `main` tại thời điểm này vẫn là `f17b8675ed5a5415894ca47ad42096e240489fa5`; snapshot local mới hơn đang chờ phê duyệt push. Kết quả trên là báo cáo từ maintainer local, **không phải** test do tác giả tài liệu chạy hoặc CI xác nhận trên remote `main`.
+- Public GitHub `main` vẫn là `f17b8675ed5a5415894ca47ad42096e240489fa5`; snapshot local mới hơn đang chờ phê duyệt push. Local main hiện đã land PR #27 tại `cdd9a5f5` và PR #28 tại `8522ce7b`; cả hai chưa được đưa lên public GitHub `main`. Kết quả trên là báo cáo từ maintainer local, **không phải** test do tác giả tài liệu chạy hoặc CI xác nhận trên remote `main`.
 - Khi kiểm chứng/land, luôn lấy SHA thực tế từ PR head và xác nhận đúng base. Không tái sử dụng test count từ một SHA khác hoặc suy ra remote đã có các commit local chưa push.
 
 ## Single source of truth — app version
@@ -28,13 +28,13 @@ Các lát cắt production-hardening đã/đang được xử lý gồm:
 1. IPC sender validation — xác thực sender tại ranh giới IPC.
 2. Egress/SSRF — giới hạn network egress và nhận diện đích bare `curl`/`wget`.
 3. Vault fallback — hiển thị/trạng thái lưu trữ fallback dành riêng cho webhook key; PR #29 đang chờ Muse xác minh.
-4. MCP config-file permissions — siết quyền file cấu hình; PR #27 đã được Muse xác minh land-ready và maintainer đang land.
-5. Router local-model child environment — lọc child env; PR #28 đã được Muse xác minh land-ready và maintainer đang land.
+4. MCP config-file permissions — siết quyền file cấu hình; PR #27 đã landed trên local main `cdd9a5f5`, đang chờ push snapshot lên remote.
+5. Router local-model child environment — lọc child env; PR #28 đã landed trên local main `8522ce7b`, đang chờ push snapshot lên remote.
 6. Webhook approval-payload minimisation — chỉ phát các trường allowlist cần thiết ra webhook.
 7. Skills prompt-injection blocking — quét nội dung/metadata trước khi skill đi vào prompt.
 8. Plugin security disclosure — nêu rõ process riêng không phải OS sandbox và plugin vẫn có quyền của OS user hiện tại.
 
-PR #26 (bare curl/wget egress targets) đã được maintainer báo landed trên local main. PR #27/#28 đang được land; PR #29 và PR #30 chưa được xem là landed/verified cho tới khi Muse xác minh đúng head SHA. Tình trạng remote cần kiểm tra lại trên GitHub, vì local main và public GitHub main có thể lệch nhau.
+PR #26 (bare curl/wget egress targets), #27 (MCP config permissions) và #28 (Router V2 child environment) đã landed trên local main; #27 landed tại `cdd9a5f5`, #28 tại `8522ce7b`. Cả #27/#28 đang chờ snapshot push được phê duyệt; public GitHub `main` vẫn `f17b8675`. PR #29/#30 vẫn pending independent Muse verification. Local main và public GitHub main hiện lệch nhau.
 
 ## Cài đặt dependencies, build và typecheck
 
