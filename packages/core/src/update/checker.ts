@@ -141,9 +141,36 @@ export interface GitHubReleaseSummary {
 }
 
 /**
+ * Return the first prerelease identifier only for a valid SemVer release tag.
+ * Channel names are defined as the first prerelease identifier (for example,
+ * `-nightly.20261109`), not an arbitrary substring later in the tag.
+ */
+function firstPrereleaseIdentifier(tagName: string): string | null {
+  const match =
+    /^v?(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$/.exec(
+      tagName,
+    );
+  if (!match) return null;
+
+  const coreParts = [match[1], match[2], match[3]];
+  if (coreParts.some((part) => !Number.isSafeInteger(Number(part)))) return null;
+
+  const identifiers = match[4].split('.');
+  if (
+    identifiers.some(
+      (identifier) =>
+        /^\\d+$/.test(identifier) && identifier.length > 1 && identifier.startsWith('0'),
+    )
+  ) {
+    return null;
+  }
+  return identifiers[0].toLowerCase();
+}
+
+/**
  * True when a release belongs to `track`'s channel. `stable` takes the
- * first non-prerelease; other tracks take a prerelease whose tag
- * carries the channel suffix (`-dogfood`, `-nightly`, `-lab`).
+ * first non-prerelease; other tracks require the exact first prerelease
+ * identifier to equal the channel name.
  */
 export function releaseMatchesTrack(
   release: { tag_name?: unknown; prerelease?: unknown },
@@ -151,10 +178,7 @@ export function releaseMatchesTrack(
 ): boolean {
   if (typeof release.tag_name !== 'string' || release.tag_name === '') return false;
   if (track === 'stable') return release.prerelease === false;
-  return (
-    release.prerelease === true &&
-    release.tag_name.toLowerCase().includes(`-${track}`)
-  );
+  return release.prerelease === true && firstPrereleaseIdentifier(release.tag_name) === track;
 }
 
 /** First release of the track's channel in a newest-first list (null when none). */

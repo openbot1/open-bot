@@ -86,6 +86,14 @@ test('v0.59 feed: releaseMatchesTrack / pickReleaseForTrack chọn đúng kênh 
   assert.equal(releaseMatchesTrack(LAB_OLD_RELEASE, 'lab'), true);
   assert.equal(releaseMatchesTrack({ tag_name: '', prerelease: true }, 'lab'), false);
   assert.equal(releaseMatchesTrack({ tag_name: 'v1.0.0-lab.1', prerelease: false }, 'lab'), false);
+  assert.equal(releaseMatchesTrack({ tag_name: 'v0.59.0-not-nightly.1', prerelease: true }, 'nightly'), false);
+  assert.equal(releaseMatchesTrack({ tag_name: 'v0.59.0-nightlyish.1', prerelease: true }, 'nightly'), false);
+  assert.equal(releaseMatchesTrack({ tag_name: 'v0.59.0-nightly-internal.1', prerelease: true }, 'nightly'), false);
+  assert.equal(releaseMatchesTrack({ tag_name: 'v0.59.0-nightly.01', prerelease: true }, 'nightly'), false);
+  assert.equal(releaseMatchesTrack({ tag_name: 'v0.59.0-NIGHTLY.20261109+build.1', prerelease: true }, 'nightly'), true);
+  assert.equal(releaseMatchesTrack({ tag_name: 'v0.59.0-nightly', prerelease: true }, 'nightly'), true);
+  const spoofedNightly = { tag_name: 'v0.60.0-not-nightly.1', prerelease: true, html_url: 'https://example.invalid/spoof' };
+  assert.equal(pickReleaseForTrack([spoofedNightly, NIGHTLY_RELEASE], 'nightly')?.tag_name, NIGHTLY_RELEASE.tag_name);
 
   assert.equal(pickReleaseForTrack(FEED_ALL, 'dogfood')?.tag_name, 'v0.59.0-dogfood.1');
   assert.equal(pickReleaseForTrack(FEED_ALL, 'nightly')?.tag_name, 'v0.59.0-nightly.20261109');
