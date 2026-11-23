@@ -23,8 +23,9 @@
  * so tests use a fake feed and never hit the network), but no channel
  * releases exist yet — push GitHub is still deferred — so until such
  * releases are actually published the check honestly answers "no newer
- * release for this channel". The releases-list URL is configurable
- * (`releasesListApiUrl`) for a self-hosted feed later.
+ * release for this channel". Feed requests are pinned to this
+ * repository's canonical GitHub API endpoints; custom endpoints and
+ * redirects to other origins fail closed.
  *
  * Pure except for the injected fetch: tests pass a mock fetch, main
  * passes the global fetch. No network call is made when the caller
@@ -80,6 +81,7 @@ export function compareSemver(a: string, b: string): number {
 export async function checkForUpdate(opts: {
   currentVersion: string;
   fetchImpl?: UpdateFetchLike;
+  /** Must remain the canonical GitHub Releases API URL for this repository. */
   releasesApiUrl?: string;
   timeoutMs?: number;
 }): Promise<UpdateCheckResult> {
@@ -242,6 +244,7 @@ export async function checkForTrackUpdate(opts: {
   currentVersion: string;
   track: UpdateTrack;
   fetchImpl?: UpdateFetchLike;
+  /** Must remain the canonical GitHub releases-list API URL for this repository. */
   releasesListApiUrl?: string;
   timeoutMs?: number;
 }): Promise<UpdateCheckResult> {
