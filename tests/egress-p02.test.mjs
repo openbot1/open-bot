@@ -325,18 +325,19 @@ test('egress: extractNetworkTargets bắt host trần làm operand curl/wget, b�
 
 test('egress: curl and wget value-taking options do not become bare URL targets', () => {
   const curlTargets = extractNetworkTargets(
-    'curl --dns-servers 127.0.0.1 --tlspassword intranet.local ' +
+    'curl --dns-servers 127.0.0.1,2001:db8::53 --tlspassword intranet.local ' +
       '--mail-from sender@intranet.local --etag-save etag.intranet.local ' +
       '--ciphers cipher.intranet.local --engine engine.intranet.local ' +
       'https://public.example/x',
   );
   assert.deepEqual(
     curlTargets.map((target) => target.host),
-    ['public.example'],
+    ['127.0.0.1', '2001:db8::53', 'public.example'],
+    'explicit DNS server IPs are network targets, not discarded option values',
   );
 
   const wgetTargets = extractNetworkTargets(
-    'wget --input-file intranet.local --execute intranet.local ' +
+    'wget --dns-servers 10.0.0.53 --input-file intranet.local --execute intranet.local ' +
       '--domains intranet.local --exclude-domains intranet.local ' +
       '--accept intranet.local --reject intranet.local ' +
       '--include-directories intranet.local --exclude-directories intranet.local ' +
@@ -344,7 +345,8 @@ test('egress: curl and wget value-taking options do not become bare URL targets'
   );
   assert.deepEqual(
     wgetTargets.map((target) => target.host),
-    ['public.example'],
+    ['10.0.0.53', 'public.example'],
+    'explicit Wget DNS server IP is also an egress target',
   );
 
   const socksTargets = extractNetworkTargets(

@@ -544,6 +544,20 @@ function appendCurlOptionTarget(value: string, push: (target: EgressTarget) => v
   if (target) push(target);
 }
 
+function appendDnsServerTargets(value: string, push: (target: EgressTarget) => void): void {
+  for (const entry of value.split(',')) {
+    const address = entry.trim();
+    if (address === '') continue;
+    // curl / Wget DNS-server lists may contain bare IPv4 or IPv6 literals;
+    // preserve them as explicit network targets rather than URL operands.
+    if (isIP(address) !== 0) {
+      push({ host: address.toLowerCase(), scheme: 'https', raw: address });
+    } else {
+      appendCurlOptionTarget(address, push);
+    }
+  }
+}
+
 function appendCurlResolveTargets(value: string, push: (target: EgressTarget) => void): void {
   const match = value.match(/^(?:\[[^\]]+\]|[^:]+):(\d+):(.+)$/);
   if (!match) return;
@@ -607,6 +621,15 @@ export function extractNetworkTargets(command: string): EgressTarget[] {
       if (httpClientKind(token)) break;
       if (token === '--') {
         optionsEnded = true;
+        continue;
+      }
+
+      if (token === '--dns-servers' || token.startsWith('--dns-servers=')) {
+        const value = token === '--dns-servers' ? tokens[j + 1] : token.slice('--dns-servers='.length);
+        if (value !== undefined && value !== ';' && value !== '|' && value !== '&') {
+          appendDnsServerTargets(value, push);
+          if (token === '--dns-servers') j += 1;
+        }
         continue;
       }
 
