@@ -294,6 +294,8 @@ export interface VaultOptions {
   encryptor?: Encryptor;
   /** Machine key file for the default LocalEncryptor. Default: `<storePath>.key`. */
   keyFilePath?: string;
+  /** Refuse to create a missing LocalEncryptor machine key; default true. */
+  createMachineKeyIfMissing?: boolean;
   /**
    * v0.5 NO_STORAGE mode (ROADMAP §2d): start with durable writes
    * disabled. While on, `setSecret`/`deleteSecret` only change the
@@ -486,7 +488,17 @@ export class Vault {
       this.keyFilePath = null;
     } else {
       this.keyFilePath = options.keyFilePath ?? `${options.storePath}.key`;
-      this.encryptor = new LocalEncryptor(loadOrCreateMachineKey(this.keyFilePath));
+      let machineKey: Buffer;
+      if (options.createMachineKeyIfMissing === false) {
+        try {
+          machineKey = fs.readFileSync(this.keyFilePath);
+        } catch {
+          throw new Error('Creating a LocalEncryptor fallback machine key requires explicit consent.');
+        }
+      } else {
+        machineKey = loadOrCreateMachineKey(this.keyFilePath);
+      }
+      this.encryptor = new LocalEncryptor(machineKey);
     }
     this.localFallback = this.encryptor instanceof LocalEncryptor;
     this.maxEntries = options.maxEntries ?? DEFAULT_VAULT_MAX_ENTRIES;
@@ -1571,28 +1583,12 @@ export function openVaultWithSafeStorage(
   const keyFilePath = options.keyFilePath ?? `${options.storePath}.key`;
 
   const openLocalFallback = (): OpenVaultWithSafeStorageResult => {
-    let vault: Vault;
-    if (options.createLocalFallbackKey === false) {
-      // Opening a secondary store for status/read purposes must not silently
-      // create a new machine key. Existing fallback keys remain readable.
-      let machineKey: Buffer;
-      try {
-        machineKey = fs.readFileSync(keyFilePath);
-      } catch {
-        throw new Error('Creating a LocalEncryptor fallback machine key requires explicit consent.');
-      }
-      vault = new Vault({
-        storePath: options.storePath,
-        encryptor: new LocalEncryptor(machineKey),
-        writePolicy: 'require-local-fallback-consent',
-      });
-    } else {
-      vault = new Vault({
-        storePath: options.storePath,
-        keyFilePath,
-        writePolicy: 'require-local-fallback-consent',
-      });
-    }
+    const vault = new Vault({
+      storePath: options.storePath,
+      keyFilePath,
+      createMachineKeyIfMissing: options.createLocalFallbackKey !== false,
+      writePolicy: 'require-local-fallback-consent',
+    });
     if (!vault.canDecryptAllSecrets()) {
       vault.setWritePolicy('disabled');
       return { vault, status: 'unavailable' };
