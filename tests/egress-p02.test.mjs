@@ -323,6 +323,22 @@ test('egress: extractNetworkTargets bắt host trần làm operand curl/wget, b�
   );
 });
 
+test('egress: curl --noproxy "*" does not create a wildcard host target and keeps loopback allowed', async () => {
+  const command = "curl --noproxy '*' http://127.0.0.1:43123/hello";
+  const targets = extractNetworkTargets(command);
+  assert.deepEqual(
+    targets.map((target) => target.host),
+    ['127.0.0.1'],
+    'the --noproxy wildcard is an option value, never a destination host',
+  );
+
+  const allowed = await checkEgress(targets[0], createDefaultEgressPolicy(), {
+    context: 'local-service',
+  });
+  assert.equal(allowed.allowed, true);
+  assert.equal(allowed.reason, 'local-service');
+});
+
 // ---------------------------------------------------------------------------
 // Team allowlist override
 // ---------------------------------------------------------------------------

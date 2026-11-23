@@ -300,42 +300,109 @@ const GIT_SCP_RE = /\bgit@([A-Za-z0-9.-]+):[^\s'"<>\x60]+/g;
 const TRAILING_PUNCT_RE = /[.,;:!?)\]}'"]+$/;
 
 const CURL_OPTIONS_WITH_VALUE = new Set([
+  // Short and common transfer options.
   '-A', '--user-agent',
   '-b', '--cookie',
   '-c', '--cookie-jar',
+  '-C', '--continue-at',
   '-d', '--data', '--data-ascii', '--data-binary', '--data-raw', '--data-urlencode',
+  '-D', '--dump-header',
   '-e', '--referer',
-  '-F', '--form',
+  '-E', '--cert', '--cert-type',
+  '-F', '--form', '--form-string',
   '-H', '--header',
   '-K', '--config',
   '-m', '--max-time', '--connect-timeout', '--max-redirs', '--retry', '--retry-delay',
-  '-o', '--output',
+  '-o', '--output', '--output-dir',
+  '-P', '--ftp-port',
+  '-Q', '--quote',
   '-r', '--range',
-  '-T', '--upload-file',
+  '-t', '--telnet-option',
+  '-T', '--upload-file', '--upload-flags',
   '-u', '--user',
   '-U', '--proxy-user',
-  '-X', '--request',
-  '--interface',
-  '--cacert', '--capath', '--cert', '--key', '--pass',
   '-w', '--write-out',
-  '--limit-rate', '--max-filesize', '--proto', '--proto-redir',
-  '--unix-socket', '--local-port', '--ftp-port',
-  '--oauth2-bearer', '--proxy-header', '--proxy-cacert', '--proxy-cert',
-  '--proxy-key', '--proxy-pass', '--proxy-tlsuser', '--proxy-tlspassword',
+  '-X', '--request',
+  '-Y', '--speed-limit',
+  '-y', '--speed-time',
+  '-z', '--time-cond',
+
+  // Connection, TLS, DNS and transfer settings with separate values.
+  '--abstract-unix-socket', '--alt-svc', '--aws-sigv4',
+  '--cacert', '--capath', '--ciphers', '--create-file-mode', '--crlfile', '--curves',
+  '--delegation',
+  '--dns-interface', '--dns-ipv4-addr', '--dns-ipv6-addr', '--dns-servers', '--doh-url',
+  '--ech', '--egd-file', '--engine', '--etag-compare', '--etag-save', '--expect100-timeout',
+  '--ftp-account', '--ftp-alternative-to-user', '--ftp-method', '--ftp-ssl-ccc-mode',
+  '--happy-eyeballs-timeout-ms', '--haproxy-clientip',
+  '--hostpubmd5', '--hostpubsha256', '--hsts',
+  '--interface', '--ip-tos', '--ipfs-gateway',
+  '--keepalive-cnt', '--keepalive-time',
+  '--key', '--key-type', '--knownhosts', '--krb',
+  '--libcurl', '--limit-rate', '--local-port', '--login-options',
+  '--mail-auth', '--mail-from', '--mail-rcpt',
+  '--max-filesize', '--max-redirs', '--max-time',
+  '--netrc-file', '--noproxy', '--oauth2-bearer',
+  '--parallel-max', '--parallel-max-host',
+  '--pass', '--pinnedpubkey',
+  '--proto', '--proto-default', '--proto-redir',
+  '--pubkey', '--random-file', '--rate',
+  '--request-target', '--retry-max-time',
+  '--sasl-authzid', '--service-name', '--sigalgs',
+  '--socks4', '--socks4a', '--socks5', '--socks5-gssapi-service', '--socks5-hostname',
+  '--stderr',
+  '--tftp-blksize', '--tls-max', '--tls13-ciphers', '--tlsauthtype', '--tlspassword', '--tlsuser',
+  '--trace', '--trace-ascii', '--trace-config',
+  '--unix-socket', '--url-query', '--variable', '--vlan-priority',
+
+  // Proxy TLS/auth options. Proxy endpoints themselves are parsed below.
+  '--proxy-cacert', '--proxy-capath', '--proxy-cert', '--proxy-cert-type',
+  '--proxy-ciphers', '--proxy-crlfile', '--proxy-header', '--proxy-key',
+  '--proxy-key-type', '--proxy-pass', '--proxy-pinnedpubkey', '--proxy-service-name',
+  '--proxy-tls13-ciphers', '--proxy-tlsauthtype', '--proxy-tlspassword',
+  '--proxy-tlsuser',
+
+  // Proxy endpoint flags: their values are separately added as egress targets.
+  '--preproxy', '--proxy1.0',
 ]);
 
 const WGET_OPTIONS_WITH_VALUE = new Set([
+  '-A', '--accept',
+  '-a', '--append-output',
+  '-D', '--domains',
+  '-e', '--execute',
+  '-i', '--input-file',
+  '-I', '--include-directories',
+  '-o', '--output-file',
   '-O', '--output-document',
   '-P', '--directory-prefix',
+  '-R', '--reject',
+  '-T', '--timeout',
+  '-t', '--tries',
   '-U', '--user-agent',
-  '--header', '--post-data', '--post-file',
-  '--load-cookies', '--save-cookies',
-  '--bind-address', '--dns-timeout', '--connect-timeout', '--read-timeout',
-  '--tries', '--timeout', '--wait', '--limit-rate', '--referer',
-  '--ca-certificate', '--certificate', '--private-key',
-  '--ftp-user', '--ftp-password', '--http-user', '--http-password',
-  '--proxy-user', '--proxy-password', '--method', '--body-data', '--body-file',
-  '--config', '--max-redirect', '--user', '--password',
+  '-w', '--wait',
+  '-X', '--exclude-directories',
+
+  '--accept-regex', '--append-output', '--backups', '--base',
+  '--bind-address', '--bind-dns-address',
+  '--body-data', '--body-file',
+  '--ca-certificate', '--certificate', '--compression', '--config',
+  '--connect-timeout', '--cut-dirs',
+  '--default-page', '--dns-servers', '--dns-timeout',
+  '--egd-file', '--exclude-domains',
+  '--follow-tags', '--ftp-password', '--ftp-user',
+  '--header', '--http-password', '--http-user',
+  '--ignore-tags', '--limit-rate', '--load-cookies',
+  '--local-encoding', '--max-redirect', '--method',
+  '--output-document', '--output-file',
+  '--password', '--post-data', '--post-file', '--prefer-family',
+  '--private-key', '--private-key-type', '--progress',
+  '--proxy-password', '--proxy-user',
+  '--quota', '--random-file', '--read-timeout', '--referer',
+  '--regex-type', '--reject-regex', '--remote-encoding',
+  '--restrict-file-names', '--save-cookies', '--secure-protocol',
+  '--timeout', '--tries', '--use-askpass', '--user',
+  '--wait', '--waitretry',
 ]);
 
 /** Parse một target (URL string, host trần, hoặc EgressTarget) thành { host, scheme }. Ném EgressError khi không parse được. */
@@ -449,7 +516,7 @@ function parseHttpClientTarget(value: string): EgressTarget | undefined {
   try {
     const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(cleaned) ? cleaned : 'https://' + cleaned;
     const url = new URL(candidate);
-    if (!url.hostname) return undefined;
+    if (!url.hostname || url.hostname === '*') return undefined;
     return parseEgressTarget(url);
   } catch {
     return undefined;
@@ -546,6 +613,12 @@ export function extractNetworkTargets(command: string): EgressTarget[] {
         const inlineOptions = [
           ['--url=', appendCurlOptionTarget],
           ['--proxy=', appendCurlOptionTarget],
+          ['--preproxy=', appendCurlOptionTarget],
+          ['--proxy1.0=', appendCurlOptionTarget],
+          ['--socks4=', appendCurlOptionTarget],
+          ['--socks4a=', appendCurlOptionTarget],
+          ['--socks5=', appendCurlOptionTarget],
+          ['--socks5-hostname=', appendCurlOptionTarget],
           ['--resolve=', appendCurlResolveTargets],
           ['--connect-to=', appendCurlConnectToTarget],
         ] as const;
@@ -557,6 +630,9 @@ export function extractNetworkTargets(command: string): EgressTarget[] {
 
         if (
           token === '--url' || token === '--proxy' || token === '-x' ||
+          token === '--preproxy' || token === '--proxy1.0' ||
+          token === '--socks4' || token === '--socks4a' ||
+          token === '--socks5' || token === '--socks5-hostname' ||
           token === '--resolve' || token === '--connect-to'
         ) {
           const value = tokens[j + 1];
