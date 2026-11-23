@@ -81,6 +81,7 @@ export function verifyGitHubReleaseArtifactMetadata(
 
   const artifacts: VerifiedReleaseArtifact[] = [];
   const seenNames = new Set<string>();
+  const seenPlatforms = new Set<VerifiedArtifactPlatform>();
   let supportedAssetCount = 0;
 
   for (const rawAsset of rawAssets) {
@@ -90,6 +91,7 @@ export function verifyGitHubReleaseArtifactMetadata(
     if (!platform) continue;
 
     supportedAssetCount += 1;
+    seenPlatforms.add(platform);
     if (
       !/^[A-Za-z0-9][A-Za-z0-9._ +()\-]{0,199}$/.test(name) ||
       name === '.' ||
@@ -126,6 +128,12 @@ export function verifyGitHubReleaseArtifactMetadata(
 
   if (supportedAssetCount === 0 || artifacts.length === 0) {
     return fail('release contains no supported desktop installer asset (.AppImage, .dmg, or .exe)');
+  }
+
+  const requiredPlatforms: VerifiedArtifactPlatform[] = ['linux', 'macos', 'windows'];
+  const missingPlatforms = requiredPlatforms.filter((platform) => !seenPlatforms.has(platform));
+  if (missingPlatforms.length > 0) {
+    return fail(`release is missing required desktop installer platforms: ${missingPlatforms.join(', ')}`);
   }
 
   return { verified: true, tag, releaseUrl, artifacts };
