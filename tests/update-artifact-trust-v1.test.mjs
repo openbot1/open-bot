@@ -149,6 +149,19 @@ test('stable and channel checkers gate availability on trusted release artifact 
   assert.equal(redirectedStable.available, false);
   assert.equal(redirectedStable.checkFailed, true);
 
+  const redirectedTrack = await checkForTrackUpdate({
+    currentVersion: '1.0.0',
+    track: 'nightly',
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      url: 'https://evil.example/releases?per_page=20',
+      json: async () => [makeRelease()],
+    }),
+  });
+  assert.equal(redirectedTrack.available, false);
+  assert.equal(redirectedTrack.checkFailed, true);
+
   const stableCalls = [];
   const customStable = await checkForUpdate({
     currentVersion: '1.0.0',
