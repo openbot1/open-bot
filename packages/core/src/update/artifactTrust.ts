@@ -43,7 +43,14 @@ function platformForArtifactName(name: string): VerifiedArtifactPlatform | null 
 }
 
 function validTag(tag: string): boolean {
-  return /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.test(tag);
+  const match = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.exec(tag);
+  if (!match) return false;
+
+  const prerelease = match[4]?.split('.') ?? [];
+  return !prerelease.some(
+    (identifier) =>
+      /^\d+$/.test(identifier) && identifier.length > 1 && identifier.startsWith('0'),
+  );
 }
 
 /**
