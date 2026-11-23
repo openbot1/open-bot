@@ -361,6 +361,11 @@ test('egress: curl --noproxy "*" does not create a wildcard host target and keep
   const command = "curl --noproxy '*' http://127.0.0.1:43123/hello";
   const targets = extractNetworkTargets(command);
   assert.deepEqual(
+    extractNetworkTargets('curl *'),
+    [],
+    'a wildcard cannot be a real hostname',
+  );
+  assert.deepEqual(
     targets.map((target) => target.host),
     ['127.0.0.1'],
     'the --noproxy wildcard is an option value, never a destination host',
