@@ -2,7 +2,7 @@
 
 ## Trạng thái production / Production status
 
-Cập nhật tài liệu: 23/11/2026 (20:00 +07).
+Cập nhật tài liệu: 24/11/2026 (06:01 +07).
 
 - Repo hiện dùng GitHub Releases làm kênh phân phối dự kiến. Tại lần kiểm tra trong release-gate, repo chưa có release/artifact đã publish.
 - Updater hiện kiểm tra release theo track và mở trang release chính thức để tải thủ công. **Ứng dụng chưa tự tải, xác minh rồi cài bản cập nhật trong app**; nút kiểm tra bản mới không đồng nghĩa với auto-install.
@@ -11,9 +11,9 @@ Cập nhật tài liệu: 23/11/2026 (20:00 +07).
 
 ### Version source and hardening snapshot
 
-- **Nguồn version duy nhất:** trường `version` trong root `package.json`. Các version trong workspace manifests và `package-lock.json` là metadata mirror được đồng bộ bằng `npm run version:sync` và kiểm tra bằng `npm run version:check`. Không tự sửa version trong package con. PR #30 chuẩn hóa runtime consumers qua generated `APP_VERSION` modules; PR này phải được Muse kiểm chứng độc lập trước khi land.
+- **Nguồn version duy nhất:** trường `version` trong root `package.json`. Các version trong workspace manifests và `package-lock.json` là metadata mirror được đồng bộ bằng `npm run version:sync` và kiểm tra bằng `npm run version:check`. Không tự sửa version trong package con. PR #30 đã chuẩn hóa runtime consumers qua generated `APP_VERSION` modules và đã land trên local main tại `1fe41d25`; thay đổi này hiện chưa nằm trên public GitHub `main` do snapshot local chưa được đẩy.
 - Hardening đã bao phủ các ranh giới: IPC sender validation; egress/SSRF (bao gồm nhận diện bare `curl`/`wget` targets); Vault fallback; MCP config-file permissions; router local-model child-environment filtering; webhook approval-payload minimisation; chặn skill prompt-injection trước khi đưa nội dung vào prompt; và disclosure rằng plugin chạy ở process riêng vẫn giữ quyền của cùng OS user.
-- **Snapshot có phân biệt local/remote:** full suite trên local snapshot `1fb2cded` ngày 23/11/2026 chạy từ 19:03 đến 19:33 +07 (land commit lúc 19:34 +07; 20:00 +07 là thời điểm viết báo cáo), với 12,804 pass / 0 fail / 19 skipped. Đây là kết quả maintainer báo cáo trên local checkout, không phải kết quả do tài liệu này chạy hay CI trên remote SHA xác nhận. PR #27 đã landed trên local main `cdd9a5f5`; PR #28 đã landed trên local main `8522ce7b`; cả hai đang chờ push snapshot lên remote (public GitHub `main` vẫn là `f17b8675`). PRs #29/#30 vẫn chờ Muse kiểm chứng độc lập.
+- **Snapshot local/remote (maintainer-reported, 24/11/2026 06:01 +07):** local main hiện ở `1fe41d25`; PR #28 (`8522ce7b`), #30 (`1fe41d25`), #32 (`5c8eac59`) và #33 (`bcfa06c1`) đã land trên local main. `npm run build` và `npm run typecheck` đã exit 0; full suite cho `1fe41d25` vẫn đang chạy tại thời điểm cập nhật, nên chưa ghi kết quả pass/fail hoặc tái sử dụng test count từ SHA cũ. Quyền đẩy snapshot mới vẫn chờ; approval `709d77cc` tạo lúc 21:32 +07 ngày 23/11 dựa trên manifest cũ, không phải xác nhận cho HEAD này. Public GitHub `main` vẫn ở `f17b8675`. PR #29 v3 đã được Muse kiểm chứng độc lập và báo cáo LAND-READY (0 blocker; focused checks 7/7, probe 27/27, vùng chạm 145/145), nhưng trạng thái local landing cần được theo dõi riêng.
 - Chỉ coi một thay đổi là đã land khi nó có mặt trên đúng source snapshot/commit. Không suy ra trạng thái remote từ local main hoặc từ việc một PR đã được mở.
 
 ## Tiếng Việt
@@ -138,9 +138,9 @@ Create a key with the provider you choose, then enter it in Settings or follow [
 
 ### Version source and hardening snapshot
 
-- **Single version source:** the `version` field in the root `package.json`. Workspace manifest versions and `package-lock.json` entries are synchronized metadata mirrors maintained by `npm run version:sync` and checked by `npm run version:check`. Do not edit workspace versions independently. PR #30 standardizes runtime consumers through generated `APP_VERSION` modules and is awaiting Muse's independent verification before landing.
+- **Single version source:** the `version` field in the root `package.json`. Workspace manifest versions and `package-lock.json` entries are synchronized metadata mirrors maintained by `npm run version:sync` and checked by `npm run version:check`. Do not edit workspace versions independently. PR #30 standardized runtime consumers through generated `APP_VERSION` modules and has landed on local main at `1fe41d25`; this change is not yet present on public GitHub `main` because the local snapshot has not been pushed.
 - Hardening work covers IPC sender validation; egress/SSRF controls (including bare `curl`/`wget` target detection); Vault fallback; MCP config-file permissions; router local-model child-environment filtering; webhook approval-payload minimisation; prompt-injection blocking before skill content enters prompts; and disclosure that a separate plugin process still runs with the same OS user's privileges.
-- **Local/remote snapshot distinction:** the full suite on local snapshot `1fb2cded` ran on 23 Nov 2026 from 19:03 to 19:33 +07 (the landing commit was created at 19:34 +07; 20:00 +07 was the report-writing time), with 12,804 passed / 0 failed / 19 skipped. This is a maintainer-reported local result, not a run performed by this documentation author or evidence of CI passing on the remote SHA. PR #27 landed on local main at `cdd9a5f5`; PR #28 landed on local main at `8522ce7b`; both are awaiting the approved snapshot push (public GitHub `main` remains `f17b8675`). PRs #29/#30 remain pending independent Muse verification.
+- **Local/remote snapshot (maintainer-reported, 24 Nov 2026 06:01 +07):** local main is `1fe41d25`; PRs #28 (`8522ce7b`), #30 (`1fe41d25`), #32 (`5c8eac59`) and #33 (`bcfa06c1`) have landed on local main. `npm run build` and `npm run typecheck` exited 0; the full suite for `1fe41d25` was still running at documentation time, so no pass/fail result is claimed and no test count from an older SHA is reused. Approval `709d77cc`, created at 21:32 +07 on 23 Nov, is still pending and refers to an older manifest, not this HEAD. Public GitHub `main` remains `f17b8675`. Muse independently verified PR #29 v3 as LAND-READY (0 blockers; focused checks 7/7, probe 27/27, touched-area tests 145/145); its local landing state is tracked separately.
 - Treat a change as landed only when it is present on the exact source snapshot/commit being released. Do not infer remote state from local main or from an opened PR.
 
 ### Release builds
