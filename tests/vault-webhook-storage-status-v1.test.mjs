@@ -66,8 +66,10 @@ test('safeStorage probe and no-create Vault open avoid fallback key creation bef
   assert.ok(MAIN.includes('const encryptor = createSafeStorageEncryptor(safeStorage);'));
   assert.ok(MAIN.includes("return isWebhookKeySafeStorageAvailable() ? 'available' : 'degraded';"));
   assert.ok(core.includes('createLocalFallbackKey?: boolean;'));
-  assert.ok(core.includes('if (options.createLocalFallbackKey === false)'));
-  assert.ok(core.includes('encryptor: new LocalEncryptor(machineKey)'));
+  assert.ok(core.includes('createMachineKeyIfMissing?: boolean;'));
+  assert.ok(core.includes('if (options.createMachineKeyIfMissing === false)'));
+  assert.ok(core.includes('machineKey = fs.readFileSync(this.keyFilePath);'));
+  assert.ok(core.includes('createMachineKeyIfMissing: options.createLocalFallbackKey !== false,'));
   assert.ok(core.includes('Creating a LocalEncryptor fallback machine key requires explicit consent.'));
 });
 
