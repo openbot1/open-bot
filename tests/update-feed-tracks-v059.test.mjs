@@ -177,7 +177,7 @@ test('v0.59 feed: feed lỗi → fail soft (checkFailed, không throw, không b�
   assert.equal(bad.available, false);
 });
 
-test('v0.59 feed: releasesListApiUrl cấu hình được — fetch gọi đúng URL đó', async () => {
+test('v0.59 feed: custom release-list endpoint is rejected before network access', async () => {
   const customUrl = 'https://example.invalid/feeds/nightly.json';
   const feed = fakeFeedFetch([NIGHTLY_RELEASE]);
   const res = await checkForTrackUpdate({
@@ -186,8 +186,10 @@ test('v0.59 feed: releasesListApiUrl cấu hình được — fetch gọi đúng
     fetchImpl: feed.fn,
     releasesListApiUrl: customUrl,
   });
-  assert.equal(res.available, true);
-  assert.deepEqual(feed.calls, [customUrl]);
+  assert.equal(res.available, false);
+  assert.equal(res.checkFailed, true);
+  assert.match(res.error ?? '', /canonical/);
+  assert.deepEqual(feed.calls, []);
 });
 
 // ---------------------------------------------------------------------------
