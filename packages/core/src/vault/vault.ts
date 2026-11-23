@@ -108,8 +108,8 @@ export interface OpenVaultWithSafeStorageOptions {
   /** Defaults to `${storePath}.key`; also checks .new/.bak recovery keys. */
   keyFilePath?: string;
   /**
-   * When false, a LocalEncryptor fallback may use an existing machine key
-   * but must not create a new one. Defaults to true for backwards compatibility.
+   * When false, fallback requires an existing primary machine-key file and
+   * refuses to create it when missing. Defaults to true for compatibility.
    */
   createLocalFallbackKey?: boolean;
 }
@@ -294,7 +294,7 @@ export interface VaultOptions {
   encryptor?: Encryptor;
   /** Machine key file for the default LocalEncryptor. Default: `<storePath>.key`. */
   keyFilePath?: string;
-  /** Refuse to create a missing LocalEncryptor machine key; default true. */
+  /** Refuse to create a missing primary LocalEncryptor machine-key file; default true. */
   createMachineKeyIfMissing?: boolean;
   /**
    * v0.5 NO_STORAGE mode (ROADMAP §2d): start with durable writes
