@@ -89,6 +89,70 @@ npm run release:linux
 
 The Linux AppImage is **not GPG-signed** by this configuration. Do not describe it as a signed release artifact.
 
+## Verify the exact release artifacts before publishing
+
+The preflight above checks the source tag, working tree, synchronized versions, host and credential presence. It does **not** prove that the generated DMG or NSIS installer is correctly signed, that Apple's notary service accepted the app, or that the final artifact contains the expected ticket. Perform the checks below on the native host against the exact files intended for the draft release.
+
+### macOS DMG (native macOS host)
+
+1. Verify the DMG container before mounting it:
+
+```bash
+hdiutil verify "<path-to-open-bot.dmg>"
+```
+
+2. Mount the DMG read-only, locate the bundled `open-bot.app`, then verify the nested code and Gatekeeper assessment:
+
+```bash
+hdiutil attach -readonly -nobrowse "<path-to-open-bot.dmg>"
+codesign --verify --deep --strict --verbose=2 "<mounted-path>/open-bot.app"
+spctl --assess --type execute --verbose=4 "<mounted-path>/open-bot.app"
+```
+
+3. Validate the notarization ticket on the exact distribution item to which it was stapled. The app bundle and disk image are separate possible stapling targets; validate the one the release process actually stapled:
+
+```bash
+xcrun stapler validate "<mounted-path>/open-bot.app"
+# Or, when the DMG itself is the stapled item:
+xcrun stapler validate "<path-to-open-bot.dmg>"
+```
+
+4. Record the notary submission as **Accepted**, inspect its log for errors/warnings, and verify that the Team ID / signing identity matches the release identity configured by the maintainer. Do not treat a successful `codesign` check alone as proof of notarization or Gatekeeper acceptance.
+
+### Windows NSIS installer (native Windows host)
+
+Run PowerShell against the final installer file:
+
+```powershell
+$signature = Get-AuthenticodeSignature -LiteralPath "<path-to-open-bot-setup.exe>"
+if ($signature.Status -ne 'Valid') {
+  throw "Installer Authenticode verification failed: $($signature.Status) — $($signature.StatusMessage)"
+}
+$signature | Format-List Status, StatusMessage, SignerCertificate
+```
+
+Also compare the signer certificate subject and thumbprint with the release identity approved by the maintainer. A `Valid` status proves that Windows validated the Authenticode signature chain for that file; it does not by itself prove that the signer is the intended open-bot publisher.
+
+### Linux AppImage
+
+The current AppImage target is **not GPG-signed**. Do not claim signature authenticity or treat a checksum as a digital signature. Record the digest of the exact file reviewed:
+
+```bash
+sha256sum "<path-to-open-bot.AppImage>"
+```
+
+Use the digest only to compare copies of that exact artifact (for example, the file reviewed locally and the file attached to the draft release).
+
+### Final release approval
+
+- Verify the exact final DMG / NSIS / AppImage files after packaging; do not substitute a source build, a different architecture, or a rebuilt file after verification.
+- Keep the release in draft if any required native signature, notarization, ticket or publisher-identity check fails or cannot be performed.
+- Record the artifact filename, SHA-256 digest, target architecture, native verification result and signer/notary identity in the release approval record.
+- After uploading assets, compare the uploaded asset names and digests with the verified files. Do not publish if an asset changed after verification.
+- These are maintainer-operated release checks, not checks executed by the source PR gate. The new checklist regression test only prevents this procedure from silently disappearing; it does not verify any real signature, notarization or artifact.
+
+References: [Apple code-signature verification and Gatekeeper assessment](https://developer.apple.com/library/archive/documentation/Security/Conceptual/CodeSigningGuide/Procedures/Procedures.html), [Apple notarization and stapling workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow), and [Microsoft Get-AuthenticodeSignature](https://learn.microsoft.com/powershell/module/microsoft.powershell.security/get-authenticodesignature).
+
 ## Release order
 
 1. Merge the release-gate and other approved hardening work only after the independent checks described in `docs/TESTING.md` are green on the intended source snapshot.
