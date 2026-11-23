@@ -2,12 +2,19 @@
 
 ## Trạng thái production / Production status
 
-Cập nhật tài liệu: 20/11/2026.
+Cập nhật tài liệu: 23/11/2026 (20:00 +07).
 
 - Repo hiện dùng GitHub Releases làm kênh phân phối dự kiến. Tại lần kiểm tra trong release-gate, repo chưa có release/artifact đã publish.
 - Updater hiện kiểm tra release theo track và mở trang release chính thức để tải thủ công. **Ứng dụng chưa tự tải, xác minh rồi cài bản cập nhật trong app**; nút kiểm tra bản mới không đồng nghĩa với auto-install.
 - electron-builder có cấu hình đích AppImage (Linux), DMG (macOS) và NSIS (Windows). macOS/Windows release được cấu hình fail-closed khi thiếu chứng chỉ; macOS còn yêu cầu notarization. Linux AppImage chưa có chữ ký GPG trong cấu hình hiện tại.
 - Việc một nền tảng có target đóng gói không chứng minh ứng dụng đã được chạy/kiểm thử trên nền tảng đó. Xem [docs/TESTING.md](docs/TESTING.md) để biết cách phân biệt bằng chứng trên GitHub CI với kết quả từ máy phát triển.
+
+### Version source and hardening snapshot
+
+- **Nguồn version duy nhất:** trường `version` trong root `package.json`. Các version trong workspace manifests và `package-lock.json` là metadata mirror được đồng bộ bằng `npm run version:sync` và kiểm tra bằng `npm run version:check`. Không tự sửa version trong package con. PR #30 chuẩn hóa runtime consumers qua generated `APP_VERSION` modules; PR này phải được Muse kiểm chứng độc lập trước khi land.
+- Hardening đã bao phủ các ranh giới: IPC sender validation; egress/SSRF (bao gồm nhận diện bare `curl`/`wget` targets); Vault fallback; MCP config-file permissions; router local-model child-environment filtering; webhook approval-payload minimisation; chặn skill prompt-injection trước khi đưa nội dung vào prompt; và disclosure rằng plugin chạy ở process riêng vẫn giữ quyền của cùng OS user.
+- **Snapshot có phân biệt local/remote:** maintainer báo local `main` tại `1fb2cded` ngày 23/11/2026 20:00 +07 đã đạt 12,804 pass / 0 fail / 19 skipped. Public GitHub `main` khi đó vẫn ở `f17b8675`, chờ phê duyệt push snapshot mới. Đây là kết quả do maintainer báo cáo trên local checkout, không phải kết quả do tài liệu này chạy hay CI trên remote SHA xác nhận. PR #27/#28 đã được Muse xác minh land-ready và đang được land; PR #29/#30 vẫn chờ Muse xác minh độc lập.
+- Chỉ coi một thay đổi là đã land khi nó có mặt trên đúng source snapshot/commit. Không suy ra trạng thái remote từ local main hoặc từ việc một PR đã được mở.
 
 ## Tiếng Việt
 
@@ -29,6 +36,7 @@ Yêu cầu: Node.js 24+ và npm.
 ```bash
 npm run version:sync
 npm ci
+npm run version:check
 npm run dev
 ```
 
@@ -39,7 +47,17 @@ npm run build
 npm run typecheck
 ```
 
-Chạy test theo hướng dẫn và điều kiện nền tảng trong [docs/TESTING.md](docs/TESTING.md).
+Full-suite gate (run on the exact commit being considered for landing):
+
+```bash
+# Linux
+xvfb-run -a npm test
+
+# Windows / macOS
+npm test
+```
+
+**Không land nếu full suite có bất kỳ test fail nào.** Skip phải được báo cáo riêng, có lý do; không coi skip là pass hoặc bằng chứng tích hợp thật. Các lệnh root build/typecheck chạy lần lượt các workspace core, tools, desktop và CLI. Xem [docs/TESTING.md](docs/TESTING.md) để biết lệnh từng workspace, CI matrix và quy trình Muse xác minh độc lập.
 
 ### Cấu hình API key
 
@@ -84,6 +102,7 @@ Requirements: Node.js 24+ and npm.
 ```bash
 npm run version:sync
 npm ci
+npm run version:check
 npm run dev
 ```
 
@@ -94,7 +113,17 @@ npm run build
 npm run typecheck
 ```
 
-See [docs/TESTING.md](docs/TESTING.md) for test commands and platform prerequisites.
+Full-suite gate (run on the exact commit being considered for landing):
+
+```bash
+# Linux
+xvfb-run -a npm test
+
+# Windows / macOS
+npm test
+```
+
+Do not land with any full-suite test failures. Report skipped tests separately with reasons; a skip is neither a pass nor proof of real integration. The root build/typecheck scripts run core, tools, desktop and CLI workspaces in sequence. See [docs/TESTING.md](docs/TESTING.md) for per-workspace commands, the CI matrix and Muse's independent verification procedure.
 
 ### API keys
 
@@ -106,6 +135,13 @@ Create a key with the provider you choose, then enter it in Settings or follow [
 - Secret protection depends on the operating system's secure-storage availability and the active configuration. Do not assume every environment provides the same protection as an OS keychain.
 - Self-update currently provides **check + notification + opening the download page**; it does not download and install updates in-app.
 - Computer-use has platform limitations. A packaging target is not evidence that computer-use is supported on Wayland/macOS/Windows. See [docs/unbuildable-gaps-v086.md](docs/unbuildable-gaps-v086.md).
+
+### Version source and hardening snapshot
+
+- **Single version source:** the `version` field in the root `package.json`. Workspace manifest versions and `package-lock.json` entries are synchronized metadata mirrors maintained by `npm run version:sync` and checked by `npm run version:check`. Do not edit workspace versions independently. PR #30 standardizes runtime consumers through generated `APP_VERSION` modules and is awaiting Muse's independent verification before landing.
+- Hardening work covers IPC sender validation; egress/SSRF controls (including bare `curl`/`wget` target detection); Vault fallback; MCP config-file permissions; router local-model child-environment filtering; webhook approval-payload minimisation; prompt-injection blocking before skill content enters prompts; and disclosure that a separate plugin process still runs with the same OS user's privileges.
+- **Local/remote snapshot distinction:** the maintainer reported local `main` at `1fb2cded` on 23 Nov 2026, 20:00 +07 with 12,804 passed / 0 failed / 19 skipped. Public GitHub `main` was still `f17b8675`, pending approval to push the newer snapshot. This is a maintainer-reported local result, not a run performed by this documentation author or evidence of CI passing on the remote SHA. PRs #27/#28 were independently verified by Muse as land-ready and were being landed; PRs #29/#30 remained pending Muse verification.
+- Treat a change as landed only when it is present on the exact source snapshot/commit being released. Do not infer remote state from local main or from an opened PR.
 
 ### Release builds
 

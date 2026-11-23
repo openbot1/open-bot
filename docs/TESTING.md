@@ -1,83 +1,128 @@
 # Build, testing and production verification
 
-Cập nhật: 20/11/2026. Yêu cầu runtime/build: Node.js 24+ và npm.
+Cập nhật: 23/11/2026, 20:00 +07. Yêu cầu runtime/build: Node.js 24+ và npm.
 
-## Quy tắc báo cáo trạng thái
+## Snapshot production được maintainer xác nhận
 
-- Một kết quả test chỉ có giá trị khi ghi kèm **commit SHA, lệnh chính xác, môi trường/OS, thời điểm và summary do runner trả về**.
-- Không lấy test count trong log cũ hoặc từ một checkout khác làm bằng chứng cho commit hiện tại.
-- Không ghi “CI xanh” nếu chưa kiểm tra GitHub Actions của đúng SHA. Workflow CI hiện định nghĩa build, typecheck và test trên Ubuntu, Windows, macOS; trạng thái phải đọc ở trang Actions của commit/PR cụ thể.
-- PR release-gate này được tạo bằng GitHub web UI; tác giả không có checkout thực thi, nên **không chạy build, typecheck, unit test, full suite, signing hay notarization**.
-- Tại lúc cập nhật tài liệu, maintainer báo local main `dfd90beb` khác public GitHub main `9ecb82ed24aface43b4287ae8ffd81c484ea85ea`. PR #7/#8/#9 còn local-only và chưa được đưa vào base của release-gate. Coordinator đang xử lý nhóm 13 regression test fail riêng; release-gate không sửa các test đó và không tuyên bố full suite đã xanh. Chỉ land release-gate sau khi coordinator xác nhận full suite xanh trên source snapshot dự định phát hành và Muse hoàn thành kiểm chứng độc lập.
+- Local `main` được maintainer xác nhận tại `1fb2cded` (23/11/2026 ~20:00 +07).
+- Full suite trên đúng local SHA đó: **12,804 passed / 0 failed / 19 skipped** (12,823 test cases được runner báo cáo). Điều kiện bắt buộc để land: **0 test fail** trên đúng head SHA được kiểm chứng. Báo cáo skip riêng, xem xét lý do và không tính skip là pass.
+- Public GitHub `main` tại thời điểm này vẫn là `f17b8675ed5a5415894ca47ad42096e240489fa5`; snapshot local mới hơn đang chờ phê duyệt push. Kết quả trên là báo cáo từ maintainer local, **không phải** test do tác giả tài liệu chạy hoặc CI xác nhận trên remote `main`.
+- Khi kiểm chứng/land, luôn lấy SHA thực tế từ PR head và xác nhận đúng base. Không tái sử dụng test count từ một SHA khác hoặc suy ra remote đã có các commit local chưa push.
 
-## Cài đặt, build và typecheck
+## Single source of truth — app version
 
-Tại repository root:
+- Trường `version` trong root `package.json` là **nguồn version sản phẩm duy nhất** và là nơi duy nhất được sửa khi đổi release version.
+- Version trong `apps/*/package.json`, `packages/*/package.json` và các workspace entries của `package-lock.json` là generated/synchronized npm metadata mirrors, không phải nguồn version độc lập.
+- Chạy `npm run version:sync` để đồng bộ metadata; `npm run version:check` phải pass trước khi release/tag.
+- PR #30 chuẩn hóa runtime consumers qua các generated `APP_VERSION` modules lấy từ root version. PR #30 đang chờ Muse xác minh độc lập; sau khi land, không tạo thêm literal product-version ở runtime và không sửa generated module thủ công.
 
 ```bash
 npm run version:sync
+npm run version:check
+```
+
+## Hardening scope được theo dõi
+
+Các lát cắt production-hardening đã/đang được xử lý gồm:
+
+1. IPC sender validation — xác thực sender tại ranh giới IPC.
+2. Egress/SSRF — giới hạn network egress và nhận diện đích bare `curl`/`wget`.
+3. Vault fallback — hiển thị/trạng thái lưu trữ fallback dành riêng cho webhook key; PR #29 đang chờ Muse xác minh.
+4. MCP config-file permissions — siết quyền file cấu hình; PR #27 đã được Muse xác minh land-ready và maintainer đang land.
+5. Router local-model child environment — lọc child env; PR #28 đã được Muse xác minh land-ready và maintainer đang land.
+6. Webhook approval-payload minimisation — chỉ phát các trường allowlist cần thiết ra webhook.
+7. Skills prompt-injection blocking — quét nội dung/metadata trước khi skill đi vào prompt.
+8. Plugin security disclosure — nêu rõ process riêng không phải OS sandbox và plugin vẫn có quyền của OS user hiện tại.
+
+PR #26 (bare curl/wget egress targets) đã được maintainer báo landed trên local main. PR #27/#28 đang được land; PR #29 và PR #30 chưa được xem là landed/verified cho tới khi Muse xác minh đúng head SHA. Tình trạng remote cần kiểm tra lại trên GitHub, vì local main và public GitHub main có thể lệch nhau.
+
+## Cài đặt dependencies, build và typecheck
+
+Yêu cầu: Node.js 24+ (khớp CI và `packages/core/package.json` engines) cùng npm. Tại repository root:
+
+```bash
 npm ci
+npm run version:sync
+npm run version:check
 npm run build
 npm run typecheck
 ```
 
-`package.json` ở root là nguồn version chuẩn. `version:sync` đồng bộ version sang các workspace manifests và `package-lock.json`; `version:check` xác minh metadata không bị lệch:
+Root scripts trong `package.json` thực hiện build/typecheck theo thứ tự core → tools → desktop → CLI. Lệnh tương đương từng workspace:
 
 ```bash
-npm run version:check
+npm run build --workspace=@open-bot/core
+npm run build --workspace=@open-bot/tools
+npm run build --workspace=@open-bot/desktop
+npm run build --workspace=@open-bot/cli
+
+npm run typecheck --workspace=@open-bot/core
+npm run typecheck --workspace=@open-bot/tools
+npm run typecheck --workspace=@open-bot/desktop
+npm run typecheck --workspace=@open-bot/cli
 ```
 
-Root build/typecheck/dev/dist và desktop workspace build/dist đều gọi script đồng bộ trước khi chạy. CLI đọc version từ root manifest trong monorepo; Electron lấy `app.getVersion()` từ desktop package đã được đồng bộ trước build/package.
+Root `prebuild` và `pretypecheck` tự gọi `version:sync`; chạy lệnh sync/check tường minh giúp chứng minh manifest/lockfile đồng bộ và tránh dựa vào lifecycle hook một cách ngầm định. Desktop workspace cũng có prebuild/predist sync.
 
-## Chạy test
+## Full-suite test gate
 
-Trên Linux, nhóm test dùng display cần chạy dưới Xvfb:
+Root `npm test` gọi `node --test` cho toàn bộ test suite. Dùng đúng lệnh theo OS:
 
 ```bash
+# Linux — cần virtual display cho nhóm computer-use/X11 tests
 xvfb-run -a npm test
-```
 
-Trên Windows/macOS:
-
-```bash
+# Windows / macOS
 npm test
 ```
 
-Với thay đổi updater ở release-gate (sau khi build các workspace):
+**Không land nếu full suite có bất kỳ test fail nào (yêu cầu 0 fail).** Ghi nguyên văn summary runner, số pass/fail/skipped, OS, Node/npm version, thời điểm và exact commit SHA. Các test skipped phải được liệt kê/giải thích; không diễn giải skip thành pass và không chấp nhận skip mới không có lý do.
+
+Trước full suite, chạy focused regression tests cho đúng lát cắt PR bằng chính lệnh `node --test <test-file...>` ghi trong PR. Với các thay đổi ảnh hưởng platform boundary, CI còn có platform job:
 
 ```bash
-node --test tests/auth-update-v07.test.mjs tests/update-tracks-v054.test.mjs tests/update-feed-tracks-v059.test.mjs
+npm ci
+npm run build
+node --test tests/platform.test.mjs
 ```
 
-Nếu một test cần API key, service ngoài, display hoặc binary hệ thống, hãy ghi rõ điều kiện đó và trạng thái skip. Skip không được tính là xác minh tích hợp thật. Khi báo cáo kết quả, đính kèm summary nguyên bản của `node --test` và không suy diễn test count.
+## GitHub Actions CI
 
-## CI
+Workflow thực tế: `.github/workflows/ci.yml`.
 
-Workflow `.github/workflows/ci.yml` khai báo:
+- Job `build-test`: matrix `ubuntu-latest`, `windows-latest`, `macos-latest`; mỗi OS chạy `npm ci`, `npm run build`, `npm run typecheck` và full suite. Linux dùng `xvfb-run -a npm test`; Windows/macOS dùng `npm test`.
+- Job `platform`: cùng matrix ba OS; chạy `npm ci`, `npm run build`, rồi `node --test tests/platform.test.mjs`.
+- Workflow declaration chỉ mô tả các bước sẽ chạy. Chỉ kết luận CI xanh sau khi mở Actions/checks của **đúng PR head SHA** và xác nhận mọi job bắt buộc pass; không suy diễn từ cấu hình YAML hoặc run của commit khác.
 
-- Build + typecheck + full test trên `ubuntu-latest`, `windows-latest`, `macos-latest`.
-- Linux full test chạy bằng `xvfb-run -a npm test`.
-- Một job platform chạy `tests/platform.test.mjs` sau build trên cả ba OS.
+## Quy trình kiểm chứng PR do ChatGPT tạo
 
-Cấu hình workflow không chứng minh một run cụ thể đã pass. Kiểm tra đúng commit SHA trên GitHub Actions trước khi gọi release gate là xanh. Không có CI status hoặc full-suite count mới nào được ghi trong tài liệu này.
+ChatGPT hỗ trợ đọc/sửa source và mở PR qua GitHub, nhưng môi trường tác giả **không clone checkout, không chạy build, typecheck, unit test hoặc full suite**. Mọi PR do ChatGPT tạo đều phải được Muse độc lập kiểm chứng trên đúng head SHA trước khi land.
 
-## Release readiness
+Muse cần:
+1. Xác nhận PR head SHA/base branch và đọc toàn bộ diff; không tin test claims chưa có runner output.
+2. Chạy `npm ci`, `npm run version:check`, `npm run build`, `npm run typecheck`.
+3. Chạy focused regression tests liên quan đúng scope.
+4. Chạy full-suite gate theo OS ở trên và ghi nguyên bản output summary (yêu cầu 0 fail).
+5. Với PR ảnh hưởng platform, xác minh platform test và runtime trên OS đích khi phù hợp; kiểm tra GitHub Actions của đúng SHA.
+6. Báo cáo SHA, OS, Node/npm versions, commands, thời điểm, pass/fail/skip và mọi giới hạn trước khi maintainer quyết định land.
 
-Release packaging, version tagging, signing, notarization và draft GitHub Releases được mô tả tại [docs/RELEASING.md](RELEASING.md). Lưu ý:
+Không mark PR là ready, không merge và không mô tả PR là verified chỉ vì code đã được soạn hoặc Draft PR đã mở.
 
-- Updater hiện check GitHub Releases theo track và mở trang release để tải thủ công; nó **không tự tải/cài**.
-- Không có release artifact nào được publish tại lần kiểm tra khi soạn release-gate.
-- macOS release đòi Developer ID signing + notarization; Windows release đòi Authenticode signing. Linux AppImage hiện không được GPG-sign bởi cấu hình release.
-- Không chạy hoặc mô tả một release là signed/notarized cho tới khi artifact thật đã được tạo trên host phù hợp và xác minh trên OS đích.
+## Release readiness và ranh giới ngoài scope
+
+Quy trình packaging/tag/signing/notarization/GitHub Releases nằm trong [docs/RELEASING.md](RELEASING.md). Source build/test gate không thay thế signing, notarization hoặc kiểm thử artifact trên OS đích. Các lát cắt updater, signing/notarizing và tài liệu release khác cần PR/gate riêng; không coi chúng đã được xác minh chỉ từ PR docs này.
+
+- Updater hiện chỉ check release và mở trang tải thủ công; không tự download/verify/install trong app.
+- macOS yêu cầu Developer ID signing + notarization; Windows yêu cầu Authenticode signing. Linux AppImage không được GPG-sign theo cấu hình hiện tại.
+- Không có thao tác signing/notarizing trong quy trình PR docs này. Chỉ xác nhận artifact signed/notarized sau khi tạo và verify thật trên nền tảng tương ứng.
 
 ## Known gaps / môi trường chưa xác minh
 
-- Self-install/update verification end-to-end chưa được implement; xem `docs/unbuildable-gaps-v086.md` và `docs/update-tracks.md`.
+- Self-install/update end-to-end chưa được implement; xem `docs/unbuildable-gaps-v086.md` và `docs/update-tracks.md`.
 - Computer-use ngoài Linux + X11 chưa được xác minh trong môi trường tương ứng; xem `docs/unbuildable-gaps-v086.md`.
 - Build target macOS/Windows không thay thế test runtime thật trên Mac/Windows.
-- Provider live tests yêu cầu key/service thật; không có key thì test có thể skip. Không ghi live-provider pass dựa trên mock.
-- Signing/notarization requires external certificate and secrets; PR source changes do not constitute a signed release.
-
+- Provider live tests yêu cầu key/service thật; nếu thiếu key, test có thể skip. Không ghi live-provider pass dựa trên mock.
+- Signing/notarization đòi certificate và secrets bên ngoài; source PR không phải signed release.
 ---
 
 ## Lịch sử kiểm thử cũ (chỉ tham khảo, không phải bằng chứng release hiện tại)
