@@ -57,7 +57,7 @@ export interface UpdateCheckResult {
 export type UpdateFetchLike = (
   url: string,
   init?: { headers?: Record<string, string> },
-) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
+) => Promise<{ ok: boolean; status: number; url?: string; json: () => Promise<unknown> }>;
 
 /** Parse "v1.2.3" / "1.2.3" / "1.2" into [major, minor, patch]; null when unparseable. */
 export function parseSemver(version: string): [number, number, number] | null {
@@ -99,13 +99,20 @@ export async function checkForUpdate(opts: {
   if (!fetchFn) {
     return { ...base, checkFailed: true, error: 'Không có fetch để kiểm tra bản mới.' };
   }
+  const releasesApiUrl = opts.releasesApiUrl ?? UPDATE_RELEASES_API;
+  if (releasesApiUrl !== UPDATE_RELEASES_API) {
+    return { ...base, checkFailed: true, error: 'Từ chối update feed không phải GitHub API endpoint canonical của openbot1/open-bot.' };
+  }
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 10_000);
     try {
-      const res = await fetchFn(opts.releasesApiUrl ?? UPDATE_RELEASES_API, {
+      const res = await fetchFn(releasesApiUrl, {
         headers: { Accept: 'application/vnd.github+json' },
       });
+      if (typeof res.url === 'string' && res.url !== releasesApiUrl) {
+        return { ...base, checkFailed: true, error: 'GitHub update feed redirect tới endpoint khác; đã từ chối.' };
+      }
       const data = (await res.json()) as Record<string, unknown>;
       if (!res.ok) {
         const msg = typeof data['message'] === 'string' ? data['message'] : `HTTP ${res.status}`;
@@ -254,13 +261,20 @@ export async function checkForTrackUpdate(opts: {
   if (!fetchFn) {
     return { ...base, checkFailed: true, error: 'Không có fetch để kiểm tra bản mới.' };
   }
+  const releasesListApiUrl = opts.releasesListApiUrl ?? UPDATE_RELEASES_LIST_API;
+  if (releasesListApiUrl !== UPDATE_RELEASES_LIST_API) {
+    return { ...base, checkFailed: true, error: 'Từ chối update feed không phải GitHub API endpoint canonical của openbot1/open-bot.' };
+  }
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 10_000);
     try {
-      const res = await fetchFn(opts.releasesListApiUrl ?? UPDATE_RELEASES_LIST_API, {
+      const res = await fetchFn(releasesListApiUrl, {
         headers: { Accept: 'application/vnd.github+json' },
       });
+      if (typeof res.url === 'string' && res.url !== releasesListApiUrl) {
+        return { ...base, checkFailed: true, error: 'GitHub update feed redirect tới endpoint khác; đã từ chối.' };
+      }
       const data: unknown = await res.json();
       if (!res.ok) {
         const msg =
