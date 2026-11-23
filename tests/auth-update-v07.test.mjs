@@ -491,7 +491,16 @@ test('update: newer release is reported available with its download link', async
     status: 200,
     json: async () => ({
       tag_name: 'v0.7.0',
+      draft: false,
+      prerelease: false,
       html_url: 'https://github.com/openbot1/open-bot/releases/tag/v0.7.0',
+      assets: [{
+        name: 'open-bot-0.7.0.AppImage',
+        state: 'uploaded',
+        size: 1024,
+        digest: `sha256:${'a'.repeat(64)}`,
+        browser_download_url: 'https://github.com/openbot1/open-bot/releases/download/v0.7.0/open-bot-0.7.0.AppImage',
+      }],
     }),
   });
   const res = await checkForUpdate({ currentVersion: '0.2.0', fetchImpl: mockFetch });
@@ -505,7 +514,19 @@ test('update: newer release is reported available with its download link', async
 test('update: same or newer current version means no update; API failure is reported, not thrown', async () => {
   const sameFetch = async () => ({
     ok: true, status: 200,
-    json: async () => ({ tag_name: 'v0.2.0', html_url: 'https://example.invalid/r' }),
+    json: async () => ({
+      tag_name: 'v0.2.0',
+      draft: false,
+      prerelease: false,
+      html_url: 'https://github.com/openbot1/open-bot/releases/tag/v0.2.0',
+      assets: [{
+        name: 'open-bot-0.2.0.AppImage',
+        state: 'uploaded',
+        size: 1024,
+        digest: `sha256:${'b'.repeat(64)}`,
+        browser_download_url: 'https://github.com/openbot1/open-bot/releases/download/v0.2.0/open-bot-0.2.0.AppImage',
+      }],
+    }),
   });
   const same = await checkForUpdate({ currentVersion: '0.2.0', fetchImpl: sameFetch });
   assert.equal(same.available, false);
