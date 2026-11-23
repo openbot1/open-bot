@@ -35,6 +35,27 @@ test('webhook-key create and rotate obtain one-write consent from the relevant s
   assert.ok(MAIN.includes("if (storageStatus !== 'degraded') return false;"));
 });
 
+test('declined degraded fallback consent is rejected before either webhook store is opened', () => {
+  const createStart = MAIN.indexOf("registerMainWindowIpcHandler('automations:webhook-key:create'");
+  const rotateStart = MAIN.indexOf("registerMainWindowIpcHandler('automations:webhook-key:rotate'");
+  const deleteStart = MAIN.indexOf("registerMainWindowIpcHandler('automations:webhook-key:delete'");
+  assert.ok(createStart >= 0 && rotateStart > createStart && deleteStart > rotateStart);
+  const handlers = [
+    MAIN.slice(createStart, rotateStart),
+    MAIN.slice(rotateStart, deleteStart),
+  ];
+  for (const handler of handlers) {
+    const guard = handler.indexOf("if (webhookStorageStatus === 'degraded' && !allowLocalFallback)");
+    const storeOpen = handler.indexOf('webhookKeyStores()');
+    assert.ok(guard >= 0, 'degraded + declined consent must be rejected explicitly');
+    assert.ok(storeOpen > guard, 'the store factory must not run before the consent guard');
+    assert.ok(handler.includes("throw new Error('Đã huỷ lưu secret: LocalEncryptor fallback cần xác nhận riêng cho từng lần lưu.')"));
+  }
+  // Available storage legitimately returns allowLocalFallback=false; the guard
+  // must remain conditional on degraded status, not on the boolean alone.
+  assert.ok(MAIN.includes("if (webhookStorageStatus === 'degraded' && !allowLocalFallback)"));
+});
+
 test('Settings surfaces the separate webhook store and both unsafe storage states', () => {
   assert.ok(SECURITY.includes('<strong>{t(\'settings.vaultTitle\')} — webhook signing keys</strong>'));
   assert.ok(SECURITY.includes("vaultStorageStatus?.webhookKeyStore?.status === 'degraded'"));

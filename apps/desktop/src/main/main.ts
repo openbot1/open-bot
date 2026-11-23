@@ -9411,11 +9411,15 @@ function registerIpc(): void {
     if (automation.trigger.kind !== 'webhook') {
       throw new Error('Automation này không dùng trigger webhook.');
     }
+    const webhookStorageStatus = webhookKeyStorageStatus ?? vaultStorageStatus;
     const allowLocalFallback = await requestLocalFallbackConsent(
       payload?.allowLocalFallback,
       'automation webhook signing key',
-      webhookKeyStorageStatus ?? vaultStorageStatus,
+      webhookStorageStatus,
     );
+    if (webhookStorageStatus === 'degraded' && !allowLocalFallback) {
+      throw new Error('Đã huỷ lưu secret: LocalEncryptor fallback cần xác nhận riêng cho từng lần lưu.');
+    }
     return createAutomationWebhookKey(webhookKeyStores(), id, { allowLocalFallback });
   });
 
@@ -9427,11 +9431,15 @@ function registerIpc(): void {
     if (automation.trigger.kind !== 'webhook') {
       throw new Error('Automation này không dùng trigger webhook.');
     }
+    const webhookStorageStatus = webhookKeyStorageStatus ?? vaultStorageStatus;
     const allowLocalFallback = await requestLocalFallbackConsent(
       payload?.allowLocalFallback,
       'rotated automation webhook signing key',
-      webhookKeyStorageStatus ?? vaultStorageStatus,
+      webhookStorageStatus,
     );
+    if (webhookStorageStatus === 'degraded' && !allowLocalFallback) {
+      throw new Error('Đã huỷ lưu secret: LocalEncryptor fallback cần xác nhận riêng cho từng lần lưu.');
+    }
     return rotateAutomationWebhookKey(webhookKeyStores(), id, { allowLocalFallback });
   });
 
