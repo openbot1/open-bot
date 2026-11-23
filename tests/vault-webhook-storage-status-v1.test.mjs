@@ -1,7 +1,8 @@
 /**
  * Regression coverage for the dedicated automation webhook-key Vault status.
  *
- * Run after building the desktop application:
+ * Run after building the root workspaces (core dist is imported below):
+ *   npm run build
  *   node --test tests/vault-webhook-storage-status-v1.test.mjs
  *
  * This GitHub-only authoring session did not execute this test.
