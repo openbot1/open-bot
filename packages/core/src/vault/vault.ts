@@ -107,6 +107,11 @@ export interface OpenVaultWithSafeStorageOptions {
   safeStorage: SafeStorageLike;
   /** Defaults to `${storePath}.key`; also checks .new/.bak recovery keys. */
   keyFilePath?: string;
+  /**
+   * When false, a LocalEncryptor fallback may use an existing machine key
+   * but must not create a new one. Defaults to true for backwards compatibility.
+   */
+  createLocalFallbackKey?: boolean;
 }
 
 export interface OpenVaultWithSafeStorageResult {
@@ -1566,11 +1571,28 @@ export function openVaultWithSafeStorage(
   const keyFilePath = options.keyFilePath ?? `${options.storePath}.key`;
 
   const openLocalFallback = (): OpenVaultWithSafeStorageResult => {
-    const vault = new Vault({
-      storePath: options.storePath,
-      keyFilePath,
-      writePolicy: 'require-local-fallback-consent',
-    });
+    let vault: Vault;
+    if (options.createLocalFallbackKey === false) {
+      // Opening a secondary store for status/read purposes must not silently
+      // create a new machine key. Existing fallback keys remain readable.
+      let machineKey: Buffer;
+      try {
+        machineKey = fs.readFileSync(keyFilePath);
+      } catch {
+        throw new Error('Creating a LocalEncryptor fallback machine key requires explicit consent.');
+      }
+      vault = new Vault({
+        storePath: options.storePath,
+        encryptor: new LocalEncryptor(machineKey),
+        writePolicy: 'require-local-fallback-consent',
+      });
+    } else {
+      vault = new Vault({
+        storePath: options.storePath,
+        keyFilePath,
+        writePolicy: 'require-local-fallback-consent',
+      });
+    }
     if (!vault.canDecryptAllSecrets()) {
       vault.setWritePolicy('disabled');
       return { vault, status: 'unavailable' };

@@ -27,12 +27,15 @@ test('main process retains dedicated webhook store status separately from the pr
 });
 
 test('webhook-key create and rotate obtain one-write consent from the relevant store state', () => {
-  assert.ok(MAIN.includes("'automation webhook signing key',\n      webhookKeyStorageStatus ?? vaultStorageStatus,"));
-  assert.ok(MAIN.includes("'rotated automation webhook signing key',\n      webhookKeyStorageStatus ?? vaultStorageStatus,"));
-  assert.ok(MAIN.includes('return createAutomationWebhookKey(webhookKeyStores(), id, { allowLocalFallback });'));
-  assert.ok(MAIN.includes('return rotateAutomationWebhookKey(webhookKeyStores(), id, { allowLocalFallback });'));
+  assert.ok(MAIN.includes('const webhookStorageStatus = getWebhookKeyStorageStatusForConsent();'));
+  assert.ok(MAIN.includes("'automation webhook signing key',\\n      webhookStorageStatus,"));
+  assert.ok(MAIN.includes("'rotated automation webhook signing key',\\n      webhookStorageStatus,"));
+  assert.ok(MAIN.includes('return createAutomationWebhookKey(webhookKeyStores(allowLocalFallback), id, { allowLocalFallback });'));
+  assert.ok(MAIN.includes('return rotateAutomationWebhookKey(webhookKeyStores(allowLocalFallback), id, { allowLocalFallback });'));
   assert.ok(MAIN.includes("storageStatus: 'available' | 'degraded' | 'unavailable' = vaultStorageStatus"));
   assert.ok(MAIN.includes("if (storageStatus !== 'degraded') return false;"));
+  assert.ok(MAIN.includes('function getWebhookKeyStorageStatusForConsent():'));
+  assert.ok(MAIN.includes('createLocalFallbackKey: allowLocalFallbackKeyCreation,'));
 });
 
 test('declined degraded fallback consent is rejected before either webhook store is opened', () => {
@@ -54,6 +57,16 @@ test('declined degraded fallback consent is rejected before either webhook store
   // Available storage legitimately returns allowLocalFallback=false; the guard
   // must remain conditional on degraded status, not on the boolean alone.
   assert.ok(MAIN.includes("if (webhookStorageStatus === 'degraded' && !allowLocalFallback)"));
+});
+
+test('safeStorage probe and no-create Vault open avoid fallback key creation before consent', () => {
+  const core = fs.readFileSync(path.join(ROOT, 'packages/core/src/vault/vault.ts'), 'utf8');
+  assert.ok(MAIN.includes('const encryptor = createSafeStorageEncryptor(safeStorage);'));
+  assert.ok(MAIN.includes("return isWebhookKeySafeStorageAvailable() ? 'available' : 'degraded';"));
+  assert.ok(core.includes('createLocalFallbackKey?: boolean;'));
+  assert.ok(core.includes('if (options.createLocalFallbackKey === false)'));
+  assert.ok(core.includes('encryptor: new LocalEncryptor(machineKey)'));
+  assert.ok(core.includes('Creating a LocalEncryptor fallback machine key requires explicit consent.'));
 });
 
 test('Settings surfaces the separate webhook store and both unsafe storage states', () => {

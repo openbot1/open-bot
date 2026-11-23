@@ -84,6 +84,7 @@ import {
   createPluginTemplate,
   createProvider,
   createRolePolicyChecker,
+  createSafeStorageEncryptor,
   openVaultWithSafeStorage,
   WEBHOOK_KEYS_FILE,
   clearComposioApiKey,
@@ -1126,12 +1127,34 @@ function notifyBotEvent(
  */
 let webhookKeyStore: WebhookKeyStore | null = null;
 let webhookKeyStorageStatus: 'available' | 'degraded' | 'unavailable' | null = null;
-function getWebhookKeyStore(): WebhookKeyStore {
+
+/**
+ * Probe the secondary store's OS backend without constructing a Vault or
+ * creating a fallback machine-key file. The primary Vault's status is not
+ * authoritative for this independently-opened store.
+ */
+function isWebhookKeySafeStorageAvailable(): boolean {
+  try {
+    const encryptor = createSafeStorageEncryptor(safeStorage);
+    const probe = Buffer.from('open-bot-webhook-store-probe', 'utf8');
+    return encryptor.decrypt(encryptor.encrypt(probe)).equals(probe);
+  } catch {
+    return false;
+  }
+}
+
+/** Resolve consent against the dedicated store, even before it is opened. */
+function getWebhookKeyStorageStatusForConsent(): 'available' | 'degraded' | 'unavailable' {
+  if (webhookKeyStorageStatus !== null) return webhookKeyStorageStatus;
+  return isWebhookKeySafeStorageAvailable() ? 'available' : 'degraded';
+}
+function getWebhookKeyStore(allowLocalFallbackKeyCreation = false): WebhookKeyStore {
   if (!webhookKeyStore) {
     const dir = app.getPath('userData');
     const opened = openVaultWithSafeStorage({
       storePath: path.join(dir, WEBHOOK_KEYS_FILE),
       safeStorage,
+      createLocalFallbackKey: allowLocalFallbackKeyCreation,
     });
     webhookKeyStorageStatus = opened.status;
     webhookKeyStore = new WebhookKeyStore({ dir, vault: opened.vault });
@@ -1151,8 +1174,8 @@ function webhookKeyStoreHasPersistedFile(dir: string): boolean {
 }
 
 /** Cặp store cho mọi thao tác key webhook: ghi vào store riêng, đọc fallback kho cũ để migrate. */
-function webhookKeyStores(): { store: WebhookKeyStore; legacyStore: Vault } {
-  return { store: getWebhookKeyStore(), legacyStore: vault };
+function webhookKeyStores(allowLocalFallbackKeyCreation = false): { store: WebhookKeyStore; legacyStore: Vault } {
+  return { store: getWebhookKeyStore(allowLocalFallbackKeyCreation), legacyStore: vault };
 }
 
 /**
@@ -8468,10 +8491,11 @@ function registerIpc(): void {
     // this second Vault already contains persistent state worth checking.
     if (!webhookKeyStore && webhookKeyStoreHasPersistedFile(userDataDir)) {
       try {
-        getWebhookKeyStore();
+        getWebhookKeyStore(false);
       } catch {
-        // Fail closed in the UI when the existing store cannot be opened.
-        webhookKeyStorageStatus = 'unavailable';
+        // A missing fallback key needs explicit consent before it may be
+        // created. Keep degraded distinct from unreadable safeStorage data.
+        webhookKeyStorageStatus = isWebhookKeySafeStorageAvailable() ? 'unavailable' : 'degraded';
       }
     }
     return {
@@ -9411,7 +9435,7 @@ function registerIpc(): void {
     if (automation.trigger.kind !== 'webhook') {
       throw new Error('Automation này không dùng trigger webhook.');
     }
-    const webhookStorageStatus = webhookKeyStorageStatus ?? vaultStorageStatus;
+    const webhookStorageStatus = getWebhookKeyStorageStatusForConsent();
     const allowLocalFallback = await requestLocalFallbackConsent(
       payload?.allowLocalFallback,
       'automation webhook signing key',
@@ -9420,7 +9444,7 @@ function registerIpc(): void {
     if (webhookStorageStatus === 'degraded' && !allowLocalFallback) {
       throw new Error('Đã huỷ lưu secret: LocalEncryptor fallback cần xác nhận riêng cho từng lần lưu.');
     }
-    return createAutomationWebhookKey(webhookKeyStores(), id, { allowLocalFallback });
+    return createAutomationWebhookKey(webhookKeyStores(allowLocalFallback), id, { allowLocalFallback });
   });
 
   registerMainWindowIpcHandler('automations:webhook-key:rotate', async (_event: unknown, payload: { id: string; allowLocalFallback?: boolean }) => {
@@ -9431,7 +9455,7 @@ function registerIpc(): void {
     if (automation.trigger.kind !== 'webhook') {
       throw new Error('Automation này không dùng trigger webhook.');
     }
-    const webhookStorageStatus = webhookKeyStorageStatus ?? vaultStorageStatus;
+    const webhookStorageStatus = getWebhookKeyStorageStatusForConsent();
     const allowLocalFallback = await requestLocalFallbackConsent(
       payload?.allowLocalFallback,
       'rotated automation webhook signing key',
@@ -9440,7 +9464,7 @@ function registerIpc(): void {
     if (webhookStorageStatus === 'degraded' && !allowLocalFallback) {
       throw new Error('Đã huỷ lưu secret: LocalEncryptor fallback cần xác nhận riêng cho từng lần lưu.');
     }
-    return rotateAutomationWebhookKey(webhookKeyStores(), id, { allowLocalFallback });
+    return rotateAutomationWebhookKey(webhookKeyStores(allowLocalFallback), id, { allowLocalFallback });
   });
 
   registerMainWindowIpcHandler('automations:webhook-key:delete', (_event: unknown, payload: { id: string }) => {
