@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { verifyGitHubReleaseArtifactMetadata } from '../packages/core/dist/update/index.js';
+import { checkForTrackUpdate, checkForUpdate, UPDATE_RELEASES_API, UPDATE_RELEASES_LIST_API, verifyGitHubReleaseArtifactMetadata } from '../packages/core/dist/update/index.js';
 
 const REPO = 'openbot1/open-bot';
 const TAG = 'v1.2.3-nightly.20261124';
@@ -105,4 +105,63 @@ test('release artifact metadata requires at least one supported installer and ne
   const result = verifyGitHubReleaseArtifactMetadata(release, TAG);
   assert.equal(result.verified, false);
   assert.match(result.reason, /no supported desktop installer/);
+});
+
+test('stable and channel checkers gate availability on trusted release artifact metadata', async () => {
+  const tag = 'v2.0.0';
+  const name = 'open-bot-2.0.0.AppImage';
+  const stableRelease = {
+    tag_name: tag,
+    draft: false,
+    prerelease: false,
+    html_url: `https://github.com/${REPO}/releases/tag/${tag}`,
+    assets: [{
+      name,
+      state: 'uploaded',
+      size: 1024,
+      digest: `sha256:${SHA256}`,
+      browser_download_url: `https://github.com/${REPO}/releases/download/${tag}/${name}`,
+    }],
+  };
+  const stableResult = await checkForUpdate({
+    currentVersion: '1.0.0',
+    fetchImpl: async (url) => ({ ok: true, status: 200, url, json: async () => stableRelease }),
+  });
+  assert.equal(stableResult.available, true);
+  assert.equal(stableResult.checkFailed, false);
+  assert.equal(stableResult.htmlUrl, stableRelease.html_url);
+
+  const invalidTrackRelease = makeRelease();
+  invalidTrackRelease.assets[0].digest = undefined;
+  const trackResult = await checkForTrackUpdate({
+    currentVersion: '1.0.0',
+    track: 'nightly',
+    fetchImpl: async (url) => ({ ok: true, status: 200, url, json: async () => [invalidTrackRelease] }),
+  });
+  assert.equal(trackResult.available, false);
+  assert.equal(trackResult.checkFailed, true);
+  assert.match(trackResult.error ?? '', /SHA-256 digest/);
+
+  const redirectedStable = await checkForUpdate({
+    currentVersion: '1.0.0',
+    fetchImpl: async () => ({ ok: true, status: 200, url: 'https://evil.example/releases/latest', json: async () => stableRelease }),
+  });
+  assert.equal(redirectedStable.available, false);
+  assert.equal(redirectedStable.checkFailed, true);
+
+  const stableCalls = [];
+  const customStable = await checkForUpdate({
+    currentVersion: '1.0.0',
+    releasesApiUrl: 'https://evil.example/releases/latest',
+    fetchImpl: async (url) => {
+      stableCalls.push(url);
+      return { ok: true, status: 200, url, json: async () => stableRelease };
+    },
+  });
+  assert.equal(customStable.available, false);
+  assert.equal(customStable.checkFailed, true);
+  assert.deepEqual(stableCalls, []);
+
+  assert.equal(UPDATE_RELEASES_API, `https://api.github.com/repos/${REPO}/releases/latest`);
+  assert.equal(UPDATE_RELEASES_LIST_API, `https://api.github.com/repos/${REPO}/releases?per_page=20`);
 });
