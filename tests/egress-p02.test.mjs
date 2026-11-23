@@ -331,7 +331,7 @@ test('egress: curl and wget value-taking options do not become bare URL targets'
       'https://public.example/x',
   );
   assert.deepEqual(
-    curlTargets.map((target) => target.host),
+    curlTargets.map((target) => target.host).sort(),
     ['127.0.0.1', '2001:db8::53', 'public.example'],
     'explicit DNS server IPs are network targets, not discarded option values',
   );
@@ -344,7 +344,7 @@ test('egress: curl and wget value-taking options do not become bare URL targets'
       'https://public.example/x',
   );
   assert.deepEqual(
-    wgetTargets.map((target) => target.host),
+    wgetTargets.map((target) => target.host).sort(),
     ['10.0.0.53', 'public.example'],
     'explicit Wget DNS server IP is also an egress target',
   );
