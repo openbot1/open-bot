@@ -323,6 +323,40 @@ test('egress: extractNetworkTargets bắt host trần làm operand curl/wget, b�
   );
 });
 
+test('egress: curl and wget value-taking options do not become bare URL targets', () => {
+  const curlTargets = extractNetworkTargets(
+    'curl --dns-servers 127.0.0.1 --tlspassword intranet.local ' +
+      '--mail-from sender@intranet.local --etag-save etag.intranet.local ' +
+      '--ciphers cipher.intranet.local --engine engine.intranet.local ' +
+      'https://public.example/x',
+  );
+  assert.deepEqual(
+    curlTargets.map((target) => target.host),
+    ['public.example'],
+  );
+
+  const wgetTargets = extractNetworkTargets(
+    'wget --input-file intranet.local --execute intranet.local ' +
+      '--domains intranet.local --exclude-domains intranet.local ' +
+      '--accept intranet.local --reject intranet.local ' +
+      '--include-directories intranet.local --exclude-directories intranet.local ' +
+      'https://public.example/x',
+  );
+  assert.deepEqual(
+    wgetTargets.map((target) => target.host),
+    ['public.example'],
+  );
+
+  const socksTargets = extractNetworkTargets(
+    'curl --socks5 proxy.intranet.local:1080 https://public.example/x',
+  );
+  assert.deepEqual(
+    socksTargets.map((target) => target.host).sort(),
+    ['proxy.intranet.local', 'public.example'],
+    'SOCKS proxy endpoints remain egress targets',
+  );
+});
+
 test('egress: curl --noproxy "*" does not create a wildcard host target and keeps loopback allowed', async () => {
   const command = "curl --noproxy '*' http://127.0.0.1:43123/hello";
   const targets = extractNetworkTargets(command);

@@ -310,6 +310,7 @@ const CURL_OPTIONS_WITH_VALUE = new Set([
   '-e', '--referer',
   '-E', '--cert', '--cert-type',
   '-F', '--form', '--form-string',
+  '--expand-data', '--expand-url', '--expand-variable',
   '-H', '--header',
   '-K', '--config',
   '-m', '--max-time', '--connect-timeout', '--max-redirs', '--retry', '--retry-delay',
@@ -336,7 +337,7 @@ const CURL_OPTIONS_WITH_VALUE = new Set([
   '--ftp-account', '--ftp-alternative-to-user', '--ftp-method', '--ftp-ssl-ccc-mode',
   '--happy-eyeballs-timeout-ms', '--haproxy-clientip',
   '--hostpubmd5', '--hostpubsha256', '--hsts',
-  '--interface', '--ip-tos', '--ipfs-gateway',
+  '--interface', '--ip-tos', '--ipfs-gateway', '--json',
   '--keepalive-cnt', '--keepalive-time',
   '--key', '--key-type', '--knownhosts', '--krb',
   '--libcurl', '--limit-rate', '--local-port', '--login-options',
@@ -401,7 +402,7 @@ const WGET_OPTIONS_WITH_VALUE = new Set([
   '--quota', '--random-file', '--read-timeout', '--referer',
   '--regex-type', '--reject-regex', '--remote-encoding',
   '--restrict-file-names', '--save-cookies', '--secure-protocol',
-  '--timeout', '--tries', '--use-askpass', '--user',
+  '--timeout', '--tries', '--user',
   '--wait', '--waitretry',
 ]);
 
