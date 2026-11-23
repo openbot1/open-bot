@@ -28,8 +28,8 @@ test('main process retains dedicated webhook store status separately from the pr
 
 test('webhook-key create and rotate obtain one-write consent from the relevant store state', () => {
   assert.ok(MAIN.includes('const webhookStorageStatus = getWebhookKeyStorageStatusForConsent();'));
-  assert.ok(MAIN.includes("'automation webhook signing key',\\n      webhookStorageStatus,"));
-  assert.ok(MAIN.includes("'rotated automation webhook signing key',\\n      webhookStorageStatus,"));
+  assert.ok(MAIN.includes("'automation webhook signing key',\n      webhookStorageStatus,"));
+  assert.ok(MAIN.includes("'rotated automation webhook signing key',\n      webhookStorageStatus,"));
   assert.ok(MAIN.includes('return createAutomationWebhookKey(webhookKeyStores(allowLocalFallback), id, { allowLocalFallback });'));
   assert.ok(MAIN.includes('return rotateAutomationWebhookKey(webhookKeyStores(allowLocalFallback), id, { allowLocalFallback });'));
   assert.ok(MAIN.includes("storageStatus: 'available' | 'degraded' | 'unavailable' = vaultStorageStatus"));
@@ -49,7 +49,7 @@ test('declined degraded fallback consent is rejected before either webhook store
   ];
   for (const handler of handlers) {
     const guard = handler.indexOf("if (webhookStorageStatus === 'degraded' && !allowLocalFallback)");
-    const storeOpen = handler.indexOf('webhookKeyStores()');
+    const storeOpen = handler.indexOf('webhookKeyStores(');
     assert.ok(guard >= 0, 'degraded + declined consent must be rejected explicitly');
     assert.ok(storeOpen > guard, 'the store factory must not run before the consent guard');
     assert.ok(handler.includes("throw new Error('Đã huỷ lưu secret: LocalEncryptor fallback cần xác nhận riêng cho từng lần lưu.')"));
