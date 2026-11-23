@@ -29,6 +29,8 @@
  * `validateAppHtml` cua apps.ts truoc khi render.
  */
 
+import { APP_VERSION } from '../appVersion';
+
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -38,7 +40,7 @@ export const MCP_APPS_V112_FILE = 'mcp-apps-v112.json';
 /** So app toi da trong catalogue (chan catalogue phong vo han). */
 export const MCP_APPS_V112_MAX_CATALOGUE = 64;
 /** Version host hien tai cua open-bot (dung de kiem tra tuong thich). */
-export const MCP_APPS_V112_HOST_VERSION = '0.2.0';
+export const MCP_APPS_V112_HOST_VERSION = APP_VERSION;
 
 /** Quyen mot MCP app co the xin. */
 export type McpAppV112Permission =

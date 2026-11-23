@@ -46,6 +46,7 @@
 import * as path from 'node:path';
 import type { Tool } from '@open-bot/core';
 import {
+  APP_VERSION,
   AUTOMATION_V2_TRIGGER_KINDS,
   COMPOSIO_V112_MOCK_TOOLKITS,
   DEFAULT_FLEET_V9_HOST_CAPACITY,
@@ -678,7 +679,7 @@ export function createFleetV9Tools(
         query: { type: 'string', description: 'Search text (name/description/tags, empty = all).' },
         category: { type: 'string', enum: [...MCP_APP_V112_CATEGORIES], description: 'Filter by category.' },
         onlyCompatible: { type: 'boolean', description: 'Only show apps compatible with this host (default false).' },
-        hostVersion: { type: 'string', description: 'Host version for compatibility (default 0.2.0).' },
+        hostVersion: { type: 'string', description: `Host version for compatibility (default ${APP_VERSION}).` },
         grantedPermissions: { type: 'array', items: { type: 'string' }, description: 'Permissions the host grants (default read-files, clipboard, notifications).' },
         allowNetwork: { type: 'boolean', description: 'Whether the host allows app network access (default false).' },
         sandboxStrict: { type: 'boolean', description: 'Whether the host sandbox is strict (default true).' },
@@ -721,7 +722,7 @@ export function createFleetV9Tools(
       'Install one MCP App v112 from the catalogue. Refuses incompatible apps (fail-closed). State is saved to <userData>/mcp-apps-v112.json. Needs approval; needs the fleet tools wired.',
       {
         appId: { type: 'string', description: 'App id from the catalogue, e.g. kanban-board.' },
-        hostVersion: { type: 'string', description: 'Host version for compatibility (default 0.2.0).' },
+        hostVersion: { type: 'string', description: `Host version for compatibility (default ${APP_VERSION}).` },
         grantedPermissions: { type: 'array', items: { type: 'string' }, description: 'Permissions the host grants.' },
         allowNetwork: { type: 'boolean', description: 'Whether the host allows app network access (default false).' },
         sandboxStrict: { type: 'boolean', description: 'Whether the host sandbox is strict (default true).' },

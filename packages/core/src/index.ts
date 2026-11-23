@@ -5,6 +5,8 @@
 
 export type * from './types';
 
+export { APP_VERSION } from './appVersion';
+
 export {
   createProvider,
   PROVIDERS,

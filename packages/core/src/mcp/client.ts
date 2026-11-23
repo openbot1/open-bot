@@ -51,6 +51,8 @@
  *    đếm retry, tool call idle 120s / tổng 60 phút, lỗi kết nối stdio
  *    không retry (đánh dấu `McpError.nonRetryable`).
  */
+import { APP_VERSION } from '../appVersion';
+
 import { randomUUID } from 'node:crypto';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { McpDispatcher } from './dispatcher';
@@ -107,7 +109,7 @@ export const MCP_PROTOCOL_VERSIONS_SUPPORTED: readonly string[] = [
   '2024-11-05',
 ];
 export const MCP_CLIENT_NAME = 'open-bot';
-export const MCP_CLIENT_VERSION = '0.2.0';
+export const MCP_CLIENT_VERSION = APP_VERSION;
 export const MCP_REQUEST_TIMEOUT_MS = 30_000;
 
 // ---------------------------------------------------------------------------
