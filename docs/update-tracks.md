@@ -54,8 +54,9 @@ nào được phát hành thật** (kể cả kênh stable). Hệ quả:
    và chọn prerelease có channel identifier chính xác ở đầu đoạn
    prerelease; sau đó kiểm tra metadata feed-to-artifact trước khi báo
    có bản mới: canonical release/download URLs thuộc đúng repo/tag,
-   release đã publish, installer asset thuộc một trong các target
-   AppImage/DMG/NSIS EXE, state `uploaded`, kích thước dương và digest
+   release đã publish, đủ cả ba installer target cấu hình (Linux
+   AppImage, macOS DMG, Windows NSIS EXE), state `uploaded`, kích thước
+   dương và digest
    SHA-256 hợp lệ do GitHub API cung cấp.
    Lưu ý: digest là metadata do cùng GitHub feed trả về; việc này không
    tải file để tính lại hash, không xác minh code signature/Authenticode,
