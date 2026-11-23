@@ -1,20 +1,23 @@
 # Build, testing and production verification
 
-Cập nhật: 23/11/2026, 20:00 +07. Yêu cầu runtime/build: Node.js 24+ và npm.
+Cập nhật: 24/11/2026, 06:01 +07. Yêu cầu runtime/build: Node.js 24+ và npm.
 
-## Snapshot production được maintainer xác nhận
+## Snapshot production và kết quả kiểm thử
 
-- Snapshot local `main` `1fb2cded` được kiểm thử full suite ngày 23/11/2026 từ 19:03 đến 19:33 +07; land commit được tạo lúc 19:34 +07. Mốc 20:00 +07 là thời điểm viết báo cáo, không phải thời gian chạy suite.
-- Full suite trên đúng local SHA đó: **12,804 passed / 0 failed / 19 skipped** (12,823 test cases được runner báo cáo). Điều kiện bắt buộc để land: **0 test fail** trên đúng head SHA được kiểm chứng. Báo cáo skip riêng, xem xét lý do và không tính skip là pass.
-- Public GitHub `main` vẫn là `f17b8675ed5a5415894ca47ad42096e240489fa5`; snapshot local mới hơn đang chờ phê duyệt push. Local main hiện đã land PR #27 tại `cdd9a5f5` và PR #28 tại `8522ce7b`; cả hai chưa được đưa lên public GitHub `main`. Kết quả trên là báo cáo từ maintainer local, **không phải** test do tác giả tài liệu chạy hoặc CI xác nhận trên remote `main`.
-- Khi kiểm chứng/land, luôn lấy SHA thực tế từ PR head và xác nhận đúng base. Không tái sử dụng test count từ một SHA khác hoặc suy ra remote đã có các commit local chưa push.
+- Local main hiện tại tại thời điểm cập nhật (24/11/2026, 06:01 +07): **`1fe41d25`**. Các PR #28 (`8522ce7b`), #30 (`1fe41d25`), #32 (`5c8eac59`) và #33 (`bcfa06c1`) đã land trên local main.
+- Maintainer xác nhận `npm run build` và `npm run typecheck` trên snapshot hiện tại đã exit 0. Full suite cho `1fe41d25` vẫn đang chạy tại mốc ghi tài liệu; **chưa có summary cuối cùng**, nên không ghi pass/fail hoặc dùng lại số test từ SHA khác.
+- Snapshot push mới vẫn chờ phê duyệt. Approval `709d77cc` tạo lúc 21:32 +07 ngày 23/11 gắn với manifest cũ, không phải quyền duyệt snapshot `1fe41d25`. Public GitHub `main` vẫn ở `f17b8675ed5a5415894ca47ad42096e240489fa5`; không suy ra các commit local đã có trên remote.
+- Kết quả lịch sử gần nhất đã có summary đầy đủ: local SHA `1fb2cded`, chạy ngày 23/11/2026 từ 19:03 đến 19:33 +07; land commit tạo lúc 19:34 +07. Full suite trên đúng SHA đó: **12,804 passed / 0 failed / 19 skipped** (12,823 cases). Đây là kết quả của snapshot cũ, không phải kết quả cho `1fe41d25`.
+- Muse báo cáo PR #29 v3 đã xác minh độc lập: fail-before 0/7 → pass-after 7/7, probe 27/27, tests vùng chạm 145/145; 0 blocker và LAND-READY. Đây là kết quả maintainer cung cấp, không phải test do tác giả tài liệu này chạy. Chờ xác nhận trạng thái land riêng.
+- Điều kiện bắt buộc để land vẫn là **0 test fail trên đúng head SHA**. Báo cáo skip riêng, xem xét lý do và không tính skip là pass.
+
 
 ## Single source of truth — app version
 
 - Trường `version` trong root `package.json` là **nguồn version sản phẩm duy nhất** và là nơi duy nhất được sửa khi đổi release version.
 - Version trong `apps/*/package.json`, `packages/*/package.json` và các workspace entries của `package-lock.json` là generated/synchronized npm metadata mirrors, không phải nguồn version độc lập.
 - Chạy `npm run version:sync` để đồng bộ metadata; `npm run version:check` phải pass trước khi release/tag.
-- PR #30 chuẩn hóa runtime consumers qua các generated `APP_VERSION` modules lấy từ root version. PR #30 đang chờ Muse xác minh độc lập; sau khi land, không tạo thêm literal product-version ở runtime và không sửa generated module thủ công.
+- PR #30 chuẩn hóa runtime consumers qua các generated `APP_VERSION` modules lấy từ root version và đã land trên local main tại `1fe41d25`. Sau thay đổi này, không tạo thêm literal product-version ở runtime và không sửa generated module thủ công. Public GitHub `main` chưa có commit local này cho tới khi snapshot được đẩy.
 
 ```bash
 npm run version:sync
@@ -27,14 +30,14 @@ Các lát cắt production-hardening đã/đang được xử lý gồm:
 
 1. IPC sender validation — xác thực sender tại ranh giới IPC.
 2. Egress/SSRF — giới hạn network egress và nhận diện đích bare `curl`/`wget`.
-3. Vault fallback — hiển thị/trạng thái lưu trữ fallback dành riêng cho webhook key; PR #29 đang chờ Muse xác minh.
+3. Vault fallback — hiển thị/trạng thái lưu trữ fallback dành riêng cho webhook key; PR #29 v3 đã được Muse xác minh độc lập, 0 blocker và LAND-READY (local landing theo dõi riêng).
 4. MCP config-file permissions — siết quyền file cấu hình; PR #27 đã landed trên local main `cdd9a5f5`, đang chờ push snapshot lên remote.
 5. Router local-model child environment — lọc child env; PR #28 đã landed trên local main `8522ce7b`, đang chờ push snapshot lên remote.
 6. Webhook approval-payload minimisation — chỉ phát các trường allowlist cần thiết ra webhook.
 7. Skills prompt-injection blocking — quét nội dung/metadata trước khi skill đi vào prompt.
 8. Plugin security disclosure — nêu rõ process riêng không phải OS sandbox và plugin vẫn có quyền của OS user hiện tại.
 
-PR #26 (bare curl/wget egress targets), #27 (MCP config permissions) và #28 (Router V2 child environment) đã landed trên local main; #27 landed tại `cdd9a5f5`, #28 tại `8522ce7b`. Cả #27/#28 đang chờ snapshot push được phê duyệt; public GitHub `main` vẫn `f17b8675`. PR #29/#30 vẫn pending independent Muse verification. Local main và public GitHub main hiện lệch nhau.
+PR #26 (bare curl/wget egress targets), #27 (MCP config permissions), #28 (Router V2 child environment), #30 (root version as single source), #32 (prerelease SemVer precedence) và #33 (native signing/notarization gate test-only) đã land trên local main; các SHA land hiện tại lần lượt được maintainer ghi nhận cho #28 `8522ce7b`, #30 `1fe41d25`, #32 `5c8eac59` và #33 `bcfa06c1`. Snapshot local chưa được đẩy; public GitHub `main` vẫn `f17b8675`. PR #29 v3 đã Muse xác minh LAND-READY; không còn ghi #30 là đang chờ xác minh. Local main và public GitHub main hiện lệch nhau.
 
 ## Cài đặt dependencies, build và typecheck
 
