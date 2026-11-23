@@ -58,12 +58,15 @@ test('release artifact metadata accepts official release URLs and uploaded SHA-2
   assert.equal(result.artifacts[0].sha256, SHA256);
 });
 
-test('release artifact metadata rejects a non-canonical release page or selected tag mismatch', () => {
+test('release artifact metadata rejects a non-canonical release page, malformed tag or selected tag mismatch', () => {
   assert.match(
     verifyGitHubReleaseArtifactMetadata(makeRelease({ html_url: 'https://evil.example/release' }), TAG).reason,
     /canonical repository URL/,
   );
   assert.match(verifyGitHubReleaseArtifactMetadata(makeRelease(), 'v9.9.9').reason, /does not match/);
+
+  const malformedTag = makeRelease({ tag_name: 'v1.2.3-nightly.01' });
+  assert.equal(verifyGitHubReleaseArtifactMetadata(malformedTag).verified, false);
 });
 
 test('release artifact metadata rejects off-repository, wrong-tag and query-bearing download URLs', () => {
@@ -135,6 +138,25 @@ test('stable and channel checkers gate availability on trusted release artifact 
   assert.equal(stableResult.available, true);
   assert.equal(stableResult.checkFailed, false);
   assert.equal(stableResult.htmlUrl, stableRelease.html_url);
+
+  const mismarkedPrerelease = {
+    ...stableRelease,
+    tag_name: 'v2.0.0-beta.1',
+    html_url: `https://github.com/${REPO}/releases/tag/v2.0.0-beta.1`,
+    assets: [{
+      name: 'open-bot-2.0.0-beta.1.AppImage',
+      state: 'uploaded',
+      size: 1024,
+      digest: `sha256:${SHA256}`,
+      browser_download_url: `https://github.com/${REPO}/releases/download/v2.0.0-beta.1/open-bot-2.0.0-beta.1.AppImage`,
+    }],
+  };
+  const stablePrereleaseResult = await checkForUpdate({
+    currentVersion: '1.0.0',
+    fetchImpl: async (url) => ({ ok: true, status: 200, url, json: async () => mismarkedPrerelease }),
+  });
+  assert.equal(stablePrereleaseResult.available, false);
+  assert.equal(stablePrereleaseResult.checkFailed, true);
 
   const invalidTrackRelease = makeRelease();
   invalidTrackRelease.assets[0].digest = undefined;
