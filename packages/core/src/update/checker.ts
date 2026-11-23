@@ -30,6 +30,7 @@
  * passes the global fetch. No network call is made when the caller
  * passes no fetch implementation and none exists globally.
  */
+import { verifyGitHubReleaseArtifactMetadata } from './artifactTrust';
 import type { UpdateTrack } from './tracks';
 
 export const UPDATE_REPO = 'openbot1/open-bot';
@@ -111,14 +112,27 @@ export async function checkForUpdate(opts: {
         return { ...base, checkFailed: true, error: `GitHub API lỗi: ${msg}` };
       }
       const tag = typeof data['tag_name'] === 'string' ? data['tag_name'] : null;
-      const htmlUrl = typeof data['html_url'] === 'string' ? data['html_url'] : null;
-      const latest = tag ? tag.replace(/^v/, '') : null;
+      if (!tag) {
+        return { ...base, checkFailed: true, error: 'Release stable thiếu tag_name hợp lệ.' };
+      }
+      if (data['prerelease'] !== false) {
+        return { ...base, checkFailed: true, error: 'Feed stable trỏ tới release không được xác nhận là stable.' };
+      }
+      const artifactTrust = verifyGitHubReleaseArtifactMetadata(data, tag);
+      if (!artifactTrust.verified || !artifactTrust.releaseUrl) {
+        return {
+          ...base,
+          checkFailed: true,
+          error: `Metadata release/artifact không hợp lệ: ${artifactTrust.reason ?? 'không xác định'}.`,
+        };
+      }
+      const latest = tag.replace(/^v/, '');
       return {
         ...base,
         latestVersion: latest,
         latestTag: tag,
-        htmlUrl,
-        available: latest !== null && compareSemver(latest, currentVersion) > 0,
+        htmlUrl: artifactTrust.releaseUrl,
+        available: compareSemver(latest, currentVersion) > 0,
       };
     } finally {
       clearTimeout(timer);
@@ -138,6 +152,9 @@ export interface GitHubReleaseSummary {
   tag_name: string;
   prerelease: boolean;
   html_url: string | null;
+  /** Raw trust-critical fields retained for validation before reporting availability. */
+  draft?: unknown;
+  assets?: unknown;
 }
 
 /**
@@ -173,17 +190,24 @@ function firstPrereleaseIdentifier(tagName: string): string | null {
  * identifier to equal the channel name.
  */
 export function releaseMatchesTrack(
-  release: { tag_name?: unknown; prerelease?: unknown },
+  release: { tag_name?: unknown; prerelease?: unknown; draft?: unknown },
   track: UpdateTrack,
 ): boolean {
   if (typeof release.tag_name !== 'string' || release.tag_name === '') return false;
+  if (release.draft === true) return false;
   if (track === 'stable') return release.prerelease === false;
   return release.prerelease === true && firstPrereleaseIdentifier(release.tag_name) === track;
 }
 
 /** First release of the track's channel in a newest-first list (null when none). */
 export function pickReleaseForTrack(
-  releases: ReadonlyArray<{ tag_name?: unknown; prerelease?: unknown; html_url?: unknown }>,
+  releases: ReadonlyArray<{
+    tag_name?: unknown;
+    prerelease?: unknown;
+    draft?: unknown;
+    html_url?: unknown;
+    assets?: unknown;
+  }>,
   track: UpdateTrack,
 ): GitHubReleaseSummary | null {
   for (const r of releases) {
@@ -192,6 +216,8 @@ export function pickReleaseForTrack(
       tag_name: r.tag_name as string,
       prerelease: r.prerelease === true,
       html_url: typeof r.html_url === 'string' ? r.html_url : null,
+      draft: r.draft,
+      assets: r.assets,
     };
   }
   return null;
@@ -251,12 +277,20 @@ export async function checkForTrackUpdate(opts: {
         // Honest "nothing published for this channel yet" — not an error.
         return base;
       }
+      const artifactTrust = verifyGitHubReleaseArtifactMetadata(picked, picked.tag_name);
+      if (!artifactTrust.verified || !artifactTrust.releaseUrl) {
+        return {
+          ...base,
+          checkFailed: true,
+          error: `Metadata release/artifact không hợp lệ: ${artifactTrust.reason ?? 'không xác định'}.`,
+        };
+      }
       const latest = picked.tag_name.replace(/^v/, '');
       return {
         ...base,
         latestVersion: latest,
         latestTag: picked.tag_name,
-        htmlUrl: picked.html_url,
+        htmlUrl: artifactTrust.releaseUrl,
         available: compareSemver(latest, currentVersion) > 0,
       };
     } finally {
