@@ -486,7 +486,7 @@ export interface OpenBotApi {
   importTeamApply(payload: { bundle: TeamBundleView; overwrite: boolean }): Promise<TeamImportApplyResultView>;
   // v0.4: Vault (key names only, never secret values) + usage.
   listVaultSecrets(): Promise<Record<string, string[]>>;
-  getVaultStorageStatus(): Promise<{ status: 'available' | 'degraded' | 'unavailable'; backend: 'os-keychain' | 'local-fallback' | 'unavailable'; canWrite: boolean; canWriteWithConsent: boolean; consentRequired: boolean }>;
+  getVaultStorageStatus(): Promise<{ status: 'available' | 'degraded' | 'unavailable'; backend: 'os-keychain' | 'local-fallback' | 'unavailable'; canWrite: boolean; canWriteWithConsent: boolean; consentRequired: boolean; webhookKeyStore: { status: 'available' | 'degraded' | 'unavailable'; backend: 'os-keychain' | 'local-fallback' | 'unavailable'; canWrite: boolean; canWriteWithConsent: boolean; consentRequired: boolean } | null }>;
   setVaultSecret(namespace: string, key: string, value: string, opts?: { allowLocalFallback?: boolean }): Promise<boolean>;
   deleteVaultSecret(namespace: string, key: string): Promise<boolean>;
   getUsage(botId?: string): Promise<unknown>;
@@ -1022,7 +1022,7 @@ export interface OpenBotApi {
   listServiceAccounts(): Promise<ServiceAccountView[]>;
   createServiceAccount(payload: { name: string; scope: string; allowLocalFallback?: boolean }): Promise<ServiceAccountView>;
   deleteServiceAccount(id: string): Promise<boolean>;
-  getVaultStorageStatus(): Promise<{ status: 'available' | 'degraded' | 'unavailable'; backend: 'os-keychain' | 'local-fallback' | 'unavailable'; canWrite: boolean; canWriteWithConsent: boolean; consentRequired: boolean }>;
+  getVaultStorageStatus(): Promise<{ status: 'available' | 'degraded' | 'unavailable'; backend: 'os-keychain' | 'local-fallback' | 'unavailable'; canWrite: boolean; canWriteWithConsent: boolean; consentRequired: boolean; webhookKeyStore: { status: 'available' | 'degraded' | 'unavailable'; backend: 'os-keychain' | 'local-fallback' | 'unavailable'; canWrite: boolean; canWriteWithConsent: boolean; consentRequired: boolean } | null }>;
   getVaultNoStorage(): Promise<{ enabled: boolean; pendingSecrets: number }>;
   setVaultNoStorage(
     enabled: boolean,

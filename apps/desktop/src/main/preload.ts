@@ -1414,7 +1414,7 @@ export interface OpenBotApi {
   listChannelMessages: (payload: { channelId: string; limit?: number }) => Promise<ChannelMessage[]>;
   // v0.4: Vault (chỉ tên key, không bao giờ trả secret) + Usage.
   listVaultSecrets: () => Promise<Record<string, string[]>>;
-  getVaultStorageStatus: () => Promise<{ status: 'available' | 'degraded' | 'unavailable'; backend: 'os-keychain' | 'local-fallback' | 'unavailable'; canWrite: boolean; canWriteWithConsent: boolean; consentRequired: boolean }>;
+  getVaultStorageStatus: () => Promise<{ status: 'available' | 'degraded' | 'unavailable'; backend: 'os-keychain' | 'local-fallback' | 'unavailable'; canWrite: boolean; canWriteWithConsent: boolean; consentRequired: boolean; webhookKeyStore: { status: 'available' | 'degraded' | 'unavailable'; backend: 'os-keychain' | 'local-fallback' | 'unavailable'; canWrite: boolean; canWriteWithConsent: boolean; consentRequired: boolean } | null }>;
   setVaultSecret: (namespace: string, key: string, value: string, opts?: { allowLocalFallback?: boolean }) => Promise<boolean>;
   deleteVaultSecret: (namespace: string, key: string) => Promise<boolean>;
   getUsage: (botId?: string) => Promise<unknown>;
@@ -2019,7 +2019,7 @@ export interface OpenBotApi {
   setBotQuota: (payload: { botId: string; cpuCoresMax: number; ramBytesMax: number; diskBytesMax: number; warnPercent?: number; enabled?: boolean }) => Promise<BotQuota>;
   removeBotQuota: (id: string) => Promise<{ removed: boolean }>;
   listQuotaAlerts: () => Promise<QuotaAlert[]>;
-  'vault:get-storage-status'(): Promise<{ status: 'available' | 'degraded' | 'unavailable'; backend: 'os-keychain' | 'local-fallback' | 'unavailable'; canWrite: boolean; canWriteWithConsent: boolean; consentRequired: boolean }>;
+  'vault:get-storage-status'(): Promise<{ status: 'available' | 'degraded' | 'unavailable'; backend: 'os-keychain' | 'local-fallback' | 'unavailable'; canWrite: boolean; canWriteWithConsent: boolean; consentRequired: boolean; webhookKeyStore: { status: 'available' | 'degraded' | 'unavailable'; backend: 'os-keychain' | 'local-fallback' | 'unavailable'; canWrite: boolean; canWriteWithConsent: boolean; consentRequired: boolean } | null }>;
   'vault:get-nostorage'(): Promise<{ enabled: boolean; pendingSecrets: number }>;
   // v0.15 (L5 audit): opts.discardTemporarySecrets = true để xoá
   // secret tạm thay vì flush khi tắt NO_STORAGE. Trả về số secret
