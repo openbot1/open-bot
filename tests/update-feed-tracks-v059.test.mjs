@@ -50,26 +50,26 @@ function fakeFeedFetch(releases, { ok = true, status = 200 } = {}) {
   return { fn, calls };
 }
 
-const STABLE_RELEASE = {
-  tag_name: 'v0.58.0',
-  prerelease: false,
-  html_url: 'https://example.invalid/releases/v0.58.0',
-};
-const DOGFOOD_RELEASE = {
-  tag_name: 'v0.59.0-dogfood.1',
-  prerelease: true,
-  html_url: 'https://example.invalid/releases/v0.59.0-dogfood.1',
-};
-const NIGHTLY_RELEASE = {
-  tag_name: 'v0.59.0-nightly.20261109',
-  prerelease: true,
-  html_url: 'https://example.invalid/releases/v0.59.0-nightly.20261109',
-};
-const LAB_OLD_RELEASE = {
-  tag_name: 'v0.49.0-lab.1',
-  prerelease: true,
-  html_url: 'https://example.invalid/releases/v0.49.0-lab.1',
-};
+function makeRelease(tag_name, prerelease) {
+  const name = `open-bot-${tag_name}.AppImage`;
+  return {
+    tag_name,
+    draft: false,
+    prerelease,
+    html_url: `https://github.com/openbot1/open-bot/releases/tag/${tag_name}`,
+    assets: [{
+      name,
+      state: 'uploaded',
+      size: 1024,
+      digest: `sha256:${'a'.repeat(64)}`,
+      browser_download_url: `https://github.com/openbot1/open-bot/releases/download/${tag_name}/${name}`,
+    }],
+  };
+}
+const STABLE_RELEASE = makeRelease('v0.58.0', false);
+const DOGFOOD_RELEASE = makeRelease('v0.59.0-dogfood.1', true);
+const NIGHTLY_RELEASE = makeRelease('v0.59.0-nightly.20261109', true);
+const LAB_OLD_RELEASE = makeRelease('v0.49.0-lab.1', true);
 
 const FEED_ALL = [DOGFOOD_RELEASE, NIGHTLY_RELEASE, STABLE_RELEASE, LAB_OLD_RELEASE];
 
@@ -92,7 +92,7 @@ test('v0.59 feed: releaseMatchesTrack / pickReleaseForTrack chọn đúng kênh 
   assert.equal(releaseMatchesTrack({ tag_name: 'v0.59.0-nightly.01', prerelease: true }, 'nightly'), false);
   assert.equal(releaseMatchesTrack({ tag_name: 'v0.59.0-NIGHTLY.20261109+build.1', prerelease: true }, 'nightly'), true);
   assert.equal(releaseMatchesTrack({ tag_name: 'v0.59.0-nightly', prerelease: true }, 'nightly'), true);
-  const spoofedNightly = { tag_name: 'v0.60.0-not-nightly.1', prerelease: true, html_url: 'https://example.invalid/spoof' };
+  const spoofedNightly = { tag_name: 'v0.60.0-not-nightly.1', draft: false, prerelease: true, html_url: 'https://github.com/openbot1/open-bot/releases/tag/v0.60.0-not-nightly.1', assets: [] };
   assert.equal(pickReleaseForTrack([spoofedNightly, NIGHTLY_RELEASE], 'nightly')?.tag_name, NIGHTLY_RELEASE.tag_name);
 
   assert.equal(pickReleaseForTrack(FEED_ALL, 'dogfood')?.tag_name, 'v0.59.0-dogfood.1');
@@ -116,7 +116,7 @@ test('v0.59 feed: feed giả có bản mới hơn cho kênh → báo có mới, 
   assert.equal(res.available, true);
   assert.equal(res.latestVersion, '0.59.0-dogfood.1', 'latestVersion keeps the channel suffix (tag minus v, like stable)');
   assert.equal(res.latestTag, 'v0.59.0-dogfood.1');
-  assert.equal(res.htmlUrl, 'https://example.invalid/releases/v0.59.0-dogfood.1');
+  assert.equal(res.htmlUrl, 'https://github.com/openbot1/open-bot/releases/tag/v0.59.0-dogfood.1');
   assert.equal(res.checkFailed, false);
   assert.deepEqual(feed.calls, [UPDATE_RELEASES_LIST_API]);
 });
