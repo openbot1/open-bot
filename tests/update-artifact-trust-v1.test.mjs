@@ -100,11 +100,16 @@ test('release artifact metadata fails closed for draft, pending, zero-size or du
   assert.match(verifyGitHubReleaseArtifactMetadata(duplicate, TAG).reason, /duplicate/);
 });
 
-test('release artifact metadata requires at least one supported installer and never treats same-feed digest as signature proof', () => {
-  const release = makeRelease({ assets: [{ name: 'latest.yml', state: 'uploaded', size: 10, digest: `sha256:${SHA256}` }] });
-  const result = verifyGitHubReleaseArtifactMetadata(release, TAG);
-  assert.equal(result.verified, false);
-  assert.match(result.reason, /no supported desktop installer/);
+test('release artifact metadata requires all configured platforms and never treats same-feed digest as signature proof', () => {
+  const noInstallers = makeRelease({ assets: [{ name: 'latest.yml', state: 'uploaded', size: 10, digest: `sha256:${SHA256}` }] });
+  const noInstallersResult = verifyGitHubReleaseArtifactMetadata(noInstallers, TAG);
+  assert.equal(noInstallersResult.verified, false);
+  assert.match(noInstallersResult.reason, /no supported desktop installer/);
+
+  const partial = makeRelease({ assets: [makeRelease().assets[0]] });
+  const partialResult = verifyGitHubReleaseArtifactMetadata(partial, TAG);
+  assert.equal(partialResult.verified, false);
+  assert.match(partialResult.reason, /missing required desktop installer platforms: macos, windows/);
 });
 
 test('stable and channel checkers gate availability on trusted release artifact metadata', async () => {
