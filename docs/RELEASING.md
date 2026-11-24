@@ -157,6 +157,31 @@ References: [Apple code-signature verification and Gatekeeper assessment](https:
 
 For each candidate version, copy [`docs/RELEASE-APPROVAL-RECORD.md`](RELEASE-APPROVAL-RECORD.md) into the release evidence bundle or approval issue and fill it using the exact source commit and final uploaded files. The record captures the build/test gate, per-artifact hashes, native signing/notarization evidence, GitHub asset state and independent uploaded-file comparison. Do not put certificate files, passwords, API keys or other secrets in the record. Keep the GitHub Release in draft until every required row is complete and approved.
 
+
+### Reconcile the exact uploaded bytes
+
+After all platform artifacts have been built and uploaded to the **draft** GitHub Release, compare three independent values for every installer: the local final-file SHA-256, the SHA-256 of the independently downloaded release asset, and the digest returned by the GitHub Releases API. The helper below performs that byte comparison without publishing the release or changing any files.
+
+Stage only the exact final installer files in `artifacts/local`. Download the uploaded assets separately into `artifacts/uploaded`, and save the authenticated API response for the same tag:
+
+```bash
+TAG=v1.2.3  # replace with the exact tag being verified
+mkdir -p artifacts/local artifacts/uploaded
+gh api "repos/openbot1/open-bot/releases/tags/$TAG" > artifacts/release.json
+gh release download "$TAG" --repo openbot1/open-bot --dir artifacts/uploaded
+node scripts/verify-release-assets.mjs artifacts/release.json artifacts/local artifacts/uploaded
+```
+
+The helper requires the Release to remain a draft, requires uploaded assets for Linux AppImage, macOS DMG and Windows NSIS (including any additional architecture-specific installers), and checks each matching filename, API size, canonical download URL and SHA-256 digest. A success means the local and independently downloaded bytes match the GitHub API digest for every configured installer. It does **not** establish publisher identity or replace native macOS code-signature/Gatekeeper/notarization checks or Windows Authenticode verification. It also does not make the GitHub API digest an independent trust anchor: the downloaded-file hash comparison is essential.
+
+Run the regression test with:
+
+```bash
+node --test tests/release-asset-bytes-v1.test.mjs
+```
+
+Keep the Release in draft if the helper fails, any platform asset is missing, or any local file has changed since the native verification step. The helper is a local maintainer gate; it does not run signing, notarization, upload or publication.
+
 ## Release order
 
 1. Merge the release-gate and other approved hardening work only after the independent checks described in `docs/TESTING.md` are green on the intended source snapshot.
