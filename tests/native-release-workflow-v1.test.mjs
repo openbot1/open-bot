@@ -17,7 +17,7 @@ test('native release workflow is manual-only and restricted to the default branc
 
 test('release input is bound to the root product version and an immutable full source SHA', () => {
   assert.ok(WORKFLOW.includes('refs/tags/${{ inputs.release_tag }}'));
-  assert.ok(WORKFLOW.includes("['git', 'describe', '--tags', '--exact-match', 'HEAD']"));
+  assert.ok(WORKFLOW.includes("['describe', '--tags', '--exact-match', 'HEAD']"));
   assert.ok(WORKFLOW.includes("join('\\\\.')"));
   assert.ok(WORKFLOW.includes('git describe'));
   assert.ok(WORKFLOW.includes('package.json'));
