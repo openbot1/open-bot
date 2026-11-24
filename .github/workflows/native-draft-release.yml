@@ -142,7 +142,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           RELEASE_TAG: ${{ inputs.release_tag }}
-        run: node --input-type=module <<'NODE'
+        run: |
+          node --input-type=module <<'NODE'
           const response = await fetch(
             `https://api.github.com/repos/openbot1/open-bot/releases/tags/${encodeURIComponent(process.env.RELEASE_TAG)}`,
             { headers: { Authorization: `Bearer ${process.env.GH_TOKEN}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' } },
@@ -215,7 +216,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           RELEASE_TAG: ${{ inputs.release_tag }}
-        run: node --input-type=module <<'NODE'
+        run: |
+          node --input-type=module <<'NODE'
           const response = await fetch(
             `https://api.github.com/repos/openbot1/open-bot/releases/tags/${encodeURIComponent(process.env.RELEASE_TAG)}`,
             { headers: { Authorization: `Bearer ${process.env.GH_TOKEN}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' } },
@@ -285,7 +287,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           RELEASE_TAG: ${{ inputs.release_tag }}
-        run: node --input-type=module <<'NODE'
+        run: |
+          node --input-type=module <<'NODE'
           const response = await fetch(
             `https://api.github.com/repos/openbot1/open-bot/releases/tags/${encodeURIComponent(process.env.RELEASE_TAG)}`,
             { headers: { Authorization: `Bearer ${process.env.GH_TOKEN}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' } },
