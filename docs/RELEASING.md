@@ -182,6 +182,23 @@ node --test tests/release-asset-bytes-v1.test.mjs
 
 Keep the Release in draft if the helper fails, any platform asset is missing, or any local file has changed since the native verification step. The helper is a local maintainer gate; it does not run signing, notarization, upload or publication.
 
+
+
+## Native draft release workflow (manual, one platform per run)
+
+After the exact source tag has passed the release gate, the maintainer can use the **Native draft release** GitHub Actions workflow to build and upload one platform at a time. The workflow is manual-only, must be dispatched from `main`, checks that the requested tag points to the exact checked-out commit and matches the root `package.json` version, then builds/tests on the native runner before calling the existing `release:mac`, `release:win` or `release:linux` command.
+
+Before enabling it, create a GitHub Environment named `release` and configure required reviewers / deployment protection. Store these values as **environment secrets**, never repository files:
+
+- All targets: `GH_TOKEN` with permission to create/update draft releases in `openbot1/open-bot`.
+- macOS: `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_API_KEY`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`.
+- Windows: `WIN_CSC_LINK`, `WIN_CSC_KEY_PASSWORD`.
+
+Run the workflow sequentially for `mac`, `win`, and `linux` using the same exact `release_tag`. A per-tag concurrency lock prevents overlapping upload jobs. Each job reruns version-check, build, typecheck, the full suite and platform tests on the tag's immutable commit SHA. It then confirms that the GitHub Release remains a draft and the target's installer assets are uploaded with positive sizes and SHA-256 metadata.
+
+The workflow does **not** publish the Release, does not replace the native artifact verification steps above, and does not make Linux AppImage signed. After all targets finish, complete the macOS Gatekeeper/notarization/stapler checks, Windows Authenticode publisher-identity check, Linux unsigned acknowledgement, and the local-vs-downloaded byte reconciliation step. Keep the Release in draft until the approval record is complete.
+
+
 ## Release order
 
 1. Merge the release-gate and other approved hardening work only after the independent checks described in `docs/TESTING.md` are green on the intended source snapshot.
