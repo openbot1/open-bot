@@ -97,6 +97,12 @@ test('release artifact byte gate rejects downloaded bytes that differ from the l
   await assert.rejects(verifyReleaseArtifacts(data), /Local and downloaded bytes differ/);
 });
 
+test('release artifact byte gate rejects malformed SemVer tags', async (t) => {
+  const data = fixture(t);
+  data.release.tag_name = 'v1.2.3-beta.01';
+  await assert.rejects(verifyReleaseArtifacts(data), /tag is missing or invalid/);
+});
+
 test('release artifact byte gate rejects unsafe names and non-canonical release metadata', async (t) => {
   const unsafe = fixture(t);
   unsafe.release.assets[0].name = '../escape.AppImage';
