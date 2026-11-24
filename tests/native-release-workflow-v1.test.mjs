@@ -54,5 +54,5 @@ test('release guide documents protected environment setup and manual target-by-t
   assert.ok(GUIDE.includes('Native draft release workflow'));
   assert.ok(GUIDE.includes('Environment named `release`'));
   assert.ok(GUIDE.includes('one platform per run'));
-  assert.ok(GUIDE.includes('never publishes the draft automatically'));
+  assert.ok(GUIDE.includes('never publishes the Release automatically'));
 });
