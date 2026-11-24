@@ -33,7 +33,7 @@ test('approval record keeps Linux unsigned and requires independent uploaded-byt
   assert.ok(TEMPLATE.includes('no publisher signature'));
   assert.ok(TEMPLATE.includes('independently download the uploaded file'));
   assert.ok(TEMPLATE.includes('GitHub API asset digest'));
-  assert.ok(TEMPLATE.includes('all three values must agree'));
+  assert.ok(TEMPLATE.includes('All three values must agree'));
 });
 
 test('approval record blocks publication when evidence is missing or verification fails', () => {
