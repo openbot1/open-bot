@@ -72,6 +72,21 @@ import {
 import { Vault } from '../packages/core/dist/vault/index.js';
 import { createApiServer } from '../packages/core/dist/api/server.js';
 
+function makeReleaseInstallerAssets(tag, digestSeed) {
+  const names = [
+    `open-bot-${tag}.AppImage`,
+    `open-bot-${tag}.dmg`,
+    `open-bot-${tag}-setup.exe`,
+  ];
+  return names.map((name, index) => ({
+    name,
+    state: 'uploaded',
+    size: 1024 * (index + 1),
+    digest: `sha256:${String.fromCharCode(digestSeed.charCodeAt(0) + index).repeat(64)}`,
+    browser_download_url: `https://github.com/openbot1/open-bot/releases/download/${tag}/${encodeURIComponent(name)}`,
+  }));
+}
+
 const tempDirs = [];
 function makeTempDir() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'open-bot-v07-test-'));
@@ -491,7 +506,10 @@ test('update: newer release is reported available with its download link', async
     status: 200,
     json: async () => ({
       tag_name: 'v0.7.0',
+      draft: false,
+      prerelease: false,
       html_url: 'https://github.com/openbot1/open-bot/releases/tag/v0.7.0',
+      assets: makeReleaseInstallerAssets('v0.7.0', 'a'),
     }),
   });
   const res = await checkForUpdate({ currentVersion: '0.2.0', fetchImpl: mockFetch });
@@ -505,7 +523,13 @@ test('update: newer release is reported available with its download link', async
 test('update: same or newer current version means no update; API failure is reported, not thrown', async () => {
   const sameFetch = async () => ({
     ok: true, status: 200,
-    json: async () => ({ tag_name: 'v0.2.0', html_url: 'https://example.invalid/r' }),
+    json: async () => ({
+      tag_name: 'v0.2.0',
+      draft: false,
+      prerelease: false,
+      html_url: 'https://github.com/openbot1/open-bot/releases/tag/v0.2.0',
+      assets: makeReleaseInstallerAssets('v0.2.0', 'b'),
+    }),
   });
   const same = await checkForUpdate({ currentVersion: '0.2.0', fetchImpl: sameFetch });
   assert.equal(same.available, false);

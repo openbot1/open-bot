@@ -13,6 +13,8 @@ export {
   UPDATE_RELEASES_LIST_API,
 } from './checker';
 export type { GitHubReleaseSummary, UpdateCheckResult, UpdateFetchLike } from './checker';
+export { verifyGitHubReleaseArtifactMetadata } from './artifactTrust';
+export type { ReleaseArtifactMetadataVerification, VerifiedReleaseArtifact } from './artifactTrust';
 
 // --- v0.54 (P1-9): update track + chính sách update_required / min_client_version ---
 export {
