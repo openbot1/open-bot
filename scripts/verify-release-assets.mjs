@@ -34,13 +34,26 @@ function assertSafeAssetName(name) {
     name.length > 200 ||
     name === '.' ||
     name === '..' ||
-    !/^[A-Za-z0-9][A-Za-z0-9._ +()\\-]{0,199}$/.test(name) ||
+    !/^[A-Za-z0-9][A-Za-z0-9._ +()-]{0,199}$/.test(name) ||
     name.includes('/') ||
     name.includes('\\')
   ) {
     throw new Error('Installer asset has an unsafe filename.');
   }
   return name;
+}
+
+function isValidReleaseTag(tag) {
+  const match =
+    /^v?(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$/.exec(
+      tag,
+    );
+  if (!match) return false;
+  const prerelease = match[4]?.split('.') ?? [];
+  return !prerelease.some(
+    (identifier) =>
+      /^[0-9]+$/.test(identifier) && identifier.length > 1 && identifier.startsWith('0'),
+  );
 }
 
 function assertDirectory(directory, label) {
@@ -91,11 +104,7 @@ export async function verifyReleaseArtifacts({ release, localDir, downloadedDir 
   }
 
   const tag = release.tag_name;
-  if (
-    typeof tag !== 'string' ||
-    tag.length > 128 ||
-    !/^v?(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$/.test(tag)
-  ) {
+  if (typeof tag !== 'string' || tag.length > 128 || !isValidReleaseTag(tag)) {
     throw new Error('Release tag is missing or invalid.');
   }
 
