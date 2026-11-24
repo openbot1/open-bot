@@ -1,0 +1,170 @@
+name: Sign Linux AppImage (Sigstore)
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing draft release tag (for example, v0.2.0)
+        required: true
+        type: string
+      appimage_asset:
+        description: Exact uploaded AppImage filename (for example, open-bot-0.2.0.AppImage)
+        required: true
+        type: string
+
+# Read-only by default. The signing job narrows and elevates only the scopes it needs.
+permissions:
+  contents: read
+
+jobs:
+  sign-linux-appimage:
+    if: github.ref == 'refs/heads/main'
+    name: Sign an existing draft AppImage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+    concurrency:
+      group: linux-appimage-cosign-${{ inputs.release_tag }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Validate the draft release and download the exact asset
+        id: artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          APPIMAGE_NAME: ${{ inputs.appimage_asset }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          fail() {
+            echo "::error::$1"
+            exit 1
+          }
+
+          # Match release-preflight.mjs: only version tags and the supported
+          # dogfood/nightly/lab tracks may receive a release signature.
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-(dogfood|nightly|lab)(\.[0-9A-Za-z.-]+)?)?$ ]]; then
+            fail "Release tag is not a supported version/channel tag."
+          fi
+          if [[ ! "$APPIMAGE_NAME" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,160}\.AppImage$ ]]; then
+            fail "AppImage filename contains unsupported characters or has the wrong extension."
+          fi
+
+          mkdir -p "$RUNNER_TEMP/open-bot-appimage"
+          release_json="$RUNNER_TEMP/open-bot-appimage/release-before.json"
+          gh api -H "Accept: application/vnd.github+json" \
+            "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$release_json"
+
+          jq -e --arg tag "$RELEASE_TAG" \
+            '.tag_name == $tag and .draft == true' "$release_json" >/dev/null \
+            || fail "The exact GitHub Release tag must exist and still be a draft."
+
+          asset_count="$(jq -r --arg name "$APPIMAGE_NAME" \
+            '[.assets[]? | select(.name == $name)] | length' "$release_json")"
+          [[ "$asset_count" == "1" ]] \
+            || fail "The draft release must contain exactly one asset with the requested filename."
+
+          asset_id="$(jq -r --arg name "$APPIMAGE_NAME" \
+            '.assets[] | select(.name == $name) | .id' "$release_json")"
+          asset_state="$(jq -r --arg name "$APPIMAGE_NAME" \
+            '.assets[] | select(.name == $name) | .state' "$release_json")"
+          asset_size="$(jq -r --arg name "$APPIMAGE_NAME" \
+            '.assets[] | select(.name == $name) | .size' "$release_json")"
+          asset_digest="$(jq -r --arg name "$APPIMAGE_NAME" \
+            '.assets[] | select(.name == $name) | .digest // empty' "$release_json")"
+          [[ "$asset_state" == "uploaded" ]] || fail "AppImage upload is not complete."
+          [[ "$asset_size" =~ ^[1-9][0-9]*$ ]] || fail "GitHub did not report a positive AppImage size."
+          [[ "$asset_digest" =~ ^sha256:[a-fA-F0-9]{64}$ ]] \
+            || fail "GitHub Release API has no valid SHA-256 digest for this AppImage."
+
+          bundle_name="${APPIMAGE_NAME}.sigstore.json"
+          bundle_count="$(jq -r --arg name "$bundle_name" \
+            '[.assets[]? | select(.name == $name)] | length' "$release_json")"
+          [[ "$bundle_count" == "0" ]] \
+            || fail "A Sigstore bundle with this filename already exists; refusing to overwrite release evidence."
+
+          appimage_path="$RUNNER_TEMP/open-bot-appimage/$APPIMAGE_NAME"
+          # The release-asset API endpoint returns the exact selected asset.
+          gh api -H "Accept: application/octet-stream" \
+            "repos/$GITHUB_REPOSITORY/releases/assets/$asset_id" > "$appimage_path"
+          [[ -s "$appimage_path" ]] || fail "Downloaded AppImage is empty."
+
+          actual_size="$(wc -c < "$appimage_path" | tr -d '[:space:]')"
+          [[ "$actual_size" == "$asset_size" ]] \
+            || fail "Downloaded byte count differs from the release API asset size."
+          actual_sha256="$(sha256sum "$appimage_path" | cut -d ' ' -f1)"
+          expected_sha256="${asset_digest#sha256:}"
+          [[ "$actual_sha256" == "$expected_sha256" ]] \
+            || fail "Downloaded AppImage SHA-256 differs from the GitHub Release API digest."
+
+          bundle_path="$RUNNER_TEMP/open-bot-appimage/$bundle_name"
+          {
+            echo "appimage_path=$appimage_path"
+            echo "bundle_path=$bundle_path"
+            echo "bundle_name=$bundle_name"
+            echo "sha256=$actual_sha256"
+          } >> "$GITHUB_OUTPUT"
+
+      # Pin both the installer action and the Cosign binary version.
+      - name: Install Cosign 3.1.4
+        uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22 # v4.1.0
+        with:
+          cosign-release: v3.1.4
+
+      - name: Sign and locally verify the AppImage bundle
+        id: signing
+        env:
+          APPIMAGE_PATH: ${{ steps.artifact.outputs.appimage_path }}
+          BUNDLE_PATH: ${{ steps.artifact.outputs.bundle_path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/sign-linux-appimage.yml@refs/heads/main"
+          cosign sign-blob --yes --bundle "$BUNDLE_PATH" "$APPIMAGE_PATH"
+          cosign verify-blob "$APPIMAGE_PATH" \
+            --bundle "$BUNDLE_PATH" \
+            --certificate-identity "$expected_identity" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+          echo "identity=$expected_identity" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the Sigstore bundle to the same draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          BUNDLE_PATH: ${{ steps.artifact.outputs.bundle_path }}
+          BUNDLE_NAME: ${{ steps.artifact.outputs.bundle_name }}
+          APPIMAGE_SHA256: ${{ steps.artifact.outputs.sha256 }}
+          SIGNER_IDENTITY: ${{ steps.signing.outputs.identity }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" "$BUNDLE_PATH" --repo "$GITHUB_REPOSITORY"
+
+          release_after="$RUNNER_TEMP/open-bot-appimage/release-after.json"
+          gh api -H "Accept: application/vnd.github+json" \
+            "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$release_after"
+          jq -e --arg tag "$RELEASE_TAG" --arg bundle "$BUNDLE_NAME" \
+            '.tag_name == $tag and .draft == true and
+             ([.assets[]? | select(.name == $bundle and .state == "uploaded" and
+               .size > 0 and (.digest | type == "string") and
+               (.digest | startswith("sha256:")))] | length == 1)' \
+            "$release_after" >/dev/null \
+            || {
+              echo "::error::Sigstore bundle was not confirmed on the still-draft release."
+              exit 1
+            }
+
+          {
+            echo "## Linux AppImage Sigstore signature"
+            echo
+            echo "- Release: `$RELEASE_TAG` (still draft; not published)"
+            echo "- AppImage: `$BUNDLE_NAME` (bundle is `$BUNDLE_NAME`)"
+            echo "- AppImage SHA-256: `$APPIMAGE_SHA256`"
+            echo "- Keyless signer identity: `$SIGNER_IDENTITY`"
+            echo "- Sigstore bundle uploaded and confirmed by GitHub Release API."
+          } >> "$GITHUB_STEP_SUMMARY"
