@@ -1,15 +1,16 @@
 # Build, testing and production verification
 
-Cập nhật: 24/11/2026, 06:01 +07. Yêu cầu runtime/build: Node.js 24+ và npm.
+Cập nhật: 24/11/2026, 08:01 +07. Yêu cầu runtime/build: Node.js 24+ và npm.
 
 ## Snapshot production và kết quả kiểm thử
 
-- Local main hiện tại tại thời điểm cập nhật (24/11/2026, 06:01 +07): **`1fe41d25`**. Các PR #28 (`8522ce7b`), #30 (`1fe41d25`), #32 (`5c8eac59`) và #33 (`bcfa06c1`) đã land trên local main.
-- Maintainer xác nhận `npm run build` và `npm run typecheck` trên snapshot hiện tại đã exit 0. Full suite cho `1fe41d25` vẫn đang chạy tại mốc ghi tài liệu; **chưa có summary cuối cùng**, nên không ghi pass/fail hoặc dùng lại số test từ SHA khác.
-- Snapshot push mới vẫn chờ phê duyệt. Approval `709d77cc` tạo lúc 21:32 +07 ngày 23/11 gắn với manifest cũ, không phải quyền duyệt snapshot `1fe41d25`. Public GitHub `main` vẫn ở `f17b8675ed5a5415894ca47ad42096e240489fa5`; không suy ra các commit local đã có trên remote.
-- Kết quả lịch sử gần nhất đã có summary đầy đủ: local SHA `1fb2cded`, chạy ngày 23/11/2026 từ 19:03 đến 19:33 +07; land commit tạo lúc 19:34 +07. Full suite trên đúng SHA đó: **12,804 passed / 0 failed / 19 skipped** (12,823 cases). Đây là kết quả của snapshot cũ, không phải kết quả cho `1fe41d25`.
-- Muse báo cáo PR #29 v3 đã xác minh độc lập: fail-before 0/7 → pass-after 7/7, probe 27/27, tests vùng chạm 145/145; 0 blocker và LAND-READY. Đây là kết quả maintainer cung cấp, không phải test do tác giả tài liệu này chạy. Chờ xác nhận trạng thái land riêng.
-- Điều kiện bắt buộc để land vẫn là **0 test fail trên đúng head SHA**. Báo cáo skip riêng, xem xét lý do và không tính skip là pass.
+- Local main hiện tại tại thời điểm cập nhật (24/11/2026, 08:01 +07): **`e38671d9`**. Các PR #28 (`8522ce7b`), #30 (`1fe41d25`), #32 (`5c8eac59`) và #33 (`bcfa06c1`) đã land trước đó; PR #29 v3 (head `0df9e0cd`) vừa land trong snapshot `e38671d9` với 8 file, +256/−27 và blob 8/8 khớp PR head.
+- Gate trên đúng snapshot `e38671d9`: `npm run build` và `npm run typecheck` exit 0; full suite lần đầu **12,824 passed / 3 failed / 19 skipped** (12,846 test). Ba fail đều là CDP timeout 120 giây trong `automations-seed-samples-v074-renderer`. Retest riêng file đó **3/3 passed**; cả 7 test mới của #29 cũng pass trong full suite. Vì runner full-suite lần đầu có 3 fail, trạng thái gate của `e38671d9` **không được gọi là xanh**; retest riêng không xóa kết quả fail của lần chạy full.
+- Gate của PR #30 trên SHA riêng `1fe41d25` đã xanh lúc 07:17 ngày 24/11/2026: **12,820 passed / 0 failed / 19 skipped**. Đây là kết quả trên SHA trước khi #29 land, không phải kết quả full suite của `e38671d9`.
+- Snapshot push vẫn bị chặn: public GitHub `main` ở `f17b8675ed5a5415894ca47ad42096e240489fa5`. Approval `709d77cc` tạo lúc 21:32 +07 ngày 23/11 đang chờ và gắn với manifest cũ. Maintainer đã rebuild manifest theo local main `e38671d9`: 41 file in-scope, loại 26 file drift; snapshot mới **chưa được đẩy**. Không suy ra commit local đã có trên public remote.
+- Muse xác nhận PR #29 v3 trước khi land: 0 blocker; fail-before 0/7 → pass-after 7/7; probe 27/27; tests vùng chạm 145/145. Cả 7 test mới của PR đều pass trong suite land. Đây là kết quả maintainer cung cấp, không phải test do tác giả tài liệu này chạy.
+- PR #34 (exact prerelease channel) và #35 (native artifact verification checklist) được maintainer báo LAND-READY, chờ land. PR #36 (feed-to-artifact metadata) đang chờ kiểm chứng và xếp chồng trên #34; phải land/rebase #34 trước khi tích hợp #36.
+- Điều kiện release gate vẫn là **0 test fail trên đúng SHA dự định phát hành**. Báo cáo các lần retest riêng biệt như bằng chứng bổ sung; không thay thế summary full suite.
 
 
 ## Single source of truth — app version
@@ -30,14 +31,14 @@ Các lát cắt production-hardening đã/đang được xử lý gồm:
 
 1. IPC sender validation — xác thực sender tại ranh giới IPC.
 2. Egress/SSRF — giới hạn network egress và nhận diện đích bare `curl`/`wget`.
-3. Vault fallback — hiển thị/trạng thái lưu trữ fallback dành riêng cho webhook key; PR #29 v3 đã được Muse xác minh độc lập, 0 blocker và LAND-READY (local landing theo dõi riêng).
+3. Vault fallback — hiển thị/trạng thái lưu trữ fallback dành riêng cho webhook key; PR #29 v3 (head `0df9e0cd`) đã land trên local main trong snapshot `e38671d9` sau khi Muse báo 0 blocker và các focused/probe/touched-area checks pass.
 4. MCP config-file permissions — siết quyền file cấu hình; PR #27 đã landed trên local main `cdd9a5f5`, đang chờ push snapshot lên remote.
 5. Router local-model child environment — lọc child env; PR #28 đã landed trên local main `8522ce7b`, đang chờ push snapshot lên remote.
 6. Webhook approval-payload minimisation — chỉ phát các trường allowlist cần thiết ra webhook.
 7. Skills prompt-injection blocking — quét nội dung/metadata trước khi skill đi vào prompt.
 8. Plugin security disclosure — nêu rõ process riêng không phải OS sandbox và plugin vẫn có quyền của OS user hiện tại.
 
-PR #26 (bare curl/wget egress targets), #27 (MCP config permissions), #28 (Router V2 child environment), #30 (root version as single source), #32 (prerelease SemVer precedence) và #33 (native signing/notarization gate test-only) đã land trên local main; các SHA land hiện tại lần lượt được maintainer ghi nhận cho #28 `8522ce7b`, #30 `1fe41d25`, #32 `5c8eac59` và #33 `bcfa06c1`. Snapshot local chưa được đẩy; public GitHub `main` vẫn `f17b8675`. PR #29 v3 đã Muse xác minh LAND-READY; không còn ghi #30 là đang chờ xác minh. Local main và public GitHub main hiện lệch nhau.
+PR #26 (bare curl/wget egress targets), #27 (MCP config permissions), #28 (Router V2 child environment), #29 v3 (webhook-key storage status), #30 (root version as single source), #32 (prerelease SemVer precedence) và #33 (native signing/notarization gate test-only) đã land trên local main. Các mốc được maintainer ghi nhận: #28 `8522ce7b`, #29 trong snapshot `e38671d9` (head `0df9e0cd`), #30 `1fe41d25`, #32 `5c8eac59`, #33 `bcfa06c1`. Snapshot local chưa được đẩy; public GitHub `main` vẫn `f17b8675`. PR #34/#35 LAND-READY, #36 chờ kiểm chứng và phụ thuộc #34. Local main và public GitHub main hiện lệch nhau.
 
 ## Cài đặt dependencies, build và typecheck
 
