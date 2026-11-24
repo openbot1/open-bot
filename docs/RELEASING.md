@@ -153,6 +153,10 @@ Use the digest only to compare copies of that exact artifact (for example, the f
 
 References: [Apple code-signature verification and Gatekeeper assessment](https://developer.apple.com/library/archive/documentation/Security/Conceptual/CodeSigningGuide/Procedures/Procedures.html), [Apple notarization and stapling workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow), and [Microsoft Get-AuthenticodeSignature](https://learn.microsoft.com/powershell/module/microsoft.powershell.security/get-authenticodesignature).
 
+### Release approval record
+
+For each candidate version, copy [`docs/RELEASE-APPROVAL-RECORD.md`](RELEASE-APPROVAL-RECORD.md) into the release evidence bundle or approval issue and fill it using the exact source commit and final uploaded files. The record captures the build/test gate, per-artifact hashes, native signing/notarization evidence, GitHub asset state and independent uploaded-file comparison. Do not put certificate files, passwords, API keys or other secrets in the record. Keep the GitHub Release in draft until every required row is complete and approved.
+
 ## Release order
 
 1. Merge the release-gate and other approved hardening work only after the independent checks described in `docs/TESTING.md` are green on the intended source snapshot.
