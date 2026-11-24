@@ -196,7 +196,7 @@ Before enabling it, create a GitHub Environment named `release` and configure re
 
 Run the workflow sequentially for `mac`, `win`, and `linux` using the same exact `release_tag`. A per-tag concurrency lock prevents overlapping upload jobs. Each job reruns version-check, build, typecheck, the full suite and platform tests on the tag's immutable commit SHA. It then confirms that the GitHub Release remains a draft and the target's installer assets are uploaded with positive sizes and SHA-256 metadata.
 
-The workflow does **not** publish the Release, does not replace the native artifact verification steps above, and does not make Linux AppImage signed. After all targets finish, complete the macOS Gatekeeper/notarization/stapler checks, Windows Authenticode publisher-identity check, Linux unsigned acknowledgement, and the local-vs-downloaded byte reconciliation step. Keep the Release in draft until the approval record is complete.
+The workflow never publishes the Release automatically, does not replace the native artifact verification steps above, and does not make Linux AppImage signed. After all targets finish, complete the macOS Gatekeeper/notarization/stapler checks, Windows Authenticode publisher-identity check, Linux unsigned acknowledgement, and the local-vs-downloaded byte reconciliation step. Keep the Release in draft until the approval record is complete.
 
 
 ## Release order
