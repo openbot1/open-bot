@@ -96,14 +96,14 @@ Keep the Release as **draft** while collecting evidence. Record each uploaded as
 | `draft` remains `true` during review | [TODO] |
 | `prerelease` matches the selected track | [TODO] |
 | Uploaded asset names / states | [TODO: every required asset must be `uploaded`] |
-| GitHub API `assets[].digest` values | [TODO] |
+| GitHub API `assets[].digest` values (required) | [TODO] |
 | Download URLs from the exact Release | [TODO] |
 
 For every asset, independently download the uploaded file from the exact release URL and recompute SHA-256. Compare:
 
 1. local final artifact SHA-256;
 2. SHA-256 of the independently downloaded uploaded asset;
-3. GitHub API asset digest (when supplied).
+3. GitHub API asset digest (required by the updater trust gate).
 
 All three values must agree. A digest field returned by the same API feed is metadata, not a publisher signature and not a substitute for recomputing the downloaded file's hash.
 
