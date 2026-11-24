@@ -44,6 +44,9 @@
  * diện bằng `jsonrpc === '2.0'` để đưa vào dialect này.
  */
 
+import { APP_VERSION } from '../appVersion';
+
+
 export const UI_DIALECT_PROTOCOL_VERSION = 'ui/1.0';
 export const UI_DIALECT_METHODS = [
   'ui/initialize',
@@ -757,7 +760,7 @@ export function buildDefaultHostContext(
     platform: ['win32', 'darwin', 'linux'].includes(platform) ? platform : 'linux',
     displayMode: overrides.displayMode ?? 'inline',
     container: overrides.container ?? { width: 720, height: 480 },
-    hostVersion: overrides.hostVersion ?? '0.2.0',
+    hostVersion: overrides.hostVersion ?? APP_VERSION,
     hostName: overrides.hostName ?? 'open-bot',
     capabilities: overrides.capabilities ?? ['tools-call', 'open-link', 'model-context', 'pip', 'fullscreen'],
   };

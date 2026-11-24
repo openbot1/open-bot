@@ -107,6 +107,11 @@ export interface OpenVaultWithSafeStorageOptions {
   safeStorage: SafeStorageLike;
   /** Defaults to `${storePath}.key`; also checks .new/.bak recovery keys. */
   keyFilePath?: string;
+  /**
+   * When false, fallback requires an existing primary machine-key file and
+   * refuses to create it when missing. Defaults to true for compatibility.
+   */
+  createLocalFallbackKey?: boolean;
 }
 
 export interface OpenVaultWithSafeStorageResult {
@@ -289,6 +294,8 @@ export interface VaultOptions {
   encryptor?: Encryptor;
   /** Machine key file for the default LocalEncryptor. Default: `<storePath>.key`. */
   keyFilePath?: string;
+  /** Refuse to create a missing primary LocalEncryptor machine-key file; default true. */
+  createMachineKeyIfMissing?: boolean;
   /**
    * v0.5 NO_STORAGE mode (ROADMAP §2d): start with durable writes
    * disabled. While on, `setSecret`/`deleteSecret` only change the
@@ -481,7 +488,17 @@ export class Vault {
       this.keyFilePath = null;
     } else {
       this.keyFilePath = options.keyFilePath ?? `${options.storePath}.key`;
-      this.encryptor = new LocalEncryptor(loadOrCreateMachineKey(this.keyFilePath));
+      let machineKey: Buffer;
+      if (options.createMachineKeyIfMissing === false) {
+        try {
+          machineKey = fs.readFileSync(this.keyFilePath);
+        } catch {
+          throw new Error('Creating a LocalEncryptor fallback machine key requires explicit consent.');
+        }
+      } else {
+        machineKey = loadOrCreateMachineKey(this.keyFilePath);
+      }
+      this.encryptor = new LocalEncryptor(machineKey);
     }
     this.localFallback = this.encryptor instanceof LocalEncryptor;
     this.maxEntries = options.maxEntries ?? DEFAULT_VAULT_MAX_ENTRIES;
@@ -1569,6 +1586,7 @@ export function openVaultWithSafeStorage(
     const vault = new Vault({
       storePath: options.storePath,
       keyFilePath,
+      createMachineKeyIfMissing: options.createLocalFallbackKey !== false,
       writePolicy: 'require-local-fallback-consent',
     });
     if (!vault.canDecryptAllSecrets()) {

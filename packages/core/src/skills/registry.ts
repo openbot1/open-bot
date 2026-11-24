@@ -60,6 +60,7 @@ import {
   SKILL_FILE_NAME,
   SKILL_NAME_RE,
 } from './loader';
+import { INJECTION_PATTERNS } from '../guardrails/builtin';
 import type { Skill, SkillIndexEntry, SkillResources } from './types';
 import { SkillLoadError } from './types';
 // v1.07 (T4): directory-scoped skills (progressive disclosure by
@@ -171,40 +172,78 @@ export function applySkills(systemPrompt: string, skills: Skill[], opts: ApplySk
  * contain a credential is rejected here, not injected).
  * Throws SkillLoadError when there is no source to load the body from.
  */
+function promptInjectionFindings(text: string) {
+  return INJECTION_PATTERNS.filter((pattern) =>
+    new RegExp(pattern.source, 'i').test(text),
+  );
+}
+
+/** Text fields that are rendered directly into the tier-1/tier-2 system prompt. */
+function skillPromptMetadata(skill: Skill): string {
+  return [skill.name, skill.version, skill.description, ...skill.allowedTools].join('\n');
+}
+
+function hasSafeSkillPromptMetadata(skill: Skill): boolean {
+  return promptInjectionFindings(skillPromptMetadata(skill)).length === 0;
+}
+
+function assertSkillBodyHasNoPromptInjection(skill: Skill): void {
+  if (!skill.bodyLoaded || skill.body.length === 0) return;
+  const findings = promptInjectionFindings([skillPromptMetadata(skill), skill.body].join('\n'));
+  if (findings.length === 0) return;
+  const codes = findings.map((finding) => finding.code).join(', ');
+  throw new SkillLoadError(
+    `Skill "${skill.name}" contains prompt-injection markers (${codes}); its prompt content was blocked before injection.`,
+    skill.filePath,
+  );
+}
+
+/**
+ * Tier 2 — load a skill's body in place (mutates the registry-owned
+ * skill object and returns it). No-op when the body is already loaded.
+ * Built-ins are extracted from the raw text the registry keeps;
+ * disk skills are re-read from their file (frontmatter is re-validated
+ * and the body is secret-scanned. Every source is also prompt-injection
+ * scanned immediately before use, including cached inline/plugin bodies,
+ * so non-marketplace and post-install changes cannot bypass the guard.
+ * Throws SkillLoadError when the body is invalid or untrusted.
+ */
 export function ensureSkillBody(skill: Skill): Skill {
-  if (skill.bodyLoaded) return skill;
-  const raw = BUILTIN_SKILL_TEXT.get(skill.name);
-  if (skill.source === 'builtin' && raw !== undefined) {
-    if (looksLikeSecret(raw)) {
-      throw new SkillLoadError(
-        'Skill contains text that looks like a secret (API key / token / password). ' +
-          'Skills must never contain credentials — remove it and try again.',
-        skill.filePath,
-      );
+  if (!skill.bodyLoaded) {
+    const raw = BUILTIN_SKILL_TEXT.get(skill.name);
+    if (skill.source === 'builtin' && raw !== undefined) {
+      if (looksLikeSecret(raw)) {
+        throw new SkillLoadError(
+          'Skill contains text that looks like a secret (API key / token / password). ' +
+            'Skills must never contain credentials — remove it and try again.',
+          skill.filePath,
+        );
+      }
+      const body = extractSkillBody(raw, skill.filePath);
+      if (body.length === 0) {
+        throw new SkillLoadError(`Skill "${skill.name}" has an empty instruction body.`, skill.filePath);
+      }
+      skill.body = body;
+      skill.bodyLoaded = true;
+    } else {
+      if (!skill.filePath) {
+        throw new SkillLoadError(
+          `Skill "${skill.name}" has no body loaded and no file to load it from.`,
+          skill.filePath,
+        );
+      }
+      let text: string;
+      try {
+        text = fs.readFileSync(skill.filePath, 'utf8');
+      } catch {
+        throw new SkillLoadError(`Cannot read skill file "${skill.filePath}".`, skill.filePath);
+      }
+      const full = parseSkillMarkdown(text, skill.source, skill.filePath, skill.pluginId, skill.skillDir);
+      skill.body = full.body;
+      skill.bodyLoaded = true;
     }
-    const body = extractSkillBody(raw, skill.filePath);
-    if (body.length === 0) {
-      throw new SkillLoadError(`Skill "${skill.name}" has an empty instruction body.`, skill.filePath);
-    }
-    skill.body = body;
-    skill.bodyLoaded = true;
-    return skill;
   }
-  if (!skill.filePath) {
-    throw new SkillLoadError(
-      `Skill "${skill.name}" has no body loaded and no file to load it from.`,
-      skill.filePath,
-    );
-  }
-  let text: string;
-  try {
-    text = fs.readFileSync(skill.filePath, 'utf8');
-  } catch {
-    throw new SkillLoadError(`Cannot read skill file "${skill.filePath}".`, skill.filePath);
-  }
-  const full = parseSkillMarkdown(text, skill.source, skill.filePath, skill.pluginId, skill.skillDir);
-  skill.body = full.body;
-  skill.bodyLoaded = true;
+  assertSkillBodyHasNoPromptInjection(skill);
   return skill;
 }
 
@@ -645,7 +684,12 @@ export class SkillRegistry {
   skillIndex(exclude?: Iterable<string>): SkillIndexEntry[] {
     const excluded = excludeSet(exclude);
     return this.listEnabled()
-      .filter((s) => !s.disableModelInvocation && !excluded.has(s.name))
+      .filter(
+        (s) =>
+          !s.disableModelInvocation &&
+          !excluded.has(s.name) &&
+          hasSafeSkillPromptMetadata(s),
+      )
       .map((s) => ({
         name: s.name,
         description: s.description,
@@ -754,7 +798,11 @@ export class SkillRegistry {
     // silently hide every scoped skill — see the v1.07 regression
     // test in skills-scope-v107.test.mjs).
     const dir = resolveWorkingDir(workingDir, workspaceDir);
-    return buildDirectorySkillIndex(this.list(), { workspaceDir, workingDir: dir }, exclude);
+    return buildDirectorySkillIndex(
+      this.list().filter(hasSafeSkillPromptMetadata),
+      { workspaceDir, workingDir: dir },
+      exclude,
+    );
   }
 
   /** The directory-aware tier-1 index as compact prompt text. */

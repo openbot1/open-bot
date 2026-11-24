@@ -25,11 +25,16 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import {
   LocalBudgetTracker,
   LocalGateway,
   LocalModelRegistry,
+  defaultSpawner,
+  buildLocalModelProcessEnv,
   MockLlamaCppServer,
   MockOllamaServer,
   PolicyRouter,
@@ -82,6 +87,48 @@ function daemonSpawnerFactory() {
     };
   };
 }
+
+test('local model child env is allowlisted and excludes application credentials', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'open-bot-router-env-'));
+  try {
+    const sourceEnv = {
+      PATH: process.env.PATH ?? '',
+      HOME: process.env.HOME ?? '',
+      USERPROFILE: process.env.USERPROFILE ?? '',
+      TEMP: process.env.TEMP ?? '',
+      TMP: process.env.TMP ?? '',
+      SYSTEMROOT: process.env.SYSTEMROOT ?? process.env.SystemRoot ?? '',
+      SystemRoot: process.env.SystemRoot ?? process.env.SYSTEMROOT ?? '',
+      COMSPEC: process.env.COMSPEC ?? process.env.ComSpec ?? '',
+      ComSpec: process.env.ComSpec ?? process.env.COMSPEC ?? '',
+      CUDA_VISIBLE_DEVICES: '2',
+      HIP_VISIBLE_DEVICES: '1',
+      OPENAI_API_KEY: 'provider-secret',
+      AWS_SECRET_ACCESS_KEY: 'cloud-secret',
+      GITHUB_TOKEN: 'github-secret',
+      RANDOM_APP_SETTING: 'must-not-pass',
+      LD_PRELOAD: '/tmp/untrusted.so',
+    };
+    const env = buildLocalModelProcessEnv(sourceEnv);
+    const outputPath = join(dir, 'child-env.json');
+    const script = `require('node:fs').writeFileSync(${JSON.stringify(outputPath)}, JSON.stringify(process.env))`;
+    const child = defaultSpawner(process.execPath, ['-e', script], { env });
+    const exitCode = await new Promise((resolve) => child.on('exit', resolve));
+    assert.equal(exitCode, 0);
+
+    const childEnv = JSON.parse(readFileSync(outputPath, 'utf8'));
+    assert.equal(childEnv.PATH, sourceEnv.PATH);
+    assert.equal(childEnv.CUDA_VISIBLE_DEVICES, '2');
+    assert.equal(childEnv.HIP_VISIBLE_DEVICES, '1');
+    assert.equal(childEnv.OPENAI_API_KEY, undefined);
+    assert.equal(childEnv.AWS_SECRET_ACCESS_KEY, undefined);
+    assert.equal(childEnv.GITHUB_TOKEN, undefined);
+    assert.equal(childEnv.RANDOM_APP_SETTING, undefined);
+    assert.equal(childEnv.LD_PRELOAD, undefined);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test('mock ollama: tags/show/pull/models/chat/health', async () => {
   const server = new MockOllamaServer({

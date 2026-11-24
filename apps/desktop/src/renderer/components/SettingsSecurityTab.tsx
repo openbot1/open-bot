@@ -141,6 +141,24 @@ export default function SettingsSecurityTab({ s, onlySections }: Props) {
               {t('settings.vaultStorageStatusLoading')}
             </p>
           )}
+          <p className="hint" data-testid="vault-webhook-storage-title">
+            <strong>{t('settings.vaultTitle')} — webhook signing keys</strong>
+          </p>
+          {vaultStorageStatus?.webhookKeyStore?.status === 'available' && (
+            <p className="hint" data-testid="vault-webhook-storage-available">
+              {t('settings.vaultStorageAvailable')}
+            </p>
+          )}
+          {vaultStorageStatus?.webhookKeyStore?.status === 'degraded' && (
+            <p className="error" role="alert" data-testid="vault-webhook-storage-degraded">
+              {t('settings.vaultStorageDegraded')}
+            </p>
+          )}
+          {vaultStorageStatus?.webhookKeyStore?.status === 'unavailable' && (
+            <p className="error" role="alert" data-testid="vault-webhook-storage-unavailable">
+              {t('settings.vaultStorageUnavailable')}
+            </p>
+          )}
           {/* v0.68c: the Vault used to show "empty" while its list was
               still loading, and a failed load looked exactly like an
               empty vault — loading and error + retry are explicit now. */}

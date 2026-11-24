@@ -24,6 +24,7 @@
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { randomBytes } from 'node:crypto';
 import type { McpConfig, McpServerConfig } from './types';
 
 export const MCP_CONFIG_REL_PATH = path.join('.open-bot', 'mcp.json');
@@ -139,6 +140,44 @@ export function loadMcpConfig(workspaceDir: string): McpConfig {
 }
 
 /**
+ * Atomically write credential-bearing MCP config with owner-only permissions.
+ * The unique exclusive temp file avoids inheriting permissions from a stale
+ * predictable .tmp file; no backup is created because it would duplicate secrets.
+ */
+export function writeMcpConfigAtomic(workspaceDir: string, content: string): void {
+  const filePath = path.join(workspaceDir, MCP_CONFIG_REL_PATH);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const tmp = `${filePath}.tmp-${process.pid}-${randomBytes(8).toString('hex')}`;
+  let fd: number | undefined;
+  let tmpCreated = false;
+  try {
+    fd = fs.openSync(tmp, 'wx', 0o600);
+    tmpCreated = true;
+    fs.writeFileSync(fd, content, 'utf8');
+    fs.fsyncSync(fd);
+    fs.closeSync(fd);
+    fd = undefined;
+    fs.renameSync(tmp, filePath);
+  } catch (err) {
+    if (fd !== undefined) {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        // Ignore cleanup errors; preserve the original write error.
+      }
+    }
+    if (tmpCreated) {
+      try {
+        fs.rmSync(tmp);
+      } catch {
+        // Ignore cleanup errors; preserve the original write error.
+      }
+    }
+    throw err;
+  }
+}
+
+/**
  * v0.14: add one MCP server to `<workspaceDir>/.open-bot/mcp.json` when
  * it is not there yet (plugin bundles declare their MCP server in the
  * bundle manifest; installing the bundle wires it in like a user editing
@@ -174,11 +213,8 @@ export function ensureMcpServer(
   // liệt. Validate ở đây chặn ngay từ đầu; config đã validate cũng
   // được chuẩn hoá (bỏ field lạ) trước khi ghi.
   const validated = validateServer(name, config);
-  const filePath = path.join(workspaceDir, MCP_CONFIG_REL_PATH);
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const next: McpConfig = { servers: { ...current.servers, [name]: validated } };
-  const tmp = filePath + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(next, null, 2) + '\n', 'utf8');
-  fs.renameSync(tmp, filePath);
+  const content = JSON.stringify(next, null, 2) + '\n';
+  writeMcpConfigAtomic(workspaceDir, content);
   return { added: true };
 }

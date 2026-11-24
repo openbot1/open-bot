@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { APP_VERSION } from '../../appVersion';
 import { useT } from '../i18n/useT';
 
 /**
@@ -167,7 +168,7 @@ export default function McpAppHostV13({
       timezone: 'UTC',
       platform: 'linux',
       container: { width: 720, height: 480 },
-      hostVersion: '0.2.0',
+      hostVersion: APP_VERSION,
       hostName: 'open-bot',
       capabilities: ['tools-call', 'open-link', 'model-context', 'pip', 'fullscreen'],
       ...hostContextOverride,

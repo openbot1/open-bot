@@ -52,6 +52,8 @@
  * đây để không tạo server không auth một cách im lặng.
  * Body JSON tối đa 1 MB.
  */
+import { APP_VERSION } from '../appVersion';
+
 import * as http from 'node:http';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import {
@@ -436,7 +438,7 @@ export function createA2aServer(options: A2aServerOptions = {}): A2aServer {
   const description =
     options.description ??
     'open-bot — agent local-first: nhận việc qua chuẩn A2A, chạy bằng model và tool của bot chủ.';
-  const version = options.version ?? '0.2.0';
+  const version = options.version ?? APP_VERSION;
   const runner = options.runner;
   const onLog = options.onLog;
   // v0.97: signer (ký card) + push notifier + event log. Không truyền

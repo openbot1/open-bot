@@ -58,20 +58,89 @@ export type UpdateFetchLike = (
   init?: { headers?: Record<string, string> },
 ) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
 
-/** Parse "v1.2.3" / "1.2.3" / "1.2" into [major, minor, patch]; null when unparseable. */
-export function parseSemver(version: string): [number, number, number] | null {
-  const m = /^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:[-+].*)?$/.exec(version.trim());
-  if (!m) return null;
-  return [Number(m[1]), Number(m[2] ?? 0), Number(m[3] ?? 0)];
+interface ParsedSemver {
+  core: [number, number, number];
+  prerelease: string[] | null;
 }
 
-/** Compare two semver strings: -1 / 0 / 1. Unparseable versions compare as equal (0). */
+/**
+ * Parse the product-version forms accepted by the updater. Missing minor or
+ * patch components remain zero for backwards compatibility with older tags.
+ * Prerelease identifiers follow SemVer 2.0 precedence rules; build metadata
+ * is validated but intentionally does not affect precedence.
+ */
+function parseSemverDetails(version: string): ParsedSemver | null {
+  const match =
+    /^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(
+      version.trim(),
+    );
+  if (!match) return null;
+
+  const coreParts = [match[1], match[2] ?? '0', match[3] ?? '0'];
+  if (coreParts.some((part) => part.length > 1 && part.startsWith('0'))) return null;
+  const core: [number, number, number] = [
+    Number(coreParts[0]),
+    Number(coreParts[1]),
+    Number(coreParts[2]),
+  ];
+  if (core.some((part) => !Number.isSafeInteger(part))) return null;
+
+  const prerelease = match[4] ? match[4].split('.') : null;
+  if (
+    prerelease?.some(
+      (identifier) =>
+        /^\d+$/.test(identifier) && identifier.length > 1 && identifier.startsWith('0'),
+    )
+  ) {
+    return null;
+  }
+
+  return { core, prerelease };
+}
+
+/** Parse "v1.2.3" / "1.2.3" / "1.2" into [major, minor, patch]; null when unparseable. */
+export function parseSemver(version: string): [number, number, number] | null {
+  return parseSemverDetails(version)?.core ?? null;
+}
+
+/** Compare two SemVer versions: -1 / 0 / 1. Invalid versions compare as equal (0). */
 export function compareSemver(a: string, b: string): number {
-  const pa = parseSemver(a);
-  const pb = parseSemver(b);
-  if (!pa || !pb) return 0;
+  const parsedA = parseSemverDetails(a);
+  const parsedB = parseSemverDetails(b);
+  if (!parsedA || !parsedB) return 0;
+
   for (let i = 0; i < 3; i++) {
-    if (pa[i] !== pb[i]) return pa[i] < pb[i] ? -1 : 1;
+    if (parsedA.core[i] !== parsedB.core[i]) {
+      return parsedA.core[i] < parsedB.core[i] ? -1 : 1;
+    }
+  }
+
+  // A release without prerelease identifiers has higher precedence than
+  // any prerelease of the same core version.
+  if (parsedA.prerelease === null && parsedB.prerelease !== null) return 1;
+  if (parsedA.prerelease !== null && parsedB.prerelease === null) return -1;
+  if (parsedA.prerelease === null || parsedB.prerelease === null) return 0;
+
+  const count = Math.max(parsedA.prerelease.length, parsedB.prerelease.length);
+  for (let i = 0; i < count; i++) {
+    const identifierA = parsedA.prerelease[i];
+    const identifierB = parsedB.prerelease[i];
+    if (identifierA === undefined) return -1;
+    if (identifierB === undefined) return 1;
+    if (identifierA === identifierB) continue;
+
+    const numericA = /^\d+$/.test(identifierA);
+    const numericB = /^\d+$/.test(identifierB);
+    if (numericA && numericB) {
+      // Compare digit strings rather than Number() so large identifiers do
+      // not lose precision.
+      if (identifierA.length !== identifierB.length) {
+        return identifierA.length < identifierB.length ? -1 : 1;
+      }
+      return identifierA < identifierB ? -1 : 1;
+    }
+    if (numericA !== numericB) return numericA ? -1 : 1;
+    return identifierA < identifierB ? -1 : 1;
   }
   return 0;
 }
@@ -141,9 +210,36 @@ export interface GitHubReleaseSummary {
 }
 
 /**
+ * Return the first prerelease identifier only for a valid SemVer release tag.
+ * Channel names are defined as the first prerelease identifier (for example,
+ * `-nightly.20261109`), not an arbitrary substring later in the tag.
+ */
+function firstPrereleaseIdentifier(tagName: string): string | null {
+  const match =
+    /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.exec(
+      tagName,
+    );
+  if (!match) return null;
+
+  const coreParts = [match[1], match[2], match[3]];
+  if (coreParts.some((part) => !Number.isSafeInteger(Number(part)))) return null;
+
+  const identifiers = match[4].split('.');
+  if (
+    identifiers.some(
+      (identifier) =>
+        /^\d+$/.test(identifier) && identifier.length > 1 && identifier.startsWith('0'),
+    )
+  ) {
+    return null;
+  }
+  return identifiers[0].toLowerCase();
+}
+
+/**
  * True when a release belongs to `track`'s channel. `stable` takes the
- * first non-prerelease; other tracks take a prerelease whose tag
- * carries the channel suffix (`-dogfood`, `-nightly`, `-lab`).
+ * first non-prerelease; other tracks require the exact first prerelease
+ * identifier to equal the channel name.
  */
 export function releaseMatchesTrack(
   release: { tag_name?: unknown; prerelease?: unknown },
@@ -151,10 +247,7 @@ export function releaseMatchesTrack(
 ): boolean {
   if (typeof release.tag_name !== 'string' || release.tag_name === '') return false;
   if (track === 'stable') return release.prerelease === false;
-  return (
-    release.prerelease === true &&
-    release.tag_name.toLowerCase().includes(`-${track}`)
-  );
+  return release.prerelease === true && firstPrereleaseIdentifier(release.tag_name) === track;
 }
 
 /** First release of the track's channel in a newest-first list (null when none). */

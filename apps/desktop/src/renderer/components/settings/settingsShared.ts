@@ -168,7 +168,7 @@ export interface SettingsShared {
   reloadUpdateStatus: () => Promise<void>;
 
   // Vault (security tab).
-  vaultStorageStatus: { status: 'available' | 'degraded' | 'unavailable'; backend: 'os-keychain' | 'local-fallback' | 'unavailable'; canWrite: boolean; canWriteWithConsent: boolean; consentRequired: boolean } | null;
+  vaultStorageStatus: { status: 'available' | 'degraded' | 'unavailable'; backend: 'os-keychain' | 'local-fallback' | 'unavailable'; canWrite: boolean; canWriteWithConsent: boolean; consentRequired: boolean; webhookKeyStore: { status: 'available' | 'degraded' | 'unavailable'; backend: 'os-keychain' | 'local-fallback' | 'unavailable'; canWrite: boolean; canWriteWithConsent: boolean; consentRequired: boolean } | null } | null;
   vaultSecrets: Record<string, string[]>;
   deleteVaultKey: (ns: string, key: string) => Promise<void>;
   /** v0.68c: true only while the first Vault load is in flight. */

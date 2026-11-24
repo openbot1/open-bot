@@ -32,7 +32,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { StdioMcpClient, StreamableHttpMcpClient } from './client';
-import { loadMcpConfig, MCP_CONFIG_REL_PATH } from './config';
+import { loadMcpConfig, MCP_CONFIG_REL_PATH, writeMcpConfigAtomic } from './config';
 import type { McpConfig, McpListWarning, McpServerConfig, McpToolDef } from './types';
 import {
   fetchRemoteRegistry,
@@ -510,8 +510,7 @@ function editMcpJson(
   const servers = parsed['servers'] as Record<string, unknown>;
   mutate(servers);
   parsed['servers'] = servers;
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(parsed, null, 2) + '\n', 'utf8');
+  writeMcpConfigAtomic(workspaceDir, JSON.stringify(parsed, null, 2) + '\n');
   // Re-read through the real loader: proves the written file is valid
   // and that no other server was lost in the round-trip.
   loadMcpConfig(workspaceDir);

@@ -56,6 +56,8 @@
  * executes, or phones home.
  */
 
+import { APP_VERSION } from '../../appVersion';
+
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { loadSkillDir, parseSkillMarkdown, SKILL_FILE_NAME, SKILL_VERSION_RE } from '../loader';
@@ -65,7 +67,7 @@ import { validateSkillV13 } from './validation';
 import type { SkillV13Validation } from './validation';
 
 /** Version of the running open-bot (used for `minOpenBotVersion`). */
-export const OPEN_BOT_VERSION = '0.2.0';
+export const OPEN_BOT_VERSION = APP_VERSION;
 
 /** Name of the manifest file inside a marketplace skill directory. */
 export const SKILL_MANIFEST_FILE = 'skill.json';

@@ -119,11 +119,16 @@ ghi URL, host, path, query hay secret.** `snapshot()` trả về số đếm.
 
 ## Giới hạn đã biết
 
-- `extractNetworkTargets` chỉ bắt URL có scheme rõ ràng
-  (`http(s)://`, `ssh://`, `git://`, `ftp://`) và dạng git scp-like
-  (`git@host:path`). `curl example.com` không scheme không bị bắt —
-  vẫn còn denylist + approval chặn lệnh nguy hiểm, nhưng không phải là
-  bảo đảm egress tuyệt đối cho lệnh viết tắt.
+- `extractNetworkTargets` nhận diện URL có scheme, dạng Git SCP-like
+  và host trần là operand trực tiếp trong các lệnh `curl`/`wget` thông dụng.
+  Với curl, parser cũng kiểm tra đích proxy và địa chỉ/host thay thế từ
+  `--resolve` / `--connect-to`. Host trần trong giá trị option như
+  header/user-agent được bỏ qua; URL có scheme ở bất kỳ vị trí nào vẫn
+  bị bộ quét URL chung nhận diện (có thể false-positive). Đây vẫn là
+  heuristic, không phải shell parser đầy đủ:
+  URL nằm trong config file, input-file, command substitution, wrapper tùy ý
+  hoặc process tự mở socket có thể không bị phát hiện. Không coi nó là
+  firewall hay bảo đảm egress tuyệt đối.
 - Daemon flush fragment lúc đóng session dùng bản sync (không DNS):
   host ở mode `allow-public` không xác minh được thì fail-closed
   (fragment bị bỏ); host allowlist đã khớp thì cho qua mà không kiểm

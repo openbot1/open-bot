@@ -1,6 +1,6 @@
 # Production security model and operator checklist
 
-Cập nhật: 20/11/2026.
+Cập nhật: 22/11/2026.
 
 Tài liệu này tóm tắt ranh giới tin cậy, tài sản cần bảo vệ và các giới hạn
 an ninh cần tính đến khi triển khai/vận hành open-bot. Đây là **threat model
@@ -131,8 +131,13 @@ vào đường gọi. Giữ `allowPrivateDestinations` tắt trừ khi có use c
 
 Các giới hạn cần hiểu trước khi coi policy là hàng rào mạng:
 
-- Shell target extraction chỉ nhận diện URL có scheme rõ ràng và dạng Git
-  SCP-like; host viết tắt như `curl example.com` có thể không được trích ra.
+- Shell target extraction nhận diện URL có scheme, Git SCP-like và
+  host trần là operand trực tiếp trong `curl`/`wget` thông dụng; với
+  curl, nó còn kiểm tra proxy và host/IP thay thế do `--resolve` /
+  `--connect-to` khai báo. Đây vẫn là heuristic, không phải shell
+  parser/firewall. URL ẩn trong config/input-file, command substitution,
+  wrapper tùy ý hoặc process tự mở socket có thể nằm ngoài các điểm
+  kiểm tra của app.
 - Đường kiểm tra đồng bộ không resolve DNS; không coi đó là bảo vệ DNS
   rebinding đầy đủ.
 - Plugin/MCP hoặc chương trình đã spawn có thể mở socket trực tiếp, ngoài

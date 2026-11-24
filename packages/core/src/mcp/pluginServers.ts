@@ -28,7 +28,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { ensureMcpServer, loadMcpConfig, validateMcpServerConfig, MCP_CONFIG_REL_PATH } from './config';
+import { ensureMcpServer, loadMcpConfig, validateMcpServerConfig, writeMcpConfigAtomic } from './config';
 import type { McpConfig, McpServerConfig } from './types';
 
 /** Sidecar recording which MCP servers each plugin installed. */
@@ -98,11 +98,7 @@ export function writePluginMcpServerMap(pluginsDir: string, map: PluginMcpServer
 
 /** Write a whole mcp.json atomically (temp file + rename). */
 export function saveMcpConfig(workspaceDir: string, config: McpConfig): void {
-  const filePath = path.join(workspaceDir, MCP_CONFIG_REL_PATH);
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const tmp = `${filePath}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(config, null, 2) + '\n', 'utf8');
-  fs.renameSync(tmp, filePath);
+  writeMcpConfigAtomic(workspaceDir, JSON.stringify(config, null, 2) + '\n');
 }
 
 /** Server names one plugin installed (from the sidecar). */

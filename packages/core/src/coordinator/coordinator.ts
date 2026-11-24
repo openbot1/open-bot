@@ -6771,8 +6771,14 @@ export class AgentCoordinator {
     // `forkSkills` dưới đây, nên một chỗ lọc là đủ; `applySkillsForTask`
     // nhận thêm `exclude` làm lớp chặn thứ hai.
     const denySkills = new Set(entry.bot.denySkills ?? []);
-    const matchedSkills = this.skillRegistry
-      ? this.skillRegistry.matchSkills(runText, 3, denySkills).map((m) => m.skill)
+    const skills = this.skillRegistry;
+    const matchedSkills = skills
+      ? skills
+          .matchSkills(runText, 3, denySkills)
+          .map((m) => m.skill)
+          // Validate the loaded prompt content before the skill can also
+          // contribute allowed-tools to the parent run's tool filter.
+          .filter((skill) => skills.loadBody(skill.name) !== undefined)
       : [];
     const inlineSkills = matchedSkills.filter((s) => !skillRunsInSubagent(s));
     const forkSkills: ForkSkillInput[] = [];

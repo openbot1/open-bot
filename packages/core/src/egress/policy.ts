@@ -295,9 +295,116 @@ export function mergeEgressPolicies(base: EgressPolicy, override: EgressPolicy):
 
 // --- Target parsing ----------------------------------------------------------
 
-const URL_TARGET_RE = /\b(?:https?|ssh|git|ftp):\/\/[^\s'"<>`]+/g;
-const GIT_SCP_RE = /\bgit@([A-Za-z0-9.-]+):[^\s'"<>`]+/g;
+const URL_TARGET_RE = /\b(?:https?|ssh|git|ftp):\/\/[^\s'"<>\x60]+/g;
+const GIT_SCP_RE = /\bgit@([A-Za-z0-9.-]+):[^\s'"<>\x60]+/g;
 const TRAILING_PUNCT_RE = /[.,;:!?)\]}'"]+$/;
+
+const CURL_OPTIONS_WITH_VALUE = new Set([
+  // Short and common transfer options.
+  '-A', '--user-agent',
+  '-b', '--cookie',
+  '-c', '--cookie-jar',
+  '-C', '--continue-at',
+  '-d', '--data', '--data-ascii', '--data-binary', '--data-raw', '--data-urlencode',
+  '-D', '--dump-header',
+  '-e', '--referer',
+  '-E', '--cert', '--cert-type',
+  '-F', '--form', '--form-string',
+  '--expand-data', '--expand-url', '--expand-variable',
+  '-H', '--header',
+  '-K', '--config',
+  '-m', '--max-time', '--connect-timeout', '--max-redirs', '--retry', '--retry-delay',
+  '-o', '--output', '--output-dir',
+  '-P', '--ftp-port',
+  '-Q', '--quote',
+  '-r', '--range',
+  '-t', '--telnet-option',
+  '-T', '--upload-file', '--upload-flags',
+  '-u', '--user',
+  '-U', '--proxy-user',
+  '-w', '--write-out',
+  '-X', '--request',
+  '-Y', '--speed-limit',
+  '-y', '--speed-time',
+  '-z', '--time-cond',
+
+  // Connection, TLS, DNS and transfer settings with separate values.
+  '--abstract-unix-socket', '--alt-svc', '--aws-sigv4',
+  '--cacert', '--capath', '--ciphers', '--create-file-mode', '--crlfile', '--curves',
+  '--delegation',
+  '--dns-interface', '--dns-ipv4-addr', '--dns-ipv6-addr', '--dns-servers', '--doh-url',
+  '--ech', '--egd-file', '--engine', '--etag-compare', '--etag-save', '--expect100-timeout',
+  '--ftp-account', '--ftp-alternative-to-user', '--ftp-method', '--ftp-ssl-ccc-mode',
+  '--happy-eyeballs-timeout-ms', '--haproxy-clientip',
+  '--hostpubmd5', '--hostpubsha256', '--hsts',
+  '--interface', '--ip-tos', '--ipfs-gateway', '--json',
+  '--keepalive-cnt', '--keepalive-time',
+  '--key', '--key-type', '--knownhosts', '--krb',
+  '--libcurl', '--limit-rate', '--local-port', '--login-options',
+  '--mail-auth', '--mail-from', '--mail-rcpt',
+  '--max-filesize', '--max-redirs', '--max-time',
+  '--netrc-file', '--noproxy', '--oauth2-bearer',
+  '--parallel-max', '--parallel-max-host',
+  '--pass', '--pinnedpubkey',
+  '--proto', '--proto-default', '--proto-redir',
+  '--pubkey', '--random-file', '--rate',
+  '--request-target', '--retry-max-time',
+  '--sasl-authzid', '--service-name', '--sigalgs',
+  '--socks4', '--socks4a', '--socks5', '--socks5-gssapi-service', '--socks5-hostname',
+  '--stderr',
+  '--tftp-blksize', '--tls-max', '--tls13-ciphers', '--tlsauthtype', '--tlspassword', '--tlsuser',
+  '--trace', '--trace-ascii', '--trace-config',
+  '--unix-socket', '--url-query', '--variable', '--vlan-priority',
+
+  // Proxy TLS/auth options. Proxy endpoints themselves are parsed below.
+  '--proxy-cacert', '--proxy-capath', '--proxy-cert', '--proxy-cert-type',
+  '--proxy-ciphers', '--proxy-crlfile', '--proxy-header', '--proxy-key',
+  '--proxy-key-type', '--proxy-pass', '--proxy-pinnedpubkey', '--proxy-service-name',
+  '--proxy-tls13-ciphers', '--proxy-tlsauthtype', '--proxy-tlspassword',
+  '--proxy-tlsuser',
+
+  // Proxy endpoint flags: their values are separately added as egress targets.
+  '--preproxy', '--proxy1.0',
+]);
+
+const WGET_OPTIONS_WITH_VALUE = new Set([
+  '-A', '--accept',
+  '-a', '--append-output',
+  '-D', '--domains',
+  '-e', '--execute',
+  '-i', '--input-file',
+  '-I', '--include-directories',
+  '-o', '--output-file',
+  '-O', '--output-document',
+  '-P', '--directory-prefix',
+  '-R', '--reject',
+  '-T', '--timeout',
+  '-t', '--tries',
+  '-U', '--user-agent',
+  '-w', '--wait',
+  '-X', '--exclude-directories',
+
+  '--accept-regex', '--append-output', '--backups', '--base',
+  '--bind-address', '--bind-dns-address',
+  '--body-data', '--body-file',
+  '--ca-certificate', '--certificate', '--compression', '--config',
+  '--connect-timeout', '--cut-dirs',
+  '--default-page', '--dns-servers', '--dns-timeout',
+  '--egd-file', '--exclude-domains',
+  '--follow-tags', '--ftp-password', '--ftp-user',
+  '--header', '--http-password', '--http-user',
+  '--ignore-tags', '--limit-rate', '--load-cookies',
+  '--local-encoding', '--max-redirect', '--method',
+  '--output-document', '--output-file',
+  '--password', '--post-data', '--post-file', '--prefer-family',
+  '--private-key', '--private-key-type', '--progress',
+  '--proxy-password', '--proxy-user',
+  '--quota', '--random-file', '--read-timeout', '--referer',
+  '--regex-type', '--reject-regex', '--remote-encoding',
+  '--restrict-file-names', '--save-cookies', '--secure-protocol',
+  '--timeout', '--tries', '--user',
+  '--wait', '--waitretry',
+]);
 
 /** Parse một target (URL string, host trần, hoặc EgressTarget) thành { host, scheme }. Ném EgressError khi không parse được. */
 export function parseEgressTarget(target: string | URL | EgressTarget): EgressTarget {
@@ -343,24 +450,153 @@ export function parseEgressTarget(target: string | URL | EgressTarget): EgressTa
 }
 
 /**
- * Trích các đích mạng từ một chuỗi lệnh shell (curl/wget/git clone/ssh/
- * URL trần...). Chỉ bắt URL có scheme rõ ràng + dạng git scp-like
- * (`git@host:path`) — `curl example.com` không scheme KHÔNG bị bắt
- * (giới hạn đã ghi trong docs/egress-policy.md; vẫn còn denylist +
- * approval chặn lệnh nguy hiểm). Trả về danh sách đã dedupe theo
- * scheme://host. Không thực thi gì, không resolve DNS.
+ * Split just enough shell syntax to distinguish common HTTP-client
+ * operands from option values. This is deliberately not a shell parser:
+ * it never expands substitutions or executes anything.
+ */
+function tokenizeShellCommand(command: string): string[] {
+  const tokens: string[] = [];
+  let token = '';
+  let quote: "'" | '"' | null = null;
+  let escaped = false;
+  const push = (): void => {
+    if (token !== '') tokens.push(token);
+    token = '';
+  };
+
+  for (const char of command) {
+    if (escaped) {
+      token += char;
+      escaped = false;
+      continue;
+    }
+    if (char === '\\' && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+    if (quote !== null) {
+      if (char === quote) quote = null;
+      else token += char;
+      continue;
+    }
+    if (char === "'" || char === '"') {
+      quote = char;
+      continue;
+    }
+    if (/\s/.test(char)) {
+      push();
+      continue;
+    }
+    if (char === ';' || char === '|' || char === '&') {
+      push();
+      tokens.push(char);
+      continue;
+    }
+    token += char;
+  }
+  if (escaped) token += '\\';
+  push();
+  return tokens;
+}
+
+function httpClientKind(token: string): 'curl' | 'wget' | undefined {
+  if (token.includes('=')) return undefined;
+  const basename = token.replace(/\\/g, '/').split('/').pop()?.toLowerCase();
+  if (basename === 'curl' || basename === 'curl.exe') return 'curl';
+  if (basename === 'wget' || basename === 'wget.exe') return 'wget';
+  return undefined;
+}
+
+function parseHttpClientTarget(value: string): EgressTarget | undefined {
+  const trimmed = value.trim();
+  const cleaned =
+    trimmed.startsWith('[') && trimmed.endsWith(']')
+      ? trimmed
+      : trimmed.replace(TRAILING_PUNCT_RE, '');
+  if (cleaned === '' || cleaned === '-') return undefined;
+  try {
+    const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(cleaned) ? cleaned : 'https://' + cleaned;
+    const url = new URL(candidate);
+    if (!url.hostname || url.hostname === '*') return undefined;
+    return parseEgressTarget(url);
+  } catch {
+    return undefined;
+  }
+}
+
+function isAttachedShortOption(token: string, options: Set<string>): boolean {
+  if (!token.startsWith('-') || token.startsWith('--')) return false;
+  for (const option of options) {
+    if (
+      option.length === 2 &&
+      option[0] === '-' &&
+      token.length > option.length &&
+      token.startsWith(option)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function appendCurlOptionTarget(value: string, push: (target: EgressTarget) => void): void {
+  const target = parseHttpClientTarget(value);
+  if (target) push(target);
+}
+
+function appendDnsServerTargets(value: string, push: (target: EgressTarget) => void): void {
+  for (const entry of value.split(',')) {
+    const address = entry.trim();
+    if (address === '') continue;
+    // curl / Wget DNS-server lists may contain bare IPv4 or IPv6 literals;
+    // preserve them as explicit network targets rather than URL operands.
+    if (isIP(address) !== 0) {
+      push({ host: address.toLowerCase(), scheme: 'https', raw: address });
+    } else {
+      appendCurlOptionTarget(address, push);
+    }
+  }
+}
+
+function appendCurlResolveTargets(value: string, push: (target: EgressTarget) => void): void {
+  const match = value.match(/^(?:\[[^\]]+\]|[^:]+):(\d+):(.+)$/);
+  if (!match) return;
+  for (const address of (match[2] as string).split(',')) {
+    appendCurlOptionTarget(address.trim(), push);
+  }
+}
+
+function appendCurlConnectToTarget(value: string, push: (target: EgressTarget) => void): void {
+  const match = value.match(/^(?:\[[^\]]+\]|[^:]+):(\d+):(?:\[([^\]]+)\]|([^:]+)):(\d+)$/);
+  if (!match) return;
+  const host = match[2] ? '[' + match[2] + ']' : match[3] as string;
+  appendCurlOptionTarget(host, push);
+}
+
+/**
+ * Trích các đích mạng từ một chuỗi lệnh shell. Bắt URL có scheme,
+ * Git SCP-like (git@host:path) và URL operand dạng host trần trong
+ * các lệnh curl/wget thông dụng (curl -I example.com,
+ * wget example.com/file). Host trần trong giá trị option như --header,
+ * --user-agent và --output không bị hiểu nhầm thành đích; URL có scheme
+ * vẫn được bộ quét URL chung nhận diện một cách thận trọng.
+ *
+ * Đây là heuristic tĩnh, KHÔNG phải shell parser: không đọc config file,
+ * không mở rộng command substitution và không thể kiểm soát process tự
+ * mở socket. Trả về danh sách đã dedupe; không thực thi gì, không DNS.
  */
 export function extractNetworkTargets(command: string): EgressTarget[] {
   const seen = new Set<string>();
   const out: EgressTarget[] = [];
   const push = (target: EgressTarget): void => {
-    const key = `${target.scheme ?? ''}://${target.host}`;
+    const key = (target.scheme ?? '') + '://' + target.host;
     if (seen.has(key)) return;
     seen.add(key);
     out.push(target);
   };
-  for (const m of command.matchAll(URL_TARGET_RE)) {
-    const cleaned = m[0].replace(TRAILING_PUNCT_RE, '');
+
+  for (const match of command.matchAll(URL_TARGET_RE)) {
+    const cleaned = match[0].replace(TRAILING_PUNCT_RE, '');
     try {
       push(parseEgressTarget(cleaned));
     } catch {
@@ -368,8 +604,94 @@ export function extractNetworkTargets(command: string): EgressTarget[] {
       // qua denylist, và phía thực thi sẽ lỗi rõ khi chạy.
     }
   }
-  for (const m of command.matchAll(GIT_SCP_RE)) {
-    push({ host: (m[1] as string).toLowerCase(), scheme: 'ssh', raw: m[0] });
+  for (const match of command.matchAll(GIT_SCP_RE)) {
+    push({ host: (match[1] as string).toLowerCase(), scheme: 'ssh', raw: match[0] });
+  }
+
+  const tokens = tokenizeShellCommand(command);
+  for (let i = 0; i < tokens.length; i += 1) {
+    const client = httpClientKind(tokens[i] as string);
+    if (!client) continue;
+    const valueOptions = client === 'curl' ? CURL_OPTIONS_WITH_VALUE : WGET_OPTIONS_WITH_VALUE;
+    let optionsEnded = false;
+
+    for (let j = i + 1; j < tokens.length; j += 1) {
+      const token = tokens[j] as string;
+      if (token === ';' || token === '|' || token === '&') break;
+      if (httpClientKind(token)) break;
+      if (token === '--') {
+        optionsEnded = true;
+        continue;
+      }
+
+      if (token === '--dns-servers' || token.startsWith('--dns-servers=')) {
+        const value = token === '--dns-servers' ? tokens[j + 1] : token.slice('--dns-servers='.length);
+        if (value !== undefined && value !== ';' && value !== '|' && value !== '&') {
+          appendDnsServerTargets(value, push);
+          if (token === '--dns-servers') j += 1;
+        }
+        continue;
+      }
+
+      if (client === 'curl') {
+        const inlineOptions = [
+          ['--url=', appendCurlOptionTarget],
+          ['--proxy=', appendCurlOptionTarget],
+          ['--preproxy=', appendCurlOptionTarget],
+          ['--proxy1.0=', appendCurlOptionTarget],
+          ['--socks4=', appendCurlOptionTarget],
+          ['--socks4a=', appendCurlOptionTarget],
+          ['--socks5=', appendCurlOptionTarget],
+          ['--socks5-hostname=', appendCurlOptionTarget],
+          ['--resolve=', appendCurlResolveTargets],
+          ['--connect-to=', appendCurlConnectToTarget],
+        ] as const;
+        const inline = inlineOptions.find(([prefix]) => token.startsWith(prefix));
+        if (inline) {
+          inline[1](token.slice(inline[0].length), push);
+          continue;
+        }
+
+        if (
+          token === '--url' || token === '--proxy' || token === '-x' ||
+          token === '--preproxy' || token === '--proxy1.0' ||
+          token === '--socks4' || token === '--socks4a' ||
+          token === '--socks5' || token === '--socks5-hostname' ||
+          token === '--resolve' || token === '--connect-to'
+        ) {
+          const value = tokens[j + 1];
+          if (value !== undefined && value !== ';' && value !== '|' && value !== '&') {
+            if (token === '--resolve') appendCurlResolveTargets(value, push);
+            else if (token === '--connect-to') appendCurlConnectToTarget(value, push);
+            else appendCurlOptionTarget(value, push);
+            j += 1;
+          }
+          continue;
+        }
+
+        if (token.startsWith('-x') && token.length > 2 && !token.startsWith('--')) {
+          appendCurlOptionTarget(token.slice(2), push);
+          continue;
+        }
+      }
+
+      if (!optionsEnded && token.startsWith('-') && token !== '-') {
+        const equalsAt = token.indexOf('=');
+        const option = equalsAt >= 0 ? token.slice(0, equalsAt) : token;
+        if (valueOptions.has(token)) {
+          j += 1;
+        } else if (equalsAt >= 0 && valueOptions.has(option)) {
+          // Long option with an inline value, e.g. --header=Authorization:...
+        } else if (isAttachedShortOption(token, valueOptions)) {
+          // Short option and its value share one token, e.g. -o/tmp/output.
+        }
+        continue;
+      }
+
+      if (token.startsWith('-')) continue;
+      const target = parseHttpClientTarget(token);
+      if (target) push(target);
+    }
   }
   return out;
 }

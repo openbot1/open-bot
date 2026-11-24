@@ -153,7 +153,7 @@ export default function SettingsView({ onBack, botId = null, onOpenConnectedApps
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
   // v0.4: Vault + usage + limits + dream + performance.
   const [vaultSecrets, setVaultSecrets] = useState<Record<string, string[]>>({});
-  const [vaultStorageStatus, setVaultStorageStatus] = useState<{ status: 'available' | 'degraded' | 'unavailable'; backend: 'os-keychain' | 'local-fallback' | 'unavailable'; canWrite: boolean; canWriteWithConsent: boolean; consentRequired: boolean } | null>(null);
+  const [vaultStorageStatus, setVaultStorageStatus] = useState<{ status: 'available' | 'degraded' | 'unavailable'; backend: 'os-keychain' | 'local-fallback' | 'unavailable'; canWrite: boolean; canWriteWithConsent: boolean; consentRequired: boolean; webhookKeyStore: { status: 'available' | 'degraded' | 'unavailable'; backend: 'os-keychain' | 'local-fallback' | 'unavailable'; canWrite: boolean; canWriteWithConsent: boolean; consentRequired: boolean } | null } | null>(null);
   const [usage, setUsage] = useState<SpendStatusData | null>(null);
   const [limits, setLimits] = useState<{ dailyUsd?: number; monthlyUsd?: number }>({});
   const [dream, setDream] = useState<{ enabled: boolean; idleMinutes: number }>({ enabled: false, idleMinutes: 15 });

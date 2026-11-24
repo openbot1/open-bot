@@ -28,6 +28,8 @@
  *    SEP-1303) để model tự sửa và gọi lại, không phải lỗi protocol.
  *  - Body HTTP tối đa 1 MB; server HTTP chỉ bind loopback.
  */
+import { APP_VERSION } from '../appVersion';
+
 import * as fs from 'node:fs';
 import * as http from 'node:http';
 import * as path from 'node:path';
@@ -72,7 +74,7 @@ export const MCP_SERVER_PROTOCOL_VERSIONS_SUPPORTED: readonly string[] = [
   '2024-11-05',
 ];
 export const MCP_SERVER_NAME = 'open-bot';
-export const MCP_SERVER_VERSION = '0.2.0';
+export const MCP_SERVER_VERSION = APP_VERSION;
 
 /** Mã lỗi JSON-RPC 2.0 chuẩn (cùng bộ mã client đã dùng). */
 export const JSON_RPC_PARSE_ERROR = -32700;

@@ -261,6 +261,125 @@ test('egress: extractNetworkTargets bắt URL + git scp-like, dedupe, bỏ lện
   assert.deepEqual(extractNetworkTargets('echo hello; ls -la; git checkout main'), []);
 });
 
+test('egress: extractNetworkTargets bắt host trần làm operand curl/wget, bỏ qua option values', () => {
+  const targets = extractNetworkTargets(
+    'curl -fsSL example.com/path; wget --header "Host: intranet.local" -q example.org/file',
+  );
+  assert.deepEqual(
+    targets.map((t) => `${t.scheme}://${t.host}`).sort(),
+    ['https://example.com', 'https://example.org'],
+  );
+
+  assert.deepEqual(
+    extractNetworkTargets('curl --url=bare.example.test').map((t) => `${t.scheme}://${t.host}`),
+    ['https://bare.example.test'],
+  );
+  assert.deepEqual(
+    extractNetworkTargets('curl user:pass@evil.com').map((t) => `${t.scheme}://${t.host}`),
+    ['https://evil.com'],
+    'curl bare operands with username and password must still expose the destination host',
+  );
+  assert.deepEqual(
+    extractNetworkTargets('curl user@evil.com').map((t) => `${t.scheme}://${t.host}`),
+    ['https://evil.com'],
+    'curl bare operands with username-only userinfo must still expose the destination host',
+  );
+  assert.deepEqual(
+    extractNetworkTargets('curl --proxy user:pass@proxy:8080 https://public.example/x')
+      .map((t) => t.host).sort(),
+    ['proxy', 'public.example'],
+    'proxy credentials must not hide the proxy destination host',
+  );
+
+  assert.deepEqual(
+    extractNetworkTargets(
+      'curl --user-agent agent.example -H "Host: intranet.local" https://allowed.example/x',
+    ).map((t) => `${t.scheme}://${t.host}`),
+    ['https://allowed.example'],
+  );
+
+  assert.deepEqual(
+    extractNetworkTargets('curl --proxy 127.0.0.1:8080 https://public.example/x')
+      .map((t) => t.host).sort(),
+    ['127.0.0.1', 'public.example'],
+    'proxy destinations must be checked as well as the requested URL',
+  );
+  assert.deepEqual(
+    extractNetworkTargets('curl --resolve public.example:443:127.0.0.1 https://public.example/x')
+      .map((t) => t.host).sort(),
+    ['127.0.0.1', 'public.example'],
+    'curl DNS overrides must expose the actual connect address',
+  );
+  assert.deepEqual(
+    extractNetworkTargets('curl --connect-to public.example:443:127.0.0.2:443 https://public.example/x')
+      .map((t) => t.host).sort(),
+    ['127.0.0.2', 'public.example'],
+    'curl connect-to overrides must expose the replacement host',
+  );
+  assert.ok(
+    extractNetworkTargets('curl --resolve public.example:443:[::1] https://public.example/x')
+      .some((t) => t.host === '::1'),
+    'bracketed IPv6 resolve destinations must be recognized',
+  );
+});
+
+test('egress: curl and wget value-taking options do not become bare URL targets', () => {
+  const curlTargets = extractNetworkTargets(
+    'curl --dns-servers 127.0.0.1,2001:db8::53 --tlspassword intranet.local ' +
+      '--mail-from sender@intranet.local --etag-save etag.intranet.local ' +
+      '--ciphers cipher.intranet.local --engine engine.intranet.local ' +
+      'https://public.example/x',
+  );
+  assert.deepEqual(
+    curlTargets.map((target) => target.host).sort(),
+    ['127.0.0.1', '2001:db8::53', 'public.example'],
+    'explicit DNS server IPs are network targets, not discarded option values',
+  );
+
+  const wgetTargets = extractNetworkTargets(
+    'wget --dns-servers 10.0.0.53 --input-file intranet.local --execute intranet.local ' +
+      '--domains intranet.local --exclude-domains intranet.local ' +
+      '--accept intranet.local --reject intranet.local ' +
+      '--include-directories intranet.local --exclude-directories intranet.local ' +
+      'https://public.example/x',
+  );
+  assert.deepEqual(
+    wgetTargets.map((target) => target.host).sort(),
+    ['10.0.0.53', 'public.example'],
+    'explicit Wget DNS server IP is also an egress target',
+  );
+
+  const socksTargets = extractNetworkTargets(
+    'curl --socks5 proxy.intranet.local:1080 https://public.example/x',
+  );
+  assert.deepEqual(
+    socksTargets.map((target) => target.host).sort(),
+    ['proxy.intranet.local', 'public.example'],
+    'SOCKS proxy endpoints remain egress targets',
+  );
+});
+
+test('egress: curl --noproxy "*" does not create a wildcard host target and keeps loopback allowed', async () => {
+  const command = "curl --noproxy '*' http://127.0.0.1:43123/hello";
+  const targets = extractNetworkTargets(command);
+  assert.deepEqual(
+    extractNetworkTargets('curl *'),
+    [],
+    'a wildcard cannot be a real hostname',
+  );
+  assert.deepEqual(
+    targets.map((target) => target.host),
+    ['127.0.0.1'],
+    'the --noproxy wildcard is an option value, never a destination host',
+  );
+
+  const allowed = await checkEgress(targets[0], createDefaultEgressPolicy(), {
+    context: 'local-service',
+  });
+  assert.equal(allowed.allowed, true);
+  assert.equal(allowed.reason, 'local-service');
+});
+
 // ---------------------------------------------------------------------------
 // Team allowlist override
 // ---------------------------------------------------------------------------
