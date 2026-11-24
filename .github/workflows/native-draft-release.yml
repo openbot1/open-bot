@@ -68,9 +68,9 @@ jobs:
             throw new Error('Root package.json has no valid release version.');
           }
 
-          const escapedVersion = version.split('.').join('\\\\.');
+          const escapedVersion = version.split('.').join('\\.');
           const tagPattern = new RegExp(
-            '^v' + escapedVersion + '(?:-(?:dogfood|nightly|lab)(?:\\\\.[0-9A-Za-z.-]+)?)?$',
+            '^v' + escapedVersion + '(?:-(?:dogfood|nightly|lab)(?:\\.[0-9A-Za-z.-]+)?)?$',
           );
           if (!tagPattern.test(tag)) {
             throw new Error(`Requested tag ${tag} does not match root version ${version}.`);
@@ -85,7 +85,7 @@ jobs:
 
           const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
           if (!/^[a-f0-9]{40}$/i.test(sourceSha)) throw new Error('Unable to resolve a full source commit SHA.');
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `source_sha=${sourceSha}\\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, "source_sha=" + sourceSha + "\n");
           console.log(`Validated ${tag} at source ${sourceSha}.`);
           NODE
 
@@ -211,6 +211,7 @@ jobs:
         run: npm run release:win
 
       - name: Confirm GitHub kept the Release as a draft and uploaded NSIS assets
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           RELEASE_TAG: ${{ inputs.release_tag }}
