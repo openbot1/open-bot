@@ -19,7 +19,7 @@ test('release input is bound to the root product version and an immutable full s
   assert.ok(WORKFLOW.includes('refs/tags/${{ inputs.release_tag }}'));
   assert.ok(WORKFLOW.includes("['describe', '--tags', '--exact-match', 'HEAD']"));
   assert.ok(WORKFLOW.includes("join('\\\\.')"));
-  assert.ok(WORKFLOW.includes('git describe'));
+  assert.ok(WORKFLOW.includes("execFileSync('git', ['describe', '--tags', '--exact-match', 'HEAD']"));
   assert.ok(WORKFLOW.includes('package.json'));
   assert.ok(WORKFLOW.includes('source_sha='));
   assert.ok(WORKFLOW.includes('needs.validate-release-ref.outputs.source_sha'));
@@ -44,6 +44,7 @@ test('native release jobs use a protected environment and only their own signing
 });
 
 test('post-upload checks require draft state, uploaded assets, positive size and SHA-256 metadata', () => {
+  assert.equal(WORKFLOW.split("run: |\n          node --input-type=module <<'NODE'").length - 1, 3);
   assert.equal(WORKFLOW.split('release.draft !== true').length - 1, 3);
   assert.equal(WORKFLOW.split("asset.state !== 'uploaded'").length - 1, 3);
   assert.equal(WORKFLOW.split('/^sha256:[a-f0-9]{64}$/i').length - 1, 3);
@@ -52,6 +53,6 @@ test('post-upload checks require draft state, uploaded assets, positive size and
 test('release guide documents protected environment setup and manual target-by-target execution', () => {
   assert.ok(GUIDE.includes('Native draft release workflow'));
   assert.ok(GUIDE.includes('Environment named `release`'));
-  assert.ok(GUIDE.includes('one target per run'));
+  assert.ok(GUIDE.includes('one platform per run'));
   assert.ok(GUIDE.includes('never publishes the draft automatically'));
 });
