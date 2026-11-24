@@ -165,7 +165,7 @@ After all platform artifacts have been built and uploaded to the **draft** GitHu
 Stage only the exact final installer files in `artifacts/local`. Download the uploaded assets separately into `artifacts/uploaded`, and save the authenticated API response for the same tag:
 
 ```bash
-TAG=v<version>
+TAG=v1.2.3  # replace with the exact tag being verified
 mkdir -p artifacts/local artifacts/uploaded
 gh api "repos/openbot1/open-bot/releases/tags/$TAG" > artifacts/release.json
 gh release download "$TAG" --repo openbot1/open-bot --dir artifacts/uploaded
