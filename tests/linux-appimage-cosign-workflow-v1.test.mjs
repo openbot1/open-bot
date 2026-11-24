@@ -46,8 +46,8 @@ test('workflow accepts only supported version tags and a safe AppImage filename'
 
 test('downloaded bytes must match GitHub API size and SHA-256 before signing', () => {
   assert.ok(WORKFLOW.includes('Accept: application/octet-stream'));
-  assert.ok(WORKFLOW.includes('actual_size == "$asset_size"'));
-  assert.ok(WORKFLOW.includes('actual_sha256 == "$expected_sha256"'));
+  assert.ok(WORKFLOW.includes('actual_size" == "$asset_size"'));
+  assert.ok(WORKFLOW.includes('actual_sha256" == "$expected_sha256"'));
   assert.ok(WORKFLOW.includes('sha256sum "$appimage_path"'));
 });
 
