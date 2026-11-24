@@ -51,19 +51,23 @@ function fakeFeedFetch(releases, { ok = true, status = 200 } = {}) {
 }
 
 function makeRelease(tag_name, prerelease) {
-  const name = `open-bot-${tag_name}.AppImage`;
+  const names = [
+    `open-bot-${tag_name}.AppImage`,
+    `open-bot-${tag_name}.dmg`,
+    `open-bot-${tag_name}-setup.exe`,
+  ];
   return {
     tag_name,
     draft: false,
     prerelease,
     html_url: `https://github.com/openbot1/open-bot/releases/tag/${tag_name}`,
-    assets: [{
+    assets: names.map((name, index) => ({
       name,
       state: 'uploaded',
-      size: 1024,
-      digest: `sha256:${'a'.repeat(64)}`,
-      browser_download_url: `https://github.com/openbot1/open-bot/releases/download/${tag_name}/${name}`,
-    }],
+      size: 1024 * (index + 1),
+      digest: `sha256:${String.fromCharCode(97 + index).repeat(64)}`,
+      browser_download_url: `https://github.com/openbot1/open-bot/releases/download/${tag_name}/${encodeURIComponent(name)}`,
+    })),
   };
 }
 const STABLE_RELEASE = makeRelease('v0.58.0', false);
