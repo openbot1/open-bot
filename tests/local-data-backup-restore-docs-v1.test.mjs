@@ -26,7 +26,7 @@ test('requires a stopped writer before copying SQLite-backed state', () => {
 
 test('preserves the Vault store, fallback key and bounded backup generations', () => {
   assert.match(guide, /vault\.json\.key/);
-  assert.match(guide, /bounded.*\.1.*\.3 copies/);
+  assert.match(guide, /bounded.*\.1.*\.3.*copies/);
   assert.match(guide, /Never delete, regenerate/i);
 });
 
