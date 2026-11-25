@@ -58,6 +58,12 @@ if ($actualThumbprint -ne $expectedThumbprint) {
 }
 
 $fileHash = Get-FileHash -LiteralPath $installerPath -Algorithm SHA256
+$timestampSubject = $null
+$timestampThumbprint = $null
+if ($null -ne $signature.TimeStamperCertificate) {
+  $timestampSubject = $signature.TimeStamperCertificate.Subject
+  $timestampThumbprint = $signature.TimeStamperCertificate.Thumbprint
+}
 $evidence = [pscustomobject]@{
   File                   = $installerPath
   SizeBytes              = (Get-Item -LiteralPath $installerPath).Length
@@ -69,8 +75,8 @@ $evidence = [pscustomobject]@{
   SignerThumbprint       = $actualThumbprint
   SignerNotBefore        = $signature.SignerCertificate.NotBefore.ToUniversalTime().ToString('o')
   SignerNotAfter         = $signature.SignerCertificate.NotAfter.ToUniversalTime().ToString('o')
-  TimestampSubject       = if ($signature.TimeStamperCertificate) { $signature.TimeStamperCertificate.Subject } else { $null }
-  TimestampThumbprint    = if ($signature.TimeStamperCertificate) { $signature.TimeStamperCertificate.Thumbprint } else { $null }
+  TimestampSubject       = $timestampSubject
+  TimestampThumbprint    = $timestampThumbprint
 }
 $evidence | Format-List
 ```
