@@ -21,7 +21,7 @@ test('does not invent a security email or claim an existing policy file', () => 
 });
 
 test('defines conditional GitHub private reporting as the preferred channel', () => {
-  assert.match(runbook, /GitHub **Security** tab/);
+  assert.match(runbook, runbook.includes('GitHub **Security** tab'));
   assert.match(runbook, /Private Vulnerability Reporting only when that private reporting feature is enabled/i);
   assert.match(runbook, /Confirm that the submission is private/i);
 });
@@ -60,13 +60,13 @@ test('prohibits collection of credentials and end-user application data', () => 
 
 test('requires case ID, private ownership and acknowledgement target', () => {
   assert.match(runbook, /SEC-YYYY-NNN/);
-  assert.match(runbook, /within **2 business days**/);
+  assert.match(runbook, runbook.includes('within **2 business days**'));
   assert.match(runbook, /one maintainer as case owner/i);
   assert.match(runbook, /do not mirror the report into a public issue/i);
 });
 
 test('defines an initial triage target and explicit severity priorities', () => {
-  assert.match(runbook, /within **5 business days**/);
+  assert.match(runbook, runbook.includes('within **5 business days**'));
   for (const priority of ['P0 / Critical', 'P1 / High', 'P2 / Moderate', 'P3 / Low']) {
     assert.ok(runbook.includes(priority), `missing severity: ${priority}`);
   }
@@ -82,8 +82,8 @@ test('includes proposed remediation targets for each severity', () => {
 
 test('defines the default coordinated disclosure window and status cadence', () => {
   assert.match(runbook, /90 calendar days from the initial private report/);
-  assert.match(runbook, /every **7 calendar days**/);
-  assert.match(runbook, /at least **14 calendar days** notice/i);
+  assert.match(runbook, runbook.includes('every **7 calendar days**'));
+  assert.match(runbook, runbook.includes("at least **14 calendar days' notice**"));
   assert.match(runbook, /do not silently extend an embargo indefinitely/i);
 });
 
