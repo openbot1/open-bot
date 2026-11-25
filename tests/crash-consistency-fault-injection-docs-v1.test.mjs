@@ -41,7 +41,7 @@ test('documents bounded durable-file write ordering and backup recovery', () => 
 test('does not overstate filesystem or power-loss guarantees', () => {
   assert.match(guide, /directory fsync is best-effort/i);
   assert.match(guide, /process-kill test is not equivalent to sudden power loss/i);
-  assert.match(guide, /not a guarantee against every hardware or power-loss failure/i);
+  assert.match(guide, /not interpret atomic rename as a guarantee against every hardware or power-loss failure/i);
 });
 
 test('documents Vault key rotation staging and full-store repair checks', () => {
@@ -78,7 +78,7 @@ test('requires restart verification of both positive and negative invariants', (
 
 test('requires controlled injection, clean patch restoration and reproducible fixtures', () => {
   assert.match(guide, /one failure scenario at a time/i);
-  assert.match(guide, /finally block/i);
+  assert.match(guide, /in a `finally` block/i);
   assert.match(guide, /fresh copy/i);
 });
 
