@@ -47,7 +47,7 @@ test('documents Vault safeStorage migration and its decryption gate', () => {
 
 test('fails closed on unavailable Vault and preserves ciphertext/key pairing', () => {
   assert.match(guide, /disables persistent writes and preserves ciphertext/i);
-  assert.match(guide, /unexpected degraded state is HOLD/i);
+  assert.match(guide, /unexpected degraded status is HOLD/i);
   assert.match(guide, /matching fallback key/i);
   assert.match(guide, /Do not rotate keys or delete fallback keys during an incident/i);
 });
