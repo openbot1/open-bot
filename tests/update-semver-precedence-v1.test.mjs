@@ -61,8 +61,32 @@ test('track updater detects a newer nightly build with the same numeric core ver
       status: 200,
       json: async () => [{
         tag_name: 'v0.59.0-nightly.20261110',
+        draft: false,
         prerelease: true,
         html_url: 'https://github.com/openbot1/open-bot/releases/tag/v0.59.0-nightly.20261110',
+        assets: [
+          {
+            name: 'open-bot-0.59.0-nightly.20261110.AppImage',
+            state: 'uploaded',
+            size: 1024,
+            digest: `sha256:${'a'.repeat(64)}`,
+            browser_download_url: 'https://github.com/openbot1/open-bot/releases/download/v0.59.0-nightly.20261110/open-bot-0.59.0-nightly.20261110.AppImage',
+          },
+          {
+            name: 'open-bot-0.59.0-nightly.20261110.dmg',
+            state: 'uploaded',
+            size: 2048,
+            digest: `sha256:${'b'.repeat(64)}`,
+            browser_download_url: 'https://github.com/openbot1/open-bot/releases/download/v0.59.0-nightly.20261110/open-bot-0.59.0-nightly.20261110.dmg',
+          },
+          {
+            name: 'open-bot-0.59.0-nightly.20261110-setup.exe',
+            state: 'uploaded',
+            size: 3072,
+            digest: `sha256:${'c'.repeat(64)}`,
+            browser_download_url: 'https://github.com/openbot1/open-bot/releases/download/v0.59.0-nightly.20261110/open-bot-0.59.0-nightly.20261110-setup.exe',
+          },
+        ],
       }],
     }),
   });

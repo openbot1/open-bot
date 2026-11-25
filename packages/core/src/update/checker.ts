@@ -23,13 +23,15 @@
  * so tests use a fake feed and never hit the network), but no channel
  * releases exist yet — push GitHub is still deferred — so until such
  * releases are actually published the check honestly answers "no newer
- * release for this channel". The releases-list URL is configurable
- * (`releasesListApiUrl`) for a self-hosted feed later.
+ * release for this channel". Feed requests are pinned to this
+ * repository's canonical GitHub API endpoints; custom endpoints and
+ * redirects to other origins fail closed.
  *
  * Pure except for the injected fetch: tests pass a mock fetch, main
  * passes the global fetch. No network call is made when the caller
  * passes no fetch implementation and none exists globally.
  */
+import { verifyGitHubReleaseArtifactMetadata } from './artifactTrust';
 import type { UpdateTrack } from './tracks';
 
 export const UPDATE_REPO = 'openbot1/open-bot';
@@ -56,7 +58,7 @@ export interface UpdateCheckResult {
 export type UpdateFetchLike = (
   url: string,
   init?: { headers?: Record<string, string> },
-) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
+) => Promise<{ ok: boolean; status: number; url?: string; json: () => Promise<unknown> }>;
 
 interface ParsedSemver {
   core: [number, number, number];
@@ -148,6 +150,7 @@ export function compareSemver(a: string, b: string): number {
 export async function checkForUpdate(opts: {
   currentVersion: string;
   fetchImpl?: UpdateFetchLike;
+  /** Must remain the canonical GitHub Releases API URL for this repository. */
   releasesApiUrl?: string;
   timeoutMs?: number;
 }): Promise<UpdateCheckResult> {
@@ -167,27 +170,47 @@ export async function checkForUpdate(opts: {
   if (!fetchFn) {
     return { ...base, checkFailed: true, error: 'Không có fetch để kiểm tra bản mới.' };
   }
+  const releasesApiUrl = opts.releasesApiUrl ?? UPDATE_RELEASES_API;
+  if (releasesApiUrl !== UPDATE_RELEASES_API) {
+    return { ...base, checkFailed: true, error: 'Từ chối update feed không phải GitHub API endpoint canonical của openbot1/open-bot.' };
+  }
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 10_000);
     try {
-      const res = await fetchFn(opts.releasesApiUrl ?? UPDATE_RELEASES_API, {
+      const res = await fetchFn(releasesApiUrl, {
         headers: { Accept: 'application/vnd.github+json' },
       });
+      if (typeof res.url === 'string' && res.url !== releasesApiUrl) {
+        return { ...base, checkFailed: true, error: 'GitHub update feed redirect tới endpoint khác; đã từ chối.' };
+      }
       const data = (await res.json()) as Record<string, unknown>;
       if (!res.ok) {
         const msg = typeof data['message'] === 'string' ? data['message'] : `HTTP ${res.status}`;
         return { ...base, checkFailed: true, error: `GitHub API lỗi: ${msg}` };
       }
       const tag = typeof data['tag_name'] === 'string' ? data['tag_name'] : null;
-      const htmlUrl = typeof data['html_url'] === 'string' ? data['html_url'] : null;
-      const latest = tag ? tag.replace(/^v/, '') : null;
+      if (!tag) {
+        return { ...base, checkFailed: true, error: 'Release stable thiếu tag_name hợp lệ.' };
+      }
+      if (data['prerelease'] !== false || tag.split('+', 1)[0].includes('-')) {
+        return { ...base, checkFailed: true, error: 'Feed stable trỏ tới release có prerelease flag/tag.' };
+      }
+      const artifactTrust = verifyGitHubReleaseArtifactMetadata(data, tag);
+      if (!artifactTrust.verified || !artifactTrust.releaseUrl) {
+        return {
+          ...base,
+          checkFailed: true,
+          error: `Metadata release/artifact không hợp lệ: ${artifactTrust.reason ?? 'không xác định'}.`,
+        };
+      }
+      const latest = tag.replace(/^v/, '');
       return {
         ...base,
         latestVersion: latest,
         latestTag: tag,
-        htmlUrl,
-        available: latest !== null && compareSemver(latest, currentVersion) > 0,
+        htmlUrl: artifactTrust.releaseUrl,
+        available: compareSemver(latest, currentVersion) > 0,
       };
     } finally {
       clearTimeout(timer);
@@ -207,6 +230,9 @@ export interface GitHubReleaseSummary {
   tag_name: string;
   prerelease: boolean;
   html_url: string | null;
+  /** Raw trust-critical fields retained for validation before reporting availability. */
+  draft?: unknown;
+  assets?: unknown;
 }
 
 /**
@@ -242,17 +268,24 @@ function firstPrereleaseIdentifier(tagName: string): string | null {
  * identifier to equal the channel name.
  */
 export function releaseMatchesTrack(
-  release: { tag_name?: unknown; prerelease?: unknown },
+  release: { tag_name?: unknown; prerelease?: unknown; draft?: unknown },
   track: UpdateTrack,
 ): boolean {
   if (typeof release.tag_name !== 'string' || release.tag_name === '') return false;
+  if (release.draft === true) return false;
   if (track === 'stable') return release.prerelease === false;
   return release.prerelease === true && firstPrereleaseIdentifier(release.tag_name) === track;
 }
 
 /** First release of the track's channel in a newest-first list (null when none). */
 export function pickReleaseForTrack(
-  releases: ReadonlyArray<{ tag_name?: unknown; prerelease?: unknown; html_url?: unknown }>,
+  releases: ReadonlyArray<{
+    tag_name?: unknown;
+    prerelease?: unknown;
+    draft?: unknown;
+    html_url?: unknown;
+    assets?: unknown;
+  }>,
   track: UpdateTrack,
 ): GitHubReleaseSummary | null {
   for (const r of releases) {
@@ -261,6 +294,8 @@ export function pickReleaseForTrack(
       tag_name: r.tag_name as string,
       prerelease: r.prerelease === true,
       html_url: typeof r.html_url === 'string' ? r.html_url : null,
+      draft: r.draft,
+      assets: r.assets,
     };
   }
   return null;
@@ -278,6 +313,7 @@ export async function checkForTrackUpdate(opts: {
   currentVersion: string;
   track: UpdateTrack;
   fetchImpl?: UpdateFetchLike;
+  /** Must remain the canonical GitHub releases-list API URL for this repository. */
   releasesListApiUrl?: string;
   timeoutMs?: number;
 }): Promise<UpdateCheckResult> {
@@ -297,13 +333,20 @@ export async function checkForTrackUpdate(opts: {
   if (!fetchFn) {
     return { ...base, checkFailed: true, error: 'Không có fetch để kiểm tra bản mới.' };
   }
+  const releasesListApiUrl = opts.releasesListApiUrl ?? UPDATE_RELEASES_LIST_API;
+  if (releasesListApiUrl !== UPDATE_RELEASES_LIST_API) {
+    return { ...base, checkFailed: true, error: 'Từ chối update feed không phải GitHub API endpoint canonical của openbot1/open-bot.' };
+  }
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 10_000);
     try {
-      const res = await fetchFn(opts.releasesListApiUrl ?? UPDATE_RELEASES_LIST_API, {
+      const res = await fetchFn(releasesListApiUrl, {
         headers: { Accept: 'application/vnd.github+json' },
       });
+      if (typeof res.url === 'string' && res.url !== releasesListApiUrl) {
+        return { ...base, checkFailed: true, error: 'GitHub update feed redirect tới endpoint khác; đã từ chối.' };
+      }
       const data: unknown = await res.json();
       if (!res.ok) {
         const msg =
@@ -320,12 +363,20 @@ export async function checkForTrackUpdate(opts: {
         // Honest "nothing published for this channel yet" — not an error.
         return base;
       }
+      const artifactTrust = verifyGitHubReleaseArtifactMetadata(picked, picked.tag_name);
+      if (!artifactTrust.verified || !artifactTrust.releaseUrl) {
+        return {
+          ...base,
+          checkFailed: true,
+          error: `Metadata release/artifact không hợp lệ: ${artifactTrust.reason ?? 'không xác định'}.`,
+        };
+      }
       const latest = picked.tag_name.replace(/^v/, '');
       return {
         ...base,
         latestVersion: latest,
         latestTag: picked.tag_name,
-        htmlUrl: picked.html_url,
+        htmlUrl: artifactTrust.releaseUrl,
         available: compareSemver(latest, currentVersion) > 0,
       };
     } finally {

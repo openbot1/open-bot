@@ -32,6 +32,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify synchronized versions before build
+        run: npm run version:check
+
       - name: Build
         run: npm run build
 
@@ -67,6 +70,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Verify synchronized versions before build
+        run: npm run version:check
 
       # Platform tests import từ packages/*/dist (gitignored) nên phải build trước.
       - name: Build

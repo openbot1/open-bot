@@ -51,22 +51,33 @@ nào được phát hành thật** (kể cả kênh stable). Hệ quả:
    `stable` qua GitHub releases API latest; `dogfood`/`nightly`/`lab`
    qua `checkForTrackUpdate` (`packages/core/src/update/checker.ts`) —
    lấy danh sách releases (`/releases?per_page=20`, mới nhất trước)
-   và chọn prerelease đầu tiên có tag mang hậu tố kênh, vd
-   `v0.59.0-dogfood.1`, `v0.59.0-nightly.20261109`, `v0.59.0-lab.1`,
-   rồi so semver với bản đang chạy. Code đã test bằng feed giả local
-   (`tests/update-feed-tracks-v059.test.mjs`, không gọi mạng thật).
+   và chọn prerelease có channel identifier chính xác ở đầu đoạn
+   prerelease; sau đó kiểm tra metadata feed-to-artifact trước khi báo
+   có bản mới: canonical release/download URLs thuộc đúng repo/tag,
+   release đã publish, đủ cả ba installer target cấu hình (Linux
+   AppImage, macOS DMG, Windows NSIS EXE), state `uploaded`, kích thước
+   dương và digest
+   SHA-256 hợp lệ do GitHub API cung cấp.
+   Lưu ý: digest là metadata do cùng GitHub feed trả về; việc này không
+   tải file để tính lại hash, không xác minh code signature/Authenticode,
+   không kiểm tra Apple notarization, và không chứng minh publisher
+   identity. Không coi nó là bằng chứng artifact đã được ký hoặc an toàn.
+   Code có regression tests dùng
+   feed giả (`tests/update-feed-tracks-v059.test.mjs` và
+   `tests/update-artifact-trust-v1.test.mjs`), không gọi mạng thật.
    **Nhưng chưa có release nào cho các kênh đó tồn tại thật**, nên tới
    khi release được phát hành theo quy ước tag trên, lần kiểm tra sẽ
    trả `available: false` một cách trung thực (không có release cho
-   kênh = không phải lỗi, `checkFailed: false`). Feed URL cấu hình
-   được qua option `trackFeedUrl` của `UpdateService` (mặc định là
-   GitHub releases list API của repo); đặt `trackFeedUrl: ''` nghĩa là
-   "chưa cấu hình feed" → các track ngoài stable quay lại
+   kênh = không phải lỗi, `checkFailed: false`). Endpoint feed được pin vào GitHub API canonical của repository:
+   `https://api.github.com/repos/openbot1/open-bot/releases/latest` cho
+   stable và `https://api.github.com/repos/openbot1/open-bot/releases?per_page=20`
+   cho track prerelease. Endpoint tùy chỉnh hoặc redirect ra endpoint khác
+   bị từ chối trước khi metadata được tin cậy. Đặt `trackFeedUrl: ''` nghĩa
+   là "chưa cấu hình feed" → các track ngoài stable quay lại
    `feedStatus: 'stub-no-feed'`: `checkForUpdates` **không gọi mạng**,
-   `available: false`, `checkFailed: false` (fail soft — stub có chủ ý
-   cho trường hợp chưa cấu hình, không phải bug). Lỗi feed (mạng/API/
-   dữ liệu sai dạng) thì fail soft như track stable (`checkFailed:
-   true`, retry ở lần check sau).
+   `available: false`, `checkFailed: false` (stub có chủ ý). Lỗi feed (mạng/API/dữ liệu sai dạng), redirect ra ngoài endpoint
+   chuẩn, hoặc metadata release/artifact sai đều fail soft
+   (`checkFailed: true`, `available: false`, retry ở lần check sau).
 2. **`quitAndInstallUpdate()` luôn trả `{installed: false}`** — chưa có cơ
    chế tải + cài đặt thật (cần code-signing + feed; xem ghi chú v0.7 trong
    `packages/core/src/update/checker.ts`). App không bao giờ tự ghi đè file
