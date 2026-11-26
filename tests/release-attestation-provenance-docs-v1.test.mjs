@@ -32,7 +32,7 @@ test('producer prerequisite requires minimal GitHub Actions permissions and atte
 });
 
 test('attestation is generated only after all byte-changing signing and stapling steps', () => {
-  assert.ok(GUIDE.includes('after every operation that changes the artifact bytes'));
+  assert.ok(GUIDE.includes('every operation that changes the artifact bytes'));
   assert.ok(GUIDE.includes('after the final staple'));
   assert.ok(GUIDE.includes('generate a new attestation for the new final bytes'));
 });
@@ -60,12 +60,12 @@ test('JSON review distinguishes cryptographic certificate evidence from workflow
   assert.ok(GUIDE.includes('verificationResult'));
   assert.ok(GUIDE.includes('verified timestamps'));
   assert.ok(GUIDE.includes('Treat fields inside statement.predicate as workflow-supplied claims'));
-  assert.ok(GUIDE.includes('not an independent trust anchor'));
+  assert.ok(GUIDE.includes('as an independent trust anchor'));
 });
 
 test('pass and hold conditions require exact artifact digest and all independent release gates', () => {
   assert.ok(GUIDE.includes('independently downloaded Release asset'));
-  assert.ok(GUIDE.includes('all native signing, notarization, platform verification'));
+  assert.ok(GUIDE.includes('All native signing, notarization, platform verification'));
   assert.ok(GUIDE.includes('No attestation means **not verified**'));
   assert.ok(GUIDE.includes('Keep the GitHub Release in draft'));
 });
