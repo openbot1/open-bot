@@ -28,7 +28,7 @@ test('distinguishes tabletop simulation from real release actions', () => {
 test('defines rehearsal objectives and explicit safety boundaries', () => {
   assert.ok(runbook.includes('protect local user data'));
   assert.ok(runbook.includes('Do not change production release state during a tabletop rehearsal'));
-  assert.ok(runbook.includes('Do not add features or bundle unrelated code changes'));
+  assert.ok(runbook.includes('do not add features or bundle unrelated code changes'));
 });
 
 test('assigns decision authority and separates operational roles', () => {
@@ -58,7 +58,7 @@ test('records exact incident and release identity', () => {
   assert.ok(runbook.includes('Discovery time in UTC'));
   assert.ok(runbook.includes('Exact affected product version, release tag, source commit SHA'));
   assert.ok(runbook.includes('Artifact filename, byte size, SHA-256'));
-  assert.ok(runbook.includes('whether the release is available for download'));
+  assert.ok(runbook.includes('Whether the release is available for download'));
 });
 
 test('defines containment options without destroying evidence', () => {
@@ -83,7 +83,7 @@ test('defines when forward-fix is preferred', () => {
 
 test('defines when distribution must remain paused', () => {
   assert.ok(runbook.includes('Pause distribution or use a mitigation when'));
-  assert.ok(runbook.includes('neither rollback nor forward-fix has yet passed required verification'));
+  assert.ok(runbook.includes('Neither rollback nor forward-fix has yet passed required verification'));
   assert.ok(runbook.includes('prefer a reversible pause'));
 });
 
@@ -102,7 +102,7 @@ test('requires explicit data-safety reviewer answers', () => {
 });
 
 test('prohibits destructive testing on real user data', () => {
-  assert.ok(runbook.includes('Do not test downgrade behaviour against a user\\'s only copy of real data'));
+  assert.ok(runbook.includes("Do not test downgrade behaviour against a user's only copy of real data"));
   assert.ok(runbook.includes('Use synthetic fixtures or a disposable copy'));
   assert.ok(runbook.includes('Preserve the original backup unchanged'));
 });
@@ -161,7 +161,7 @@ test('requires updater behaviour to be described accurately', () => {
 test('defines required user-facing notice contents', () => {
   assert.ok(runbook.includes('A user notice must state'));
   assert.ok(runbook.includes('Product version range and platforms confirmed affected'));
-  assert.ok(runbook.includes('whether users must manually download/install'));
+  assert.ok(runbook.includes('Whether users must manually download/install'));
   assert.ok(runbook.includes('Publication timestamp and private route'));
 });
 
