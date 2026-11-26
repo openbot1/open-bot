@@ -27,7 +27,7 @@ test('candidate identity records source lineage and version metadata', () => {
   for (const field of ['Parent SHA', 'PR lineage', 'Source state', 'Version', 'Packet owner']) {
     assert.ok(runbook.includes(field));
   }
-  assert.match(runbook, /clean-tree confirmation/);
+  assert.match(runbook, /Clean-tree confirmation/);
 });
 
 test('the checklist requires explicit disposition for missing evidence', () => {
@@ -64,7 +64,7 @@ test('failures require preserved first run and full rerun on a new SHA', () => {
 });
 
 test('CI manifest captures immutable run identity and attempt', () => {
-  for (const field of ['workflow run ID', 'run attempt number', 'full `head_sha`', 'canonical run URL']) {
+  for (const field of ['workflow run ID', 'Run attempt number', 'Full `head_sha`', 'canonical run URL']) {
     assert.ok(runbook.includes(field));
   }
   assert.match(runbook, /exact candidate SHA/);
