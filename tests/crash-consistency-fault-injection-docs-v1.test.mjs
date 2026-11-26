@@ -83,7 +83,7 @@ test('requires controlled injection, clean patch restoration and reproducible fi
 });
 
 test('defines PASS and HOLD evidence and privacy requirements', () => {
-  assert.match(guide, /overall crash-consistency gate is **PASS**/i);
-  assert.match(guide, /is **HOLD**/i);
+  assert.match(guide, /overall crash-consistency gate is \*\*PASS\*\*/i);
+  assert.match(guide, /is \*\*HOLD\*\*/i);
   assert.match(guide, /without secret values/i);
 });
