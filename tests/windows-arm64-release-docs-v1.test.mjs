@@ -68,7 +68,7 @@ test('guide requires independent local and downloaded artifact byte reconciliati
 });
 
 test('guide requires native ARM64 install/runtime tests and complete evidence before approval', () => {
-  assert.ok(GUIDE.includes('Native ARM64 installation and runtime checks pass'));
+  assert.ok(GUIDE.includes('native ARM64 installation/runtime checks pass'));
   assert.ok(GUIDE.includes('Keep the GitHub Release in draft'));
   assert.ok(GUIDE.includes('Operator and UTC verification time'));
   assert.ok(GUIDE.includes('required native components'));
