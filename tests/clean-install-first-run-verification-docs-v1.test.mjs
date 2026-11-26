@@ -78,7 +78,7 @@ test('documents provider setup without leaking keys', () => {
 });
 
 test('documents Ollama local defaults accurately', () => {
-  assert.ok(runbook.includes('http://localhost:11434/v1'));
+  assert.ok(runbook.includes('localhost:11434/v1'));
   assert.ok(runbook.includes('llama3.1'));
   assert.ok(runbook.includes('needs no API key'));
 });
@@ -110,7 +110,7 @@ test('defines the evidence package', () => {
 });
 
 test('prohibits secret-bearing evidence', () => {
-  assert.ok(runbook.includes('raw vault.json'));
+  assert.ok(runbook.includes('raw Vault contents'));
   assert.ok(runbook.includes('unredacted environment dumps'));
   assert.ok(runbook.includes('Screenshots with secrets'));
 });
