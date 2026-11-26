@@ -99,7 +99,7 @@ test('full suite uses the OS-specific command and requires zero failures', () =>
   assert.match(runbook, /xvfb-run -a npm test/);
   assert.match(runbook, /Windows \/ macOS/);
   assert.match(runbook, /zero failed tests/);
-  assert.match(runbook, /explain every skipped test/);
+  assert.match(runbook, /[Ee]xplain every skipped test/);
 });
 
 test('CI verification requires workflow run ID and exact candidate SHA', () => {
@@ -110,7 +110,7 @@ test('CI verification requires workflow run ID and exact candidate SHA', () => {
 });
 
 test('artifact records require hashes, transfer comparison and signing evidence', () => {
-  for (const term of ['SHA-256', 'byte-for-byte equality', 'Signer identity', 'notarization', 'attestation']) {
+  for (const term of ['SHA-256', 'byte-for-byte equality', 'signer identity', 'notarization', 'attestation']) {
     assert.ok(runbook.toLowerCase().includes(term.toLowerCase()));
   }
 });
