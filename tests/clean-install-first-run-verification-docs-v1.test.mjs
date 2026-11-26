@@ -11,7 +11,7 @@ const runbook = fs.readFileSync(
 );
 
 test('identifies the exact source and artifact under test', () => {
-  assert.match(runbook, /exact application source SHA, installed artifact, OS version/);
+  assert.ok(runbook.includes('exact application source SHA, installed artifact, OS version'));
   assert.match(runbook, /artifact.*SHA-256|SHA-256.*artifact/);
   assert.ok(runbook.includes('PASS means the check was performed and met its criterion'));
   assert.ok(runbook.includes('NOT RUN means no evidence was collected'));
