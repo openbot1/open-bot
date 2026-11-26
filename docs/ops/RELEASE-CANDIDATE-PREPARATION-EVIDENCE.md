@@ -255,5 +255,5 @@ This PR is **Slice 1 only**. The following slices are planned, not opened in thi
 
 ## 8. Authoring and execution boundary
 
-This is GitHub-authored documentation and a static Node.js documentation guard. No test, build, typecheck, CI job, native acceptance, artifact signing, notarization or production deployment was executed by this author. All operator-reported local state and verifier outcomes are labeled as such. This PR is intentionally Draft and is not LAND-READY.
+This is GitHub-authored documentation and a static Node.js documentation guard. No test, build, typecheck, CI job, native acceptance, artifact signing, notarization or production deployment was executed by this author. No test/build/typecheck was run. All operator-reported local state and verifier outcomes are labeled as such. This PR is intentionally Draft and is not LAND-READY.
 
