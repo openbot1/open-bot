@@ -66,7 +66,7 @@ test('procedure preserves Windows trust policy and excludes signing secrets from
 });
 
 test('procedure links to the Microsoft references used for the verification contract', () => {
-  assert.ok(GUIDE.includes('learn.microsoft.com/powershell/module/microsoft.powershell.security/get-authenticode-signature'));
+  assert.ok(GUIDE.includes('learn.microsoft.com/powershell/module/microsoft.powershell.security/get-authenticodesignature'));
   assert.ok(GUIDE.includes('learn.microsoft.com/windows/win32/seccrypto/using-signtool-to-verify-a-file-signature'));
   assert.ok(GUIDE.includes('learn.microsoft.com/windows/win32/seccrypto/signtool'));
 });
