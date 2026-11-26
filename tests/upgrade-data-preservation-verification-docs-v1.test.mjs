@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const guide = fs.readFileSync(
-  path.join(here, '..', '..', 'docs', 'ops', 'UPGRADE-DATA-PRESERVATION-VERIFICATION.md'),
+  path.join(here, '..', 'docs', 'ops', 'UPGRADE-DATA-PRESERVATION-VERIFICATION.md'),
   'utf8',
 );
 
