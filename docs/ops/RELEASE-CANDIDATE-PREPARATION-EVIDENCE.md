@@ -1,8 +1,8 @@
 # Release Candidate Preparation & Evidence
 
-Snapshot: 2026-11-27 02:0x +07 (GitHub metadata re-read during authoring; operator-reported local state is explicitly labeled)
+Snapshot: 2026-11-27 04:05 +07 (GitHub metadata re-read during authoring; operator-reported local state is explicitly labeled)
 Repository: `openbot1/open-bot`
-Phase: Release Candidate & Go-Live Evidence — Slice 1/4
+Phase: Release Candidate & Go-Live Evidence — Slice 1/5
 Decision: **HOLD — no release candidate is approved for production go-live.**
 
 This runbook defines how to prepare one immutable release candidate and collect reproducible evidence. It is a procedure and evidence template, not a record that the listed commands or platform checks have already run successfully.
@@ -25,7 +25,7 @@ The operator reports:
 - Local `main`: `8dc29d67`, clean tree; 3,963 tracked files; 1,527,941 total tracked lines; 957,713 TypeScript lines.
 - Full suite on exact local SHA `8dc29d67`: 12,914 pass / 0 fail / 3 skipped, at approximately 21:06 +07 on 2026-11-26, first run green.
 - #42, #43, #48, #51 and #52 are landed locally on that snapshot and await the snapshot push and GitHub reconciliation.
-- Snapshot delivery has been attempted three times (approximately 22:32, 22:37 and 22:42 +07 on 2026-11-26); all three approval cards timed out after service restarts (21:09, 21:31 and 23:34 +07). At approximately 02:0x +07 on 2026-11-27 there was no active approval card. The operator reports an 8-file resumable push package and manifest are ready.
+- Snapshot delivery has been attempted three times (approximately 22:32, 22:37 and 22:42 +07 on 2026-11-26); all three approval cards timed out after service restarts (21:09, 21:31 and 23:34 +07). At 04:05 +07 on 2026-11-27 there was no active approval card. The operator reports an 8-file resumable push package and manifest are ready.
 - The push is intentionally deferred until daytime when the owner can approve it. No push is authorized by this runbook or this PR.
 
 These local details are included as operator-reported context only. They are not visible in the GitHub remote branch and have not been reproduced by this author. In particular, do not describe `8dc29d67` as the current public GitHub `main`.
