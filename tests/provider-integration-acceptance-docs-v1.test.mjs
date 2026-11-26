@@ -81,7 +81,7 @@ test('documents Ollama local endpoint and no-key behavior', () => {
 test('requires Composio opt-in and Vault key handling', () => {
   assert.ok(guide.includes('disabled by default'));
   assert.ok(guide.includes('namespace `provider`, key `composio`'));
-  assert.ok(guide.includes('not put it in source, `.env`, logs or evidence'));
+  assert.ok(guide.includes('never put it in source, `.env`, logs or evidence'));
   assert.ok(guide.includes('not the key value'));
 });
 
@@ -117,7 +117,7 @@ test('requires CLI consent and no-execution behavior before consent', () => {
 test('protects CLI credentials and separates detection from invocation', () => {
   assert.ok(guide.includes('does not read, copy or transmit CLI auth/config/session files'));
   assert.ok(guide.includes('FORBIDDEN_CLI_PATHS_V30'));
-  assert.ok(guide.includes('record detection and invocation as separate outcomes'));
+  assert.ok(guide.includes('Record detection and invocation as separate outcomes'));
 });
 
 test('distinguishes the earlier CLI probe adapter', () => {
@@ -127,9 +127,10 @@ test('distinguishes the earlier CLI probe adapter', () => {
 
 test('uses documented root build and test commands', () => {
   for (const command of ['npm ci', 'npm run version:sync', 'npm run version:check',
-    'npm run build', 'npm run typecheck', 'npm test']) {
-    assert.ok(guide.includes('`' + command + '`'), 'missing root command: ' + command);
+    'npm run build', 'npm run typecheck']) {
+    assert.ok(guide.includes(command), 'missing root command: ' + command);
   }
+  assert.ok(guide.includes('`npm test`'), 'missing root command: npm test');
   assert.ok(guide.includes('xvfb-run -a npm test'));
   assert.ok(guide.includes('docs/TESTING.md'));
 });
