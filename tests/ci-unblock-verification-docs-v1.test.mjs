@@ -82,7 +82,7 @@ test('remediation is gated on an evidenced cause', () => {
 });
 
 test('the success packet requires exact-SHA matrix evidence', () => {
-  assert.ok(runbook.includes('all six expected matrix jobs'));
+  assert.ok(runbook.includes('All six expected matrix jobs'));
   assert.ok(runbook.includes('exact candidate SHA'));
   assert.ok(runbook.includes('full-suite'));
   assert.ok(runbook.includes('platform-test results'));
