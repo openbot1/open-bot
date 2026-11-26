@@ -55,7 +55,7 @@ test('app and outer DMG stapling targets remain distinct and final bytes are reh
   assert.ok(GUIDE.includes('xcrun stapler validate "$APP_PATH"'));
   assert.ok(GUIDE.includes('xcrun stapler staple "$DMG_PATH"'));
   assert.ok(GUIDE.includes('Never try to staple an app-bundle ticket to the outer DMG'));
-  assert.ok(GUIDE.includes('After any staple operation, rerun'));
+  assert.ok(GUIDE.includes('after any staple operation, rerun'));
   assert.ok(GUIDE.includes('repeat the three-way byte reconciliation'));
 });
 
