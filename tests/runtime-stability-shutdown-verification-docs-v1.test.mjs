@@ -94,7 +94,7 @@ test('does not invent universal resource thresholds', () => {
 
 test('separates macOS window reactivation from explicit quit', () => {
   assert.ok(runbook.includes('closing the last window leaves the app available for reactivation'));
-  assert.ok(runbook.includes('application menu\\'s Quit command or Cmd+Q'));
+  assert.ok(runbook.includes("application menu's Quit command or Cmd+Q"));
   assert.ok(runbook.includes('Dock'));
 });
 
@@ -102,7 +102,7 @@ test('checks process, child process and Local API listener termination', () => {
   assert.ok(runbook.includes('main Electron process exits'));
   assert.ok(runbook.includes('coordinator or other app-owned child process exits'));
   assert.ok(runbook.includes('loopback listener releases the recorded port'));
-  assert.ok(runbook.includes('no orphaned app-owned process'));
+  assert.ok(runbook.includes('No orphaned app-owned process'));
 });
 
 test('requires subsequent relaunch and test-profile integrity checks', () => {
