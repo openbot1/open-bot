@@ -60,7 +60,7 @@ test('documents idempotent credential migration and deferred legacy values', () 
 
 test('requires candidate source-diff classification before upgrade', () => {
   assert.match(guide, /Review the candidate release's source diff/i);
-  assert.match(guide, /additive schema, row/data rewrite, file-layout change, cryptographic migration/i);
+  assert.match(guide, /additive schema, row\/data rewrite, file-layout change, cryptographic migration/i);
   assert.match(guide, /downgrade incompatibility/i);
 });
 
@@ -87,12 +87,12 @@ test('requires restoring the prior app and one matching pre-upgrade generation',
   assert.match(guide, /Reinstall the exact previously approved application version/i);
   assert.match(guide, /same generation/i);
   assert.match(guide, /Do not mix a new `memory.db` with old attachments/i);
-  assert.match(guide, /original supported OS account/profile/i);
+  assert.match(guide, /original supported OS account\/profile/i);
 });
 
 test('forbids manual downgrade edits and defines measurable PASS / HOLD states', () => {
   assert.match(guide, /ad-hoc SQL column drops/i);
-  assert.match(guide, /A rollback is **PASS** only/i);
-  assert.match(guide, /unverified OS security context is **HOLD**/i);
+  assert.match(guide, /A rollback is \*\*PASS\*\* only/i);
+  assert.match(guide, /unverified OS security context is \*\*HOLD\*\*/i);
   assert.match(guide, /does not implement database downgrade logic/i);
 });
