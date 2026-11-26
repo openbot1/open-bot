@@ -130,7 +130,7 @@ test('requires dependent credentials and all consumers to be inventoried', () =>
 
 test('defines post-rotation rejection checks for the old credential', () => {
   assert.match(runbook, /Old credential rejection/i);
-  assert.match(runbook, /provider's authoritative revoked status/i);
+  assert.match(runbook, /authoritative provider revocation status/i);
   assert.match(runbook, /Never paste the old value/i);
 });
 
