@@ -106,7 +106,7 @@ test('CI verification requires workflow run ID and exact candidate SHA', () => {
   assert.match(runbook, /workflow run ID/);
   assert.match(runbook, /full commit SHA/);
   assert.match(runbook, /Queued is not PASS/);
-  assert.match(runbook, /stale, cancelled, skipped, missing or failed/);
+  assert.match(runbook, /queued, pending, cancelled, skipped, stale, missing or failed/);
 });
 
 test('artifact records require hashes, transfer comparison and signing evidence', () => {
