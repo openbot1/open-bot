@@ -56,7 +56,7 @@ test('minimises reporter evidence and forbids secret or user-data collection', (
 test('prioritises urgent containment over perfect evidence', () => {
   assert.match(runbook, /do not delay revocation, disabling an unsafe path/i);
   assert.match(runbook, /pausing publication/i);
-  assert.match(runbook, /Do not delay urgent/i);
+  assert.match(runbook, /Protect users first/i);
 });
 
 test('defines P0 through P3 severity criteria and lane decisions', () => {
