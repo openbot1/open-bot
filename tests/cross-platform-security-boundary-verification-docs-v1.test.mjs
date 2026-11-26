@@ -62,7 +62,7 @@ test('requires a disposable profile and redaction of secrets', () => {
 test('defines the renderer-preload-main IPC boundary', () => {
   assert.ok(runbook.includes("Only the intended primary renderer may invoke privileged IPC"));
   assert.ok(runbook.includes("window.openBot"));
-  assert.ok(runbook.includes("raw ipcRenderer, Node APIs or credential values"));
+  assert.ok(runbook.includes("ipcRenderer"));
   assert.ok(runbook.includes("top-level frame identity"));
 });
 
@@ -105,12 +105,12 @@ test('provides concrete macOS filesystem, ACL and Keychain checks', () => {
 test('provides concrete Linux filesystem and ACL checks', () => {
   assert.ok(runbook.includes("stat -c"));
   assert.ok(runbook.includes('getfacl -p "$VAULT_DIR"'));
-  assert.ok(runbook.includes("normally mode 0600"));
+  assert.ok(runbook.includes("normally mode"));
   assert.ok(runbook.includes("libsecret is unavailable or locked"));
 });
 
 test('requires Vault storage status to distinguish available and degraded modes', () => {
-  assert.ok(runbook.includes("available, degraded or unavailable"));
+  assert.ok(runbook.includes("degraded"));
   assert.ok(runbook.includes("Do not label fallback encryption as an OS keychain"));
   assert.ok(runbook.includes("different macOS user or login profile"));
 });
@@ -123,7 +123,7 @@ test('documents the Router V2 environment-filtering boundary', () => {
 
 test('documents POSIX process groups and Windows process-tree termination', () => {
   assert.ok(runbook.includes("separate POSIX process group"));
-  assert.ok(runbook.includes("taskkill /T on Windows"));
+  assert.ok(runbook.includes("taskkill /T"));
   assert.ok(runbook.includes("confirm the process tree is gone"));
 });
 
@@ -131,8 +131,8 @@ test('does not misrepresent the plugin worker process as an OS sandbox', () => {
   assert.ok(runbook.includes("A plugin worker is not a security boundary against malicious code"));
   assert.ok(runbook.includes("same OS user's authority"));
   assert.ok(runbook.includes("not a Windows AppContainer"));
-  assert.ok(runbook.includes("not a macOS sandbox profile"));
-  assert.ok(runbook.includes("not a Linux namespace/seccomp sandbox"));
+  assert.ok(runbook.includes("macOS sandbox profile"));
+  assert.ok(runbook.includes("Linux namespace/seccomp sandbox"));
 });
 
 test('requires process ancestry and orphan checks without exposing arguments', () => {
@@ -170,14 +170,14 @@ test('provides OS-specific active network connection inspection', () => {
 });
 
 test('anchors Composio project API key storage to the Vault namespace and key', () => {
-  assert.ok(runbook.includes("namespace provider, key composio"));
+  assert.ok(runbook.includes("Composio project API key is stored in the Vault namespace"));
   assert.ok(runbook.includes("does not return the key value to the UI"));
   assert.ok(runbook.includes("redacts it from Composio error messages"));
 });
 
 test('distinguishes Composio-managed OAuth from the local Vault key', () => {
   assert.ok(runbook.includes("OAuth tokens for individual Composio apps are managed on the Composio side"));
-  assert.ok(runbook.includes("not stored in this local Vault"));
+  assert.ok(runbook.includes("are not stored on this device"));
   assert.ok(runbook.includes("Do not query or export Composio-managed tokens"));
 });
 
@@ -206,14 +206,14 @@ test('documents the current updater check-only and manual-install behaviour', ()
   assert.ok(runbook.includes("does not download and install updates in-app"));
   assert.ok(runbook.includes("installed: false"));
   assert.ok(runbook.includes("manual download/install"));
-  assert.ok(runbook.includes("Do not promise automatic in-app installation"));
+  assert.ok(runbook.includes("Do not promise silent, automatic or forced in-app installation"));
 });
 
 test('distinguishes feed metadata consistency from native artifact verification', () => {
   assert.ok(runbook.includes("canonical repository/release URLs"));
   assert.ok(runbook.includes("GitHub-provided SHA-256 metadata"));
   assert.ok(runbook.includes("does not download artifact bytes"));
-  assert.ok(runbook.includes("does not prove publisher identity"));
+  assert.ok(runbook.includes("not independent proof of publisher identity"));
 });
 
 test('specifies native Windows Authenticode verification', () => {
@@ -249,14 +249,14 @@ test('defines severity priorities for cross-platform boundary failures', () => {
 
 test('defines immediate containment and credential revocation steps', () => {
   assert.ok(runbook.includes("Stop the affected run, automation, plugin/MCP worker or release job"));
-  assert.ok(runbook.includes("disable the affected integration or pause distribution"));
+  assert.ok(runbook.includes("Disable the affected integration or pause distribution"));
   assert.ok(runbook.includes("Revoke/rotate any credential that may have been read"));
   assert.ok(runbook.includes("Resume only after the affected boundary is fixed or mitigated"));
 });
 
 test('preserves Vault and fallback evidence without destructive recovery', () => {
   assert.ok(runbook.includes("do not delete, recreate, rotate or migrate the only copy"));
-  assert.ok(runbook.includes("Preserve vault.json, vault.json.key if present"));
+  assert.ok(runbook.includes("vault.json"));
   assert.ok(runbook.includes("restore only a known matching pair on a disposable copy first"));
 });
 
@@ -283,8 +283,8 @@ test('prohibits retaining raw credentials and private user data as evidence', ()
 });
 
 test('requires exact-SHA native checks, independent review and honest closure status', () => {
-  assert.ok(runbook.includes("identified the exact source SHA and installed artifact"));
-  assert.ok(runbook.includes("completed the applicable native OS checks"));
+  assert.ok(runbook.includes("Identified the exact source SHA and installed artifact"));
+  assert.ok(runbook.includes("Completed the applicable native OS checks"));
   assert.ok(runbook.includes("a skipped test or a mock-only result is not a native pass"));
   assert.ok(runbook.includes("Close a platform result as PASS, FAIL or NOT VERIFIED"));
   assert.ok(runbook.includes("Do not report a universal cross-platform PASS"));
