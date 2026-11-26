@@ -262,7 +262,7 @@ test('preserves Vault and fallback evidence without destructive recovery', () =>
 
 test('defines the evidence record for each platform and boundary', () => {
   for (const term of [
-    "full source SHA",
+    "full source commit SHA",
     "OS edition/release/build",
     "PASS/FAIL/NOT RUN classification",
     "owner, mode/ACL and relevant access principals",
