@@ -2,6 +2,8 @@
 
 This runbook defines a maintainer-operated response when an API key, OAuth credential, GitHub credential or release-signing credential may have been exposed or misused. It is designed for open-bot's local-first architecture: contain credentials at their issuer, keep evidence access-restricted, and do not introduce a hosted incident system, telemetry or collection of end-user application data.
 
+Reviewed repository base snapshot: 2d14cc1b73c3f9fecb4b92614c180fb15a404aec.
+
 This is a proposed manual procedure. It does not claim that the project has staffed security operations, a contractual response SLA, a bug-bounty programme or automatic secrets management.
 
 ## 1. Activation and immediate priorities
