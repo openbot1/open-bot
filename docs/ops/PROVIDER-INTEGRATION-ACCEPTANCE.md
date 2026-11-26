@@ -70,7 +70,7 @@ Composio is an optional connected-app integration, not a required dependency for
 2. If the owner has authorized a test, enable Composio explicitly in Settings and configure the user's project API key through the supported Vault path. The key belongs in Vault namespace `provider`, key `composio`; never put it in source, `.env`, logs or evidence.
 3. Confirm the UI exposes only configured/not-configured status, not the key value.
 4. Create or refresh a Tool Router session using the server-returned MCP URL and headers. Do not construct the presigned URL manually or log/store it in evidence.
-5. Verify the read-only discovery path: list session meta-tools, search for a harmless read-only toolkit action, retrieve its schema, and inspect the returned tool metadata. The documented wire shapes include the `toolkits` policy object, `tool_slugs` for schema lookup and `tool_slug` in execute items; do not replace these with guessed field names.
+5. Verify the read-only discovery path: list session meta-tools (`COMPOSIO_SEARCH_TOOLS` and `COMPOSIO_GET_TOOL_SCHEMAS`), search for a harmless read-only toolkit action, retrieve its schema, and inspect the returned tool metadata. The documented wire shapes include the `toolkits` policy object, `tool_slugs` for schema lookup and `tool_slug` in execute items; do not replace these with guessed field names.
 6. Confirm missing-key and invalid-session failures are fail-closed and do not expose the API key or presigned session URL.
 7. Disable Composio and verify its apps/tools disappear from the registry while local providers continue to work.
 
