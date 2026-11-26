@@ -206,7 +206,7 @@ test('documents the current updater check-only and manual-install behaviour', ()
   assert.ok(runbook.includes("does not download and install updates in-app"));
   assert.ok(runbook.includes("installed: false"));
   assert.ok(runbook.includes("manual download/install"));
-  assert.ok(runbook.includes("Do not promise silent, automatic or forced in-app installation"));
+  assert.ok(runbook.includes("User instructions must therefore describe manual download/install"));
 });
 
 test('distinguishes feed metadata consistency from native artifact verification', () => {
