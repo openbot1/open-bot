@@ -65,7 +65,7 @@ test('the bundle is uploaded to the same still-draft release without a publish o
   assert.ok(WORKFLOW.includes('release_after'));
   assert.ok(WORKFLOW.includes('.draft == true'));
   assert.doesNotMatch(WORKFLOW, /gh release edit .*--draft=false|gh release create|releases\/generate-notes/);
-  assert.ok(GUIDE.includes('does not change the release from draft to published'));
+  assert.ok(GUIDE.includes('never changes the release from draft to published'));
 });
 
 test('operator documentation explains the identity and non-provenance limitation', () => {
