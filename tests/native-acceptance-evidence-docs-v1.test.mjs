@@ -166,7 +166,7 @@ test('Linux packet identifies AppImage and unsigned limitation', () => {
 test('Linux packet covers clean install, FUSE and userData isolation', () => {
   assert.ok(linux.includes('fresh disposable Linux user profile'));
   assert.ok(linux.includes('FUSE/runtime requirements'));
-  assert.ok(linux.includes('do not run as root'));
+  assert.ok(linux.includes('Do not run as root'));
   assert.ok(linux.includes('~/.config/open-bot'));
 });
 
