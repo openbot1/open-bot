@@ -50,7 +50,7 @@ test('5. The current open queue is recorded without claiming snapshot PRs are cl
 
 test('6. Evidence vocabulary contains every allowed disposition', () => {
   assert.ok(dossier.includes('**SNAPSHOT-INTEGRATED**'));
-  assert.ok(dossier.includes('**PR-CLOSURE-PENDING**'));
+  assert.ok(dossier.includes('**LOCAL-LANDED / PUSH-AND-PR-RECONCILIATION-PENDING**'));
   assert.ok(dossier.includes('**PENDING-LAND**'));
   assert.ok(dossier.includes('**PASS**'));
   assert.ok(dossier.includes('**FAIL**'));
@@ -116,7 +116,7 @@ test('12. Slices one through four have exact heads and remain Draft pending land
   assert.ok(dossier.includes('c2560e110254665008bb965befd76f4f19cc00c3'));
   assert.ok(dossier.includes('ef7c85399b2b73dba8f5044b6817c06a2e98b6d7'));
   assert.ok(dossier.includes('Draft / PENDING-LAND'));
-  assert.ok(dossier.includes('static-review PASS is not a dynamic release gate'));
+  assert.ok(dossier.includes('No slice is LAND-READY solely because its documentation guard is static PASS.'));
 });
 
 test('13. Candidate evidence gates require one immutable full SHA', () => {
@@ -163,7 +163,7 @@ test('18. No assistant test execution or production GO is claimed', () => {
   assert.ok(dossier.includes('This author used GitHub-only source authoring'));
   assert.ok(dossier.includes('did not run tests, build, typecheck, CI'));
   assert.ok(dossier.includes('This dossier records no production GO.'));
-  assert.ok(dossier.includes('No production GO'));
+  assert.ok(dossier.includes('no production GO'));
   assert.ok(dossier.includes('12 check runs were queued'));
   assert.ok(dossier.includes('no CI pass is claimed'));
 });
