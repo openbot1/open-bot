@@ -1,6 +1,6 @@
 # Final Go-Live Acceptance Dossier
 
-Snapshot time: 2026-11-27 21:36 +07 (GitHub main, open PR inventory, PR #62 and CI read back during this cycle)
+Snapshot time: 2026-11-28 01:42 +07 (GitHub main, open PR inventory, PR #62 and CI read back during this cycle)
 Repository: openbot1/open-bot
 Phase: Release Candidate & Go-Live Evidence — Slice 5/5: GO Decision & Dossier Update
 Purpose: consolidate exact-candidate evidence and record an explicit release-owner HOLD/GO decision. This dossier is an evidence register, not an automatic approval.
