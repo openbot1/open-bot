@@ -49,7 +49,7 @@ test('5. The current open queue is recorded without claiming snapshot PRs are cl
 });
 
 test('6. Evidence vocabulary contains every allowed disposition', () => {
-  assert.ok(dossier.includes('**SNAPSHOT-INTEGRATED**'));
+  assert.ok(dossier.includes('**SNAPSHOT-INTEGRATED / CLOSED-UNMERGED**'));
   assert.ok(dossier.includes('**LOCAL-LANDED / PUSH-AND-PR-RECONCILIATION-PENDING**'));
   assert.ok(dossier.includes('**PENDING-LAND**'));
   assert.ok(dossier.includes('**PASS**'));
@@ -115,7 +115,7 @@ test('12. Slices one through four have exact heads and remain Draft pending land
   assert.ok(dossier.includes('e4626e8d6262ff531854322278c72221a7b1c0bc'));
   assert.ok(dossier.includes('c2560e110254665008bb965befd76f4f19cc00c3'));
   assert.ok(dossier.includes('ef7c85399b2b73dba8f5044b6817c06a2e98b6d7'));
-  assert.ok(dossier.includes('Draft / PENDING-LAND'));
+  assert.ok(dossier.includes('Draft/HOLD'));
   assert.ok(dossier.includes('No slice is LAND-READY solely because its documentation guard is static PASS.'));
 });
 
@@ -128,7 +128,7 @@ test('13. Candidate evidence gates require one immutable full SHA', () => {
 
 test('14. Artifact, signing and native platform evidence are mandatory', () => {
   assert.ok(dossier.includes('Artifact filename, package format, byte size, source URL and SHA-256.'));
-  assert.ok(dossier.includes('uploaded/downloaded bytes'));
+  assert.ok(dossier.includes('downloaded-byte comparison'));
   assert.ok(dossier.includes('Windows Authenticode'));
   assert.ok(dossier.includes('macOS notarization/Gatekeeper'));
   assert.ok(dossier.includes('Linux signing'));
@@ -137,7 +137,7 @@ test('14. Artifact, signing and native platform evidence are mandatory', () => {
 
 test('15. Provider and runtime gates require actual execution', () => {
   assert.ok(dossier.includes('Required provider matrix'));
-  assert.ok(dossier.includes('explicit consent'));
+  assert.ok(dossier.includes('explicit authorization'));
   assert.ok(dossier.includes('harmless live requests'));
   assert.ok(dossier.includes('Idle and controlled-activity soak'));
   assert.ok(dossier.includes('window-close vs quit'));
