@@ -121,7 +121,7 @@ test('13. Candidate evidence gates require one immutable full SHA', () => {
 });
 
 test('14. Artifact, signing and native platform evidence are mandatory', () => {
-  assert.ok(dossier.includes('Artifact filename, byte size, SHA-256'));
+  assert.ok(dossier.includes('Artifact filename, package format, byte size, source URL and SHA-256.'));
   assert.ok(dossier.includes('uploaded/downloaded bytes'));
   assert.ok(dossier.includes('Windows Authenticode'));
   assert.ok(dossier.includes('macOS notarization/Gatekeeper'));
