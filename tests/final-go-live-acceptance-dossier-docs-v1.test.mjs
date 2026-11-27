@@ -20,17 +20,16 @@ test('1. Slice 5/5 is identified and the decision defaults to HOLD', () => {
 test('2. Local source SHA and remote snapshot SHA remain distinct', () => {
   assert.ok(dossier.includes('8dc29d67'));
   assert.ok(dossier.includes('798d69ce226f12377131e2d7b37f3c7f45e89f5a'));
-  assert.ok(dossier.includes('The reported local HEAD `f40a98ba` and remote snapshot SHA `798d69ce...` are distinct identities.'));
+  assert.ok(dossier.includes('The reported local HEAD `11c23e87` and remote snapshot SHA `798d69ce...` are distinct identities.'));
   assert.ok(dossier.includes('Do not infer a full SHA or equate it with remote main'));
 });
 
 test('3. Local tree and test counts are attributed to the operator', () => {
-  assert.ok(dossier.includes('3,977 tracked files'));
-  assert.ok(dossier.includes('1,530,678'));
+  assert.ok(dossier.includes('Not supplied for this cycle'));
   assert.ok(dossier.includes('12,904 pass / 0 fail / 19 skipped'));
   assert.ok(dossier.includes('12,910 pass / 0 fail / 19 skipped'));
   assert.ok(dossier.includes('12,944 pass / 0 fail / 4 skipped'));
-  assert.ok(dossier.includes('full SHA NOT VERIFIED'));
+  assert.ok(dossier.includes('GitHub lookup of this short SHA returned no commit'));
   assert.ok(dossier.includes('OPERATOR-REPORTED'));
 });
 
@@ -70,7 +69,7 @@ test('7. The GO rule requires exact candidate evidence and release-owner authori
 test('8. Repository identity table records remote and local roles separately', () => {
   assert.ok(dossier.includes('Local source HEAD'));
   assert.ok(dossier.includes('GitHub main snapshot'));
-  assert.ok(dossier.includes('local HEAD `f40a98ba` and remote snapshot SHA'));
+  assert.ok(dossier.includes('local HEAD `11c23e87` and remote snapshot SHA'));
   assert.ok(dossier.includes('OPERATOR-REPORTED'));
   assert.ok(dossier.includes('GITHUB-READ-BACK'));
 });
@@ -86,8 +85,6 @@ test('9. Five snapshot PRs and their exact heads are listed', () => {
 test('10. Release engineering PR heads are recorded', () => {
   assert.ok(dossier.includes('e65bda54f599fb48dc16b9d5ba3fd486389b0488'));
   assert.ok(dossier.includes('6ba8de831c6b4a21267e243e9aabb40c73e7bc0f'));
-  assert.ok(dossier.includes('b146ec61'));
-  assert.ok(dossier.includes('71b287ae'));
   assert.ok(dossier.includes('be6cd6457c67b45302ae71e3cb125adc651fc114'));
   assert.ok(dossier.includes('eb5a9f3bafc8c81d60949c0a064ffd49a266f9c9'));
   assert.ok(dossier.includes('73c0bfa024f7f9c2d317a44e2c061c194d65dc55'));
@@ -164,7 +161,7 @@ test('18. No assistant test execution or production GO is claimed', () => {
   assert.ok(dossier.includes('did not run tests, build, typecheck, CI'));
   assert.ok(dossier.includes('This dossier records no production GO.'));
   assert.ok(dossier.includes('no production GO'));
-  assert.ok(dossier.includes('12 check runs were queued'));
+  assert.ok(dossier.includes('12 check runs and two workflow runs were queued'));
   assert.ok(dossier.includes('No CI success, production GO'));
 });
 
@@ -173,14 +170,12 @@ test('19. Local landings remain distinct from live GitHub PR state', () => {
   assert.ok(dossier.includes('Local landing reported'));
   assert.ok(dossier.includes('Open / Draft / unmerged'));
   assert.ok(dossier.includes('Do not close or merge these PR records until the next authorized snapshot push is read back'));
-  assert.ok(dossier.includes('current local head before landing'));
+  assert.ok(dossier.includes('current local main `11c23e87`'));
 });
 
 test('20. DYNAMIC-READY and fixpack results are attributed to the operator', () => {
-  assert.ok(dossier.includes('12,971 pass / 0 fail / 4 skipped'));
-  assert.ok(dossier.includes('13,002 pass / 0 fail / 4 skipped'));
-  assert.ok(dossier.includes('13,030 pass / 0 fail / 4 skipped'));
-  assert.ok(dossier.includes('gate is running in this cycle'));
+  assert.ok(dossier.includes('r2 coordinator timeout/no verdict'));
+  assert.ok(dossier.includes('r3 running'));
   assert.ok(dossier.includes('18/18'));
   assert.ok(dossier.includes('71/71'));
   assert.ok(dossier.includes('OPERATOR-REPORTED'));
@@ -193,31 +188,32 @@ test('21. The post-GO operational assurance phase is explicitly deferred', () =>
 });
 
 
-test('22. Four newly reported local landings and gate totals are recorded distinctly', () => {
-  assert.ok(dossier.includes('#53 → `46591ea6`; gate r4: 12,944 pass / 0 fail / 4 skipped.'));
-  assert.ok(dossier.includes('#54 → `0a59a89b`; gate: 12,971 pass / 0 fail / 4 skipped.'));
-  assert.ok(dossier.includes('#55 → `fd3743a5`; gate r2: 13,002 pass / 0 fail / 4 skipped.'));
-  assert.ok(dossier.includes('#56 → `16523040`; gate: 13,030 pass / 0 fail / 4 skipped, reported green on first run.'));
+test('22. Current local main and eight local landings are recorded distinctly', () => {
+  assert.ok(dossier.includes('Short SHA `11c23e87`'));
+  assert.ok(dossier.includes('The eight local landings #38, #39 and #53–#59'));
   assert.ok(dossier.includes('OPERATOR-REPORTED'));
 });
 
-test('23. PR 57 is in progress and is not misreported as landed', () => {
-  assert.ok(dossier.includes('#57 has reportedly been cherry-picked'));
-  assert.ok(dossier.includes('gate is running in this cycle'));
-  assert.ok(dossier.includes('It is NOT reported landed yet'));
-  assert.ok(dossier.includes('2d14ddbfc288e60675632240caf37bb0fc9a1667'));
+test('23. PR 59 preserves failure, retest and inconclusive gate history', () => {
+  assert.ok(dossier.includes('PR #59 is reported locally cherry-picked'));
+  assert.ok(dossier.includes('13,109 tests / 13,104 pass / 1 fail'));
+  assert.ok(dossier.includes('isolated CLI retest 7/7'));
+  assert.ok(dossier.includes('r2 coordinator timeout/no verdict'));
+  assert.ok(dossier.includes('r3 running'));
+  assert.ok(dossier.includes('four outcomes unaccounted'));
 });
 
-test('24. Current local metrics are explicitly not GitHub-verified', () => {
-  assert.ok(dossier.includes('3,977 tracked files'));
-  assert.ok(dossier.includes('1,530,678'));
-  assert.ok(dossier.includes('full local SHA and local counts are NOT VERIFIED'));
-  assert.ok(dossier.includes('Remote main has not advanced'));
+test('24. Current local identity and metrics are explicitly not GitHub-verified', () => {
+  assert.ok(dossier.includes('11c23e87'));
+  assert.ok(dossier.includes('GitHub lookup of this short SHA returned no commit'));
+  assert.ok(dossier.includes('Local tree size / line count'));
+  assert.ok(dossier.includes('Not supplied for this cycle'));
+  assert.ok(dossier.includes('Remote main remains behind reported local HEAD'));
 });
 
 test('25. Exactly eight ordered GO blockers are enumerated', () => {
   assert.ok(dossier.includes('## 8. Ordered GO blockers — all must be closed before a GO decision'));
-  assert.ok(dossier.includes('1. **Complete #57 and all remaining local landings.**'));
+  assert.ok(dossier.includes('1. **Complete the #59 gate and reconcile all eight local landings.**'));
   assert.ok(dossier.includes('2. **Finish the remaining PR queue and reconcile dependencies.**'));
   assert.ok(dossier.includes('3. **Reconcile local and remote source lineage.**'));
   assert.ok(dossier.includes('4. **Produce one immutable final candidate.**'));
