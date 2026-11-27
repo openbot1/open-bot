@@ -50,7 +50,7 @@ GO may be recorded only by the accountable release owner, with a dated decision 
 |---|---|---|---|
 | Local source HEAD | Operator reports short HEAD 46591ea6, clean | OPERATOR-REPORTED; full SHA NOT VERIFIED | Do not infer a full SHA from the short SHA |
 | GitHub main snapshot | 798d69ce226f12377131e2d7b37f3c7f45e89f5a; snapshot: local main 8dc29d67 (PRs #42, #43, #48, #51, #52) | GITHUB-READ-BACK | Remote main has not advanced to local 46591ea6 |
-| Source/snapshot relationship | Local short HEAD 46591ea6; remote snapshot SHA above | DISTINCT IDENTITIES; local full SHA NOT VERIFIED | Record both identities and never imply they are synchronized |
+| Source/snapshot relationship | Local short HEAD 46591ea6; remote snapshot SHA above | DISTINCT IDENTITIES; local full SHA NOT VERIFIED | Record both identities and never imply they are synchronized; never shorten or conflate them in final evidence |
 | Local tree size | Operator reports clean tree and 3,969 tracked files | OPERATOR-REPORTED | Not independently counted from GitHub |
 | Current local line count | NOT VERIFIED; 1,527,941 was counted before local landings #38/#39/#53 | NOT VERIFIED / STALE PRIOR COUNT | Recount on current local HEAD before publishing a current figure |
 | #38 gate | r1: 3 failures diagnosed as flakes; r2: 12,904 pass / 0 fail / 19 skipped; local landing b146ec61 | OPERATOR-REPORTED | r1 is not green; r2 is the reported successful rerun |
@@ -60,7 +60,7 @@ GO may be recorded only by the accountable release owner, with a dated decision 
 | PR #62 CI | 12/12 check runs queued; two workflow runs queued on head 847efaa95d4a2cfb2925bafeef6f8e0ab72918a9 | GITHUB-READ-BACK / PENDING | Queued is not pass; no CI success is claimed |
 | Release decision | Final candidate evidence and release-owner approval are incomplete | HOLD | No production GO authorized |
 
-The remote snapshot commit SHA is not the same as the local source HEAD. CI, build, tests and artifacts must each state the actual full SHA they used. The prior line count of 1,527,941 is explicitly pre-land and must not be reused as a current count.
+The remote snapshot commit SHA is not the same as the local source HEAD. The local source HEAD and GitHub snapshot commit are different commit identities. CI, build, tests and artifacts must each state the actual full SHA they used. The prior line count of 1,527,941 is explicitly pre-land and must not be reused as a current count.
 
 ## 4. PR evidence register
 
