@@ -1,6 +1,6 @@
 # Final Go-Live Acceptance Dossier
 
-Snapshot time: 2026-11-28 01:42 +07 (GitHub main, open PR inventory, PR #62 and CI read back during this cycle)
+Snapshot time: 2026-11-28 05:46 +07 (GitHub main, open PR inventory, PR #62 branch and CI read back during this cycle)
 Repository: openbot1/open-bot
 Phase: Release Candidate & Go-Live Evidence — Slice 5/5: GO Decision & Dossier Update
 Purpose: consolidate exact-candidate evidence and record an explicit release-owner HOLD/GO decision. This dossier is an evidence register, not an automatic approval.
@@ -9,25 +9,19 @@ Purpose: consolidate exact-candidate evidence and record an explicit release-own
 
 **CURRENT DECISION: HOLD — NOT AUTHORIZED FOR PRODUCTION GO-LIVE.**
 
-This cycle is a GitHub read-back update of the existing dossier PR #62 only. No new PR was created, and the post-GO Production Rollout phase remains deferred.
+This cycle updates the existing dossier PR #62 only. No Production Rollout PR is created; the post-GO rollout phase remains deferred. No snapshot push, PR closure or merge is performed in this cycle.
 
-Operator reports local main at short HEAD `f40a98ba`, clean, with 3,977 tracked files and 1,530,678 lines. These local values are OPERATOR-REPORTED and cannot be independently established from GitHub's remote main because local HEAD has not been pushed. The full local SHA and local tree/counts are NOT VERIFIED by this author.
+Operator reports local main at short HEAD `11c23e87`. The eight local landings reported ahead of GitHub main are #38, #39 and #53–#59. Their GitHub PR records remain Open/Draft/unmerged pending a later authorized snapshot push and reconciliation. The local SHA, clean-tree state, tracked-file count and line count are NOT independently verifiable from GitHub while the local branch is unpushed. A direct GitHub commit lookup for short SHA `11c23e87` returned “No commit found”; record it as OPERATOR-REPORTED, not GITHUB-VERIFIED.
 
-GitHub main was read back at full SHA `798d69ce226f12377131e2d7b37f3c7f45e89f5a`, message `snapshot: local main 8dc29d67 (PRs #42, #43, #48, #51, #52)`. Remote main has not advanced to the reported local HEAD `f40a98ba`.
+GitHub main was read back at full SHA `798d69ce226f12377131e2d7b37f3c7f45e89f5a`, message `snapshot: local main 8dc29d67 (PRs #42, #43, #48, #51, #52)`. Remote main has not advanced to the reported local HEAD.
 
-Operator reports the following local landings since the previous dossier cycle:
-- #53 → `46591ea6`; gate r4: 12,944 pass / 0 fail / 4 skipped.
-- #54 → `0a59a89b`; gate: 12,971 pass / 0 fail / 4 skipped.
-- #55 → `fd3743a5`; gate r2: 13,002 pass / 0 fail / 4 skipped.
-- #56 → `16523040`; gate: 13,030 pass / 0 fail / 4 skipped, reported green on first run.
-- Earlier local landings remain reported: #38 → `b146ec61` (r2 12,904/0/19; r1 had three failures diagnosed as flakes) and #39 → `71b287ae` (first run 12,910/0/19).
-- #57 has reportedly been cherry-picked (source head `2d14ddbf`); its gate is running in this cycle. It is NOT reported landed yet and has no completed gate result in this dossier.
+Operator reports #59 was cherry-picked as three commits from PR #59 source head `6e788fc4`, adding two files and 275 lines, with local main now at `11c23e87`. Its gate history must retain the initial failure: r1 reported 13,109 tests, 13,104 passed and one failure, a 60-second timeout in the CLI `--help` test. The isolated retest of that CLI test group reportedly passed 7/7; this does not erase the original full-gate failure. The r1 aggregate leaves four test outcomes unaccounted for by the supplied pass/fail figures; do not infer whether these were skipped, cancelled or another disposition without the raw runner summary. Gate r2 was cut off when the coordinator timed out and has NO verdict. Gate r3 is reported running; no result is claimed here. The reported suite size is approximately 13,109 tests.
 
-All local landing SHAs, gate results, local file counts and line counts above are OPERATOR-REPORTED, not independently executed or reproduced here. In particular, they are not GitHub CI results.
+The other seven local landings (#38, #39, #53–#58) and all local gate outcomes remain OPERATOR-REPORTED. In particular, do not turn #57/#58 prior static or verifier counts into a current-head full-suite PASS. GitHub still shows their individual PR records as open Drafts.
 
-Live GitHub confirms 23 open PRs, all Draft. #38, #39, #53, #54, #55 and #56 remain Open/Draft/unmerged despite reported local landings. #57 remains Open/Draft/unmerged and is not yet reported landed. #42, #43, #48, #51 and #52 are Closed with `merged=false`; #41 is also Closed with `merged=false`.
+Live GitHub read-back confirms exactly 23 open PRs, all Draft. The eight locally landed PR records #38, #39 and #53–#59 remain Open/Draft/unmerged. #42, #43, #48, #51 and #52 are Closed with `merged=false`; #41 is also Closed with `merged=false`.
 
-PR #62 is the existing Open/Draft/unmerged dossier PR, still based on remote main `798d69ce...`. Its current head before this update was `e6082dd7dc1c46f1d1ade6506e01dbdcf34e436f`. Its 12/12 check runs and both workflow runs remain Queued; this is NOT PASS. No CI success, production GO, release-owner approval, signing, notarization or native acceptance is claimed.
+PR #62 at the start of this cycle is Open/Draft/unmerged, based on remote main `798d69ce226f12377131e2d7b37f3c7f45e89f5a`, with head `a677db50dceb5d669654710efbbb6432542ecd29`. The currently read-back CI for that pre-update head has 12 queued check runs and two queued workflow runs; this is NOT PASS. The dossier guard source contains 26 top-level test groups, 143 assertion calls and 143 literal `dossier.includes(...)` checks; the operator reports 26/26 passing. This author did not execute those tests. No CI success, production GO, release-owner approval, signing, notarization or native acceptance is claimed.
 
 ## 2. Evidence vocabulary and decision rules
 
@@ -53,22 +47,23 @@ GO may be recorded only by the accountable release owner, with a dated decision 
 
 | Item | Current value | Evidence state | Decision rule |
 |---|---|---|---|
-| Local source HEAD | Short SHA `f40a98ba` | OPERATOR-REPORTED; full SHA NOT VERIFIED | Do not infer a full SHA or equate it with remote main |
-| GitHub main snapshot | `798d69ce226f12377131e2d7b37f3c7f45e89f5a`; snapshot: local `8dc29d67` (PRs #42/#43/#48/#51/#52) | GITHUB-READ-BACK | Remote main has not advanced to reported local HEAD |
-| Local tree size | 3,977 tracked files; clean | OPERATOR-REPORTED / NOT VERIFIED by GitHub | Reconfirm locally on final candidate |
-| Local line count | 1,530,678 | OPERATOR-REPORTED / NOT VERIFIED by GitHub | Current local count cannot be verified from remote snapshot |
-| #38 | Local landing `b146ec61`; r2 12,904 pass / 0 fail / 19 skipped; r1 had 3 failures diagnosed as flakes | OPERATOR-REPORTED | Preserve r1 failures; r2 is reported rerun |
-| #39 | Local landing `71b287ae`; first run 12,910 pass / 0 fail / 19 skipped | OPERATOR-REPORTED | Keep exact local candidate identity |
-| #53 | Local landing `46591ea6`; r4 12,944 pass / 0 fail / 4 skipped | OPERATOR-REPORTED | Not independently reproduced |
-| #54 | Local landing `0a59a89b`; 12,971 pass / 0 fail / 4 skipped | OPERATOR-REPORTED | Not independently reproduced |
-| #55 | Local landing `fd3743a5`; r2 13,002 pass / 0 fail / 4 skipped | OPERATOR-REPORTED | Not independently reproduced |
-| #56 | Local landing `16523040`; 13,030 pass / 0 fail / 4 skipped, first run | OPERATOR-REPORTED | Not independently reproduced |
-| #57 | Cherry-pick reportedly in progress on local main; source head `2d14ddbf`; gate running | OPERATOR-REPORTED / IN PROGRESS | Not landed; no completed gate result |
-| GitHub open PR queue | 23 open, all Draft | GITHUB-READ-BACK | Includes locally landed PR records still open |
-| PR #62 CI | 12/12 check runs queued; two workflow runs queued on head `e6082dd7dc1c46f1d1ade6506e01dbdcf34e436f` | GITHUB-READ-BACK / PENDING | Queued is not PASS |
+| Local source HEAD | Short SHA `11c23e87` | OPERATOR-REPORTED; GitHub lookup of this short SHA returned no commit | Do not infer a full SHA or equate it with remote main |
+| GitHub main snapshot | `798d69ce226f12377131e2d7b37f3c7f45e89f5a`; snapshot: local `8dc29d67` (PRs #42/#43/#48/#51/#52) | GITHUB-READ-BACK | Remote main remains behind reported local HEAD |
+| Local tree size / line count | Not supplied for this cycle | NOT VERIFIED | Reconfirm locally on final candidate; do not reuse prior-cycle counts |
+| Local landed PRs | #38, #39, #53, #54, #55, #56, #57, #58, #59 | OPERATOR-REPORTED; GitHub PR records remain open | Await authorized snapshot push and reconciliation |
+| #59 cherry-pick | Three commits from source head `6e788fc4`; two files, +275 lines; local HEAD `11c23e87` | OPERATOR-REPORTED | Not independently visible on remote main |
+| #59 gate r1 | 13,109 tests; 13,104 pass; 1 fail (CLI `--help` 60-second timeout); four outcomes unaccounted in supplied aggregate | OPERATOR-REPORTED / FAIL | Preserve original failure and reconcile raw summary |
+| #59 isolated retest | CLI test group reportedly 7/7 pass | OPERATOR-REPORTED | Supplemental retest; does not convert r1 full gate to PASS |
+| #59 gate r2 | Coordinator timeout; no verdict | OPERATOR-REPORTED / NO VERDICT | Not PASS; do not count partial run as green |
+| #59 gate r3 | Running at cycle start | OPERATOR-REPORTED / IN PROGRESS | Await complete exit code, summary and SUITE_EXIT |
+| Full-suite size | Approximately 13,109 tests | OPERATOR-REPORTED | Approximate suite size, not a completed gate verdict |
+| GitHub open PR queue | Exactly 23 open, all Draft | GITHUB-READ-BACK | Includes eight locally landed PR records still open |
+| PR #62 at cycle start | Head `a677db50dceb5d669654710efbbb6432542ecd29`; base `798d69ce226f12377131e2d7b37f3c7f45e89f5a` | GITHUB-READ-BACK | New dossier commit requires fresh CI read-back |
+| PR #62 CI at cycle start | 12 check runs queued; two workflow runs queued | GITHUB-READ-BACK / PENDING | Queued is not PASS |
+| Dossier documentation guard | 26 top-level groups, 143 assertion calls, 143 literal checks; operator reports 26/26 pass | Source inventory read-back + OPERATOR-REPORTED execution | Static/documentation guard only; not product/full-suite acceptance |
 | Release decision | Candidate evidence and release-owner GO approval incomplete | HOLD | No production GO authorized |
 
-The reported local HEAD `f40a98ba` and remote snapshot SHA `798d69ce...` are distinct identities. The local file/line counts and gate outcomes are not verifiable from the unchanged GitHub main snapshot; they are explicitly retained as operator-reported evidence only.
+The reported local HEAD `11c23e87` and remote snapshot SHA `798d69ce...` are distinct identities. The short local SHA was not found by GitHub's commit lookup; local file/line counts were not supplied this cycle. All local landing and gate outcomes remain explicitly operator-reported, not GitHub CI results.
 
 ## 4. PR evidence register
 
@@ -88,33 +83,27 @@ The live GitHub PR records are closed but not merged. Their presence in the earl
 
 ### 4.2 Locally landed — remote push and PR reconciliation still pending
 
-| PR | Local landing reported | Current GitHub head SHA | GitHub state | Local gate reported by operator |
+| PR | Local landing reported | Current GitHub head SHA | GitHub state | Local evidence reported by operator |
 |---|---|---|---|---|
-| #38 | `b146ec61` | `e65bda54f599fb48dc16b9d5ba3fd486389b0488` | Open / Draft / unmerged | r1: 3 failures diagnosed as flakes; r2: 12,904 pass / 0 fail / 19 skipped |
-| #39 | `71b287ae` | `6ba8de831c6b4a21267e243e9aabb40c73e7bc0f` | Open / Draft / unmerged | First run: 12,910 pass / 0 fail / 19 skipped |
-| #53 | `46591ea6` | `8a1239e2bc114ed42843b921def8f9f4e772326f` | Open / Draft / unmerged | r4: 12,944 pass / 0 fail / 4 skipped |
-| #54 | `0a59a89b` | `064bf8c11510d0183a3a8c2c30c7b457d5e2a5c7` | Open / Draft / unmerged | 12,971 pass / 0 fail / 4 skipped |
-| #55 | `fd3743a5` | `2cf14e2baeee4475db3efebde444a5aaf3ac6ec4` | Open / Draft / unmerged | r2: 13,002 pass / 0 fail / 4 skipped |
-| #56 | `16523040` | `35cdce02aadb733eee13ff915893e070a44e397d` | Open / Draft / unmerged | 13,030 pass / 0 fail / 4 skipped; reported first-run green |
+| #38 | Included in local main `11c23e87` | `e65bda54f599fb48dc16b9d5ba3fd486389b0488` | Open / Draft / unmerged | Earlier gate record: r1 had 3 failures diagnosed as flakes; r2 12,904 pass / 0 fail / 19 skipped |
+| #39 | Included in local main `11c23e87` | `6ba8de831c6b4a21267e243e9aabb40c73e7bc0f` | Open / Draft / unmerged | Earlier first-run record: 12,910 pass / 0 fail / 19 skipped |
+| #53 | Included in local main `11c23e87` | `8a1239e2bc114ed42843b921def8f9f4e772326f` | Open / Draft / unmerged | Earlier r4 record: 12,944 pass / 0 fail / 4 skipped |
+| #54 | Included in local main `11c23e87` | `064bf8c11510d0183a3a8c2c30c7b457d5e2a5c7` | Open / Draft / unmerged | Earlier record: 12,971 pass / 0 fail / 4 skipped |
+| #55 | Included in local main `11c23e87` | `2cf14e2baeee4475db3efebde444a5aaf3ac6ec4` | Open / Draft / unmerged | Earlier r2 record: 13,002 pass / 0 fail / 4 skipped |
+| #56 | Included in local main `11c23e87` | `35cdce02aadb733eee13ff915893e070a44e397d` | Open / Draft / unmerged | Earlier record: 13,030 pass / 0 fail / 4 skipped; reported first-run green |
+| #57 | Included in local main `11c23e87` | `2d14ddbfc288e60675632240caf37bb0fc9a1667` | Open / Draft / unmerged | Local landing reported; final gate summary not supplied in this cycle |
+| #58 | Included in local main `11c23e87` | `4369feba884727818bffb1109101db096798f374` | Open / Draft / unmerged | Earlier 18/18 readiness result reported; not a full-suite verdict |
+| #59 | Three commits cherry-picked from source head `6e788fc4`; two files, +275 lines; included in local main `11c23e87` | `6e788fc4d91d1a94487bad0493f3c945e57eab39` | Open / Draft / unmerged | r1: 13,109 tests / 13,104 pass / 1 fail (CLI `--help` timeout); isolated CLI retest 7/7; four outcomes unaccounted; r2 coordinator timeout/no verdict; r3 running |
 
-The GitHub PR head SHAs are remote branch heads, not local landing commit SHAs. The local landing SHAs and gate results are operator-reported. Do not close or merge these PR records until the next authorized snapshot push is read back and the coordinator reconciles the records.
+The GitHub PR head SHAs are remote branch heads, not local landing commit SHAs. The local landing state and gate results are operator-reported. Do not close or merge these PR records until the next authorized snapshot push is read back and the coordinator reconciles the records. The initial #59 failure remains part of the evidence record even after its isolated 7/7 retest.
 
-### 4.3 Cherry-picked / gate in progress — not landed
+### 4.3 Cherry-pick and gate disposition — #59 is not a completed gate
 
-| PR | Source head | GitHub head SHA | GitHub state | Current disposition |
-|---|---|---|---|---|
-| #57 | `2d14ddbf` (operator-reported cherry-pick source) | `2d14ddbfc288e60675632240caf37bb0fc9a1667` | Open / Draft / unmerged | Gate is reported running in this cycle; no completed result and not reported landed |
+PR #59 is reported locally cherry-picked, but its verification is not complete. Preserve the r1 failure, record the isolated 7/7 retest only as supplemental evidence, treat r2 as NO VERDICT because the coordinator timed out, and await the complete r3 result. The suite's approximate 13,109-test size is not itself a gate result. Do not mark #59 fully accepted or infer the four unaccounted r1 outcomes.
 
-### 4.3.1 DYNAMIC-READY — operator-reported, still awaiting local landing
+### 4.3.1 Remaining local/remote reconciliation
 
-| PR | Scope | Current GitHub head SHA | Operator-reported verifier | Required next step |
-|---|---|---|---|---|
-| #58 | Clean install and first run | `4369feba884727818bffb1109101db096798f374` | 18/18 | Land only after dependency check; rerun relevant gate on resulting head |
-| #59 | Upgrade and data preservation | `6e788fc4d91d1a94487bad0493f3c945e57eab39` | 18/18 | Land only after dependency check; rerun relevant gate on resulting head |
-
-These readiness counts are operator-reported, not GitHub CI conclusions. Both PRs remain Open/Draft/unmerged in the live listing.
-
-
+The eight local landings #38, #39 and #53–#59 remain Open/Draft/unmerged on GitHub. No remote PR is closed or merged in this cycle. The next authorized snapshot must be read back at full SHA and compared to the reported local source lineage before PR records are reconciled.
 
 ### 4.4 Fixpack re-verified on copy — dynamic verification still required
 
@@ -128,7 +117,7 @@ These readiness counts are operator-reported, not GitHub CI conclusions. Both PR
 | #49 | Local data migration and rollback | 817a42547f4b51601821e322c937239f581464ad | Included in 71/71 /tmp-copy re-verification | Dynamic verification on current local head before landing |
 | #50 | Crash consistency fault injection | a665caf162316a046f07b53634a0b2dc9461c6ab | Included in 71/71 /tmp-copy re-verification | Dynamic verification on current local head before landing |
 
-The 71/71 result is operator-reported and applies to a /tmp copy. It does not satisfy the required dynamic verification on current local main 46591ea6.
+The 71/71 result is operator-reported and applies to a /tmp copy. It does not satisfy the required dynamic verification on current local main `11c23e87`.
 
 ### 4.5 Static PASS but intentionally Draft/HOLD — not LAND-READY
 
@@ -140,7 +129,7 @@ The 71/71 result is operator-reported and applies to a /tmp copy. It does not sa
 | 2/5 #64 | Candidate evidence checklist | e4626e8d6262ff531854322278c72221a7b1c0bc | Operator-reported static PASS 20/20; Draft/HOLD |
 | 3/5 #65 | CI unblock and verification | c2560e110254665008bb965befd76f4f19cc00c3 | Operator-reported static PASS 16/16; Draft/HOLD |
 | 4/5 #66 | Native acceptance evidence | ef7c85399b2b73dba8f5044b6817c06a2e98b6d7 | Operator-reported static PASS 21/21 and 102/102 literal matches; Draft/HOLD |
-| 5/5 #62 | Final go-live acceptance dossier | 847efaa95d4a2cfb2925bafeef6f8e0ab72918a9 | Existing PR updated in place; 18 documentation-guard groups from prior static inspection; Draft/HOLD |
+| 5/5 #62 | Final go-live acceptance dossier | `a677db50dceb5d669654710efbbb6432542ecd29` (GitHub head at cycle start) | Existing PR updated in place; 26 documentation-guard groups; operator reports 26/26 pass; Draft/HOLD |
 
 Static-review counts are operator-reported except the previously recorded static inspection of the current #62 source; none of these statements represents a successful CI run or author-executed test. No slice is LAND-READY solely because its documentation guard is static PASS.
 
@@ -148,9 +137,9 @@ Static-review counts are operator-reported except the previously recorded static
 
 The live GitHub `GET /pulls?state=open&per_page=100` response contained exactly 23 open PRs, and every returned PR was Draft. The open numbers were: #38, #39, #40, #44, #45, #46, #47, #49, #50, #53, #54, #55, #56, #57, #58, #59, #60, #61, #62, #63, #64, #65 and #66. #41 and #42/#43/#48/#51/#52 were separately read back as closed with `merged=false`.
 
-PR #62 live metadata before this update: Open, Draft, unmerged; base main at `798d69ce226f12377131e2d7b37f3c7f45e89f5a`; head `e6082dd7dc1c46f1d1ade6506e01dbdcf34e436f`; two files changed, +434 / −0.
+PR #62 live metadata at the start of this cycle: Open, Draft, unmerged; base main at `798d69ce226f12377131e2d7b37f3c7f45e89f5a`; head `a677db50dceb5d669654710efbbb6432542ecd29`; two files changed, +485 / −0.
 
-CI read-back for PR #62 pre-update head `e6082dd7dc1c46f1d1ade6506e01dbdcf34e436f`: workflow runs #46020417565 (pull_request) and #46020409172 (push) were both queued; all 12 check runs were queued and zero completed. This is NOT PASS. The update to this PR creates a new head and therefore requires a fresh CI read-back; queued checks on the old head do not validate the new head.
+CI read-back for PR #62 head at cycle start `a677db50dceb5d669654710efbbb6432542ecd29`: workflow runs #46051949895 (pull_request) and #46051944834 (push) were both queued; all 12 check runs were queued and zero completed. This is NOT PASS. The dossier update creates a new head and therefore requires a fresh CI read-back; queued checks on the old head do not validate the new head.
 
 ## 5. Final candidate evidence gates
 
@@ -226,7 +215,7 @@ Only the accountable release owner may record GO. A PR approval, static review, 
 
 ## 8. Ordered GO blockers — all must be closed before a GO decision
 
-1. **Complete #57 and all remaining local landings.** #57 is cherry-picked per operator report and its gate is still running; it is not landed yet. Complete that gate with exit code, full summary and SUITE_EXIT. Then complete required dynamic verification/landing for #58/#59 and the remaining eligible PRs (#40, #44–#47, #49–#50) on the current local head. The six local landings #38/#39/#53–#56 are operator-reported and their PR records remain open on GitHub.
+1. **Complete the #59 gate and reconcile all eight local landings.** #59 is cherry-picked per operator report, but r1 contains one CLI `--help` timeout failure and four unaccounted outcomes in the supplied aggregate; its isolated 7/7 retest is supplemental only, r2 has no verdict, and r3 is running. Obtain the full r3 exit code, runner summary and SUITE_EXIT; reconcile the raw r1 summary and preserve the initial failure. #38/#39/#53–#58 are also reported locally landed. All eight corresponding PR records remain Open/Draft on GitHub until an authorized snapshot push and read-back.
 2. **Finish the remaining PR queue and reconcile dependencies.** Read current head/base and dependency for every PR before landing. Keep #60–#66 Draft/HOLD until their evidence prerequisites are met. Do not equate static PASS with LAND-READY. After each source change, rerun affected checks on the resulting head.
 3. **Reconcile local and remote source lineage.** Reconfirm clean local tree, full local SHA, tracked file count and line count on final local main. After authorized snapshot push, read back GitHub main and verify exact source correspondence. Reconcile/close locally landed PR records only after their contents are confirmed in the pushed snapshot. The current local metrics remain operator-reported, not GitHub-verified.
 4. **Produce one immutable final candidate.** Record exact full local and remote candidate SHAs, clean tree, version metadata, PR-to-commit mapping and artifact lineage. Any later source change invalidates affected downstream evidence and requires rerun/reconciliation.
@@ -235,7 +224,7 @@ Only the accountable release owner may record GO. A PR approval, static review, 
 7. **Complete operational/security acceptance and independent review.** Close security, credential compromise, incident response, migration, crash consistency, backup/restore, runtime stability, rollback/forward-fix and provider acceptance. Preserve all failures, skips and exceptions with owners/dispositions; obtain independent reviewer sign-off and name rollback authority.
 8. **Obtain explicit release-owner GO/HOLD decision.** Only after blockers 1–7 are evidenced may the accountable release owner record a dated decision naming the exact full candidate SHA and artifact manifest. No production publication before explicit GO; otherwise remain HOLD.
 
-Current state against these blockers: (1) #57 gate in progress; (2) 23 PRs still open/Draft, with #58/#59 reported ready and seven fixpack PRs needing dynamic verification on current local head; (3) local/remote divergence remains; (4) no final immutable candidate; (5) PR #62 CI is queued on its pre-update head and new head requires fresh checks; (6) artifact/native evidence not complete; (7) operational/security acceptance and independent sign-off not complete; (8) no release-owner GO record exists.
+Current state against these blockers: (1) eight local landings are reported, but #59 r3 is still running and r1/r2 remain non-green or inconclusive; (2) 23 PRs remain Open/Draft and the seven fixpack PRs #40/#44–#47/#49/#50 still need dynamic verification on current local main; #60/#61/#63–#66 remain static-only and not LAND-READY; (3) local/remote divergence remains; (4) no final immutable candidate; (5) PR #62's old head had 12 queued checks and two queued workflows, and the new head requires fresh checks; (6) artifact/native evidence is incomplete; (7) operational/security acceptance and independent sign-off are incomplete; (8) no release-owner GO record exists.
 
 ## 8.1 Work explicitly deferred until AFTER GO
 
@@ -243,9 +232,10 @@ The separate phase Production Rollout & Post-Go-Live Operational Assurance remai
 
 ## 9. Current disposition
 
-**HOLD remains in force.** GitHub main remains `798d69ce226f12377131e2d7b37f3c7f45e89f5a`; local main is operator-reported at short HEAD `f40a98ba`, with 3,977 files and 1,530,678 lines, but full local SHA and local counts are NOT VERIFIED by this GitHub read-back. Six PRs (#38/#39/#53/#54/#55/#56) are reported locally landed; all six remain Open/Draft/unmerged on GitHub. #57 is reported cherry-picked with its gate still running and is not yet landed. The live GitHub queue is 23 Open/Draft PRs. PR #62's previous head had 12/12 queued checks and two queued workflows; no CI pass is claimed, and the new head needs its own CI result.
+**HOLD remains in force.** GitHub main remains `798d69ce226f12377131e2d7b37f3c7f45e89f5a`; local main is operator-reported at short HEAD `11c23e87`, but GitHub could not resolve that short SHA and local file/line counts were not supplied for this cycle. Eight PRs (#38, #39, #53, #54, #55, #56, #57, #58, #59) are reported locally landed; all eight remain Open/Draft/unmerged on GitHub. #59's r1 full-gate failure is retained, its 7/7 isolated CLI retest is supplemental, r2 has no verdict and r3 is running. The live GitHub queue is exactly 23 Open/Draft PRs. PR #62's head at cycle start was `a677db50dceb5d669654710efbbb6432542ecd29`; its 12 check runs and two workflow runs were queued. The new dossier head requires its own CI read-back.
 
 The eight GO blockers in Section 8 remain open. The Production Rollout & Post-Go-Live Operational Assurance phase remains explicitly deferred until after GO; no PR for that phase is created or requested here.
+
 
 This author used GitHub-only source authoring and did not run tests, build, typecheck, CI, native installation, provider requests, soak, signing, notarization or production release checks. This dossier records no production GO.
 
