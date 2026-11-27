@@ -25,24 +25,27 @@ test('2. Local source SHA and remote snapshot SHA remain distinct', () => {
 });
 
 test('3. Local tree and test counts are attributed to the operator', () => {
-  assert.ok(dossier.includes('3,963 tracked files and 1,527,941 lines'));
-  assert.ok(dossier.includes('12,914 pass / 0 fail / 3 skipped'));
-  assert.ok(dossier.includes('These local tree counts and test results are operator-reported'));
-  assert.ok(dossier.includes('this author did not run or independently reproduce them'));
+  assert.ok(dossier.includes('3,969 tracked files'));
+  assert.ok(dossier.includes('1,527,941-line count was measured before local landings #38, #39 and #53'));
+  assert.ok(dossier.includes('12,904 pass / 0 fail / 19 skipped'));
+  assert.ok(dossier.includes('12,910 pass / 0 fail / 19 skipped'));
+  assert.ok(dossier.includes('10,982 pass / 0 fail / 143 cancelled / 13 skipped'));
+  assert.ok(dossier.includes('full SHA NOT VERIFIED'));
+  assert.ok(dossier.includes('OPERATOR-REPORTED'));
 });
 
 test('4. Snapshot identity and snapshot-integrated state are explicit', () => {
   assert.ok(dossier.includes('snapshot: local main 8dc29d67 (PRs #42, #43, #48, #51, #52)'));
   assert.ok(dossier.includes('SNAPSHOT-INTEGRATED'));
-  assert.ok(dossier.includes('PR-CLOSURE-PENDING'));
-  assert.ok(dossier.includes('does not itself change their individual GitHub PR state'));
+  assert.ok(dossier.includes('CLOSED-UNMERGED'));
+  assert.ok(dossier.includes('closed with merged=false'));
 });
 
 test('5. The current open queue is recorded without claiming snapshot PRs are closed', () => {
-  assert.ok(dossier.includes('GitHub listed 28 open PRs at read-back, all Draft.'));
-  assert.ok(dossier.includes('Five are snapshot-integrated with PR closure pending; 23 other PRs remain PENDING-LAND.'));
-  assert.ok(dossier.includes('those five PRs open and Draft'));
-  assert.ok(dossier.includes('maximum listed PR number was #66'));
+  assert.ok(dossier.includes('exactly 23 open PRs'));
+  assert.ok(dossier.includes('every returned PR was Draft'));
+  assert.ok(dossier.includes('PRs #42, #43, #48, #51 and #52 were separately read back as closed'));
+  assert.ok(dossier.includes('23 open PRs, all Draft'));
 });
 
 test('6. Evidence vocabulary contains every allowed disposition', () => {
@@ -83,6 +86,8 @@ test('9. Five snapshot PRs and their exact heads are listed', () => {
 test('10. Release engineering PR heads are recorded', () => {
   assert.ok(dossier.includes('e65bda54f599fb48dc16b9d5ba3fd486389b0488'));
   assert.ok(dossier.includes('6ba8de831c6b4a21267e243e9aabb40c73e7bc0f'));
+  assert.ok(dossier.includes('b146ec61'));
+  assert.ok(dossier.includes('71b287ae'));
   assert.ok(dossier.includes('be6cd6457c67b45302ae71e3cb125adc651fc114'));
   assert.ok(dossier.includes('eb5a9f3bafc8c81d60949c0a064ffd49a266f9c9'));
   assert.ok(dossier.includes('73c0bfa024f7f9c2d317a44e2c061c194d65dc55'));
@@ -94,6 +99,7 @@ test('10. Release engineering PR heads are recorded', () => {
 
 test('11. Security, operations and lifecycle PR heads are recorded', () => {
   assert.ok(dossier.includes('8a1239e2bc114ed42843b921def8f9f4e772326f'));
+  assert.ok(dossier.includes('10,982 pass / 0 fail / 143 cancelled / 13 skipped'));
   assert.ok(dossier.includes('064bf8c11510d0183a3a8c2c30c7b457d5e2a5c7'));
   assert.ok(dossier.includes('2cf14e2baeee4475db3efebde444a5aaf3ac6ec4'));
   assert.ok(dossier.includes('35cdce02aadb733eee13ff915893e070a44e397d'));
@@ -158,4 +164,30 @@ test('18. No assistant test execution or production GO is claimed', () => {
   assert.ok(dossier.includes('did not run tests, build, typecheck, CI'));
   assert.ok(dossier.includes('This dossier records no production GO.'));
   assert.ok(dossier.includes('No production GO'));
+  assert.ok(dossier.includes('12 check runs were queued'));
+  assert.ok(dossier.includes('no CI pass is claimed'));
+});
+
+
+test('19. Local landings remain distinct from live GitHub PR state', () => {
+  assert.ok(dossier.includes('Local landing reported'));
+  assert.ok(dossier.includes('Open / Draft / unmerged'));
+  assert.ok(dossier.includes('push and PR reconciliation pending'));
+  assert.ok(dossier.includes('current local head before landing'));
+});
+
+test('20. DYNAMIC-READY and fixpack results are attributed to the operator', () => {
+  assert.ok(dossier.includes('27/27'));
+  assert.ok(dossier.includes('31/31'));
+  assert.ok(dossier.includes('28/28'));
+  assert.ok(dossier.includes('39/39'));
+  assert.ok(dossier.includes('18/18'));
+  assert.ok(dossier.includes('71/71'));
+  assert.ok(dossier.includes('OPERATOR-REPORTED'));
+});
+
+test('21. The post-GO operational assurance phase is explicitly deferred', () => {
+  assert.ok(dossier.includes('Work explicitly deferred until AFTER GO'));
+  assert.ok(dossier.includes('Production Rollout & Post-Go-Live Operational Assurance'));
+  assert.ok(dossier.includes('Do not create or land PRs for this phase before the release owner has explicitly authorized GO.'));
 });
