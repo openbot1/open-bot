@@ -21,7 +21,7 @@ The eight earlier local landings (#38, #39, #53–#58), plus the #59 cherry-pick
 
 Live GitHub read-back confirms exactly 23 open PRs, all Draft. The eight locally landed PR records #38, #39 and #53–#59 remain Open/Draft/unmerged. #42, #43, #48, #51 and #52 are Closed with `merged=false`; #41 is also Closed with `merged=false`.
 
-PR #62 at the start of this cycle is Open/Draft/unmerged, based on remote main `798d69ce226f12377131e2d7b37f3c7f45e89f5a`, with head `a677db50dceb5d669654710efbbb6432542ecd29`. The currently read-back CI for that pre-update head has 12 queued check runs and two queued workflow runs; this is NOT PASS. The dossier guard source contains 26 top-level test groups, 139 assertion calls and 139 literal `dossier.includes(...)` checks; the operator reports 26/26 passing. This author did not execute those tests. No CI success, production GO, release-owner approval, signing, notarization or native acceptance is claimed.
+PR #62 at the start of this cycle is Open/Draft/unmerged, based on remote main `798d69ce226f12377131e2d7b37f3c7f45e89f5a`, with head `a677db50dceb5d669654710efbbb6432542ecd29`. The currently read-back CI for that pre-update head has 12 queued check runs and two queued workflow runs; this is NOT PASS. The dossier guard source contains 26 top-level test groups, 139 assertion calls and 139 literal `dossier.includes(...)` checks; the operator reports 26/26 passing on the pre-update guard revision; the updated guard has not been executed by this author. No CI success, production GO, release-owner approval, signing, notarization or native acceptance is claimed.
 
 ## 2. Evidence vocabulary and decision rules
 
@@ -60,7 +60,7 @@ GO may be recorded only by the accountable release owner, with a dated decision 
 | GitHub open PR queue | Exactly 23 open, all Draft | GITHUB-READ-BACK | Includes eight locally landed PR records still open |
 | PR #62 at cycle start | Head `a677db50dceb5d669654710efbbb6432542ecd29`; base `798d69ce226f12377131e2d7b37f3c7f45e89f5a` | GITHUB-READ-BACK | New dossier commit requires fresh CI read-back |
 | PR #62 CI at cycle start | 12 check runs queued; two workflow runs queued | GITHUB-READ-BACK / PENDING | Queued is not PASS |
-| Dossier documentation guard | 26 top-level groups, 139 assertion calls, 139 literal checks; operator reports 26/26 pass | Source inventory read-back + OPERATOR-REPORTED execution | Static/documentation guard only; not product/full-suite acceptance |
+| Dossier documentation guard | 26 top-level groups, 139 assertion calls, 139 literal checks; operator reports 26/26 pass on the pre-update revision; updated guard not executed | Source inventory read-back + OPERATOR-REPORTED execution | Static/documentation guard only; not product/full-suite acceptance |
 | Release decision | Candidate evidence and release-owner GO approval incomplete | HOLD | No production GO authorized |
 
 The reported local HEAD `11c23e87` and remote snapshot SHA `798d69ce...` are distinct identities. The short local SHA was not found by GitHub's commit lookup; local file/line counts were not supplied this cycle. All local landing and gate outcomes remain explicitly operator-reported, not GitHub CI results.
