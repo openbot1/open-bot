@@ -208,10 +208,10 @@ test('23. PR 59 preserves failure, retest and inconclusive gate history', () => 
 
 test('24. Current local identity and metrics are explicitly not GitHub-verified', () => {
   assert.ok(dossier.includes('bf89e113fde085f491cab6df708e15ec1d256053'));
-  assert.ok(dossier.includes('The full local SHA and local filesystem counts are OPERATOR-REPORTED, not GITHUB-VERIFIED'));
+  assert.ok(dossier.includes('the current full local SHA and line count were not supplied'));
   assert.ok(dossier.includes('Local tree size / line count'));
   assert.ok(dossier.includes('3,986 tracked files / 1,531,721 lines; clean tree (0 changes)'));
-  assert.ok(dossier.includes('current local main is three commits ahead of remote for #45'));
+  assert.ok(dossier.includes('Current local main is `c40465b7`, clean, 3,988 tracked files, three commits ahead of remote for PR #45'));
 });
 
 test('25. Exactly eight ordered GO blockers are enumerated', () => {
@@ -251,7 +251,7 @@ test('29. Successful snapshot push, open PR reconciliation and #45 gate state ar
   assert.ok(dossier.includes('sync record: 109 entries'));
   assert.ok(dossier.includes('3,988 tracked files'));
   assert.ok(dossier.includes('three commits ahead of remote for PR #45'));
-  assert.ok(dossier.includes('r1 RED: 13,134 tests / 13,130 pass / 1 fail / 3 skipped'));
+  assert.ok(dossier.includes('Its r1 full-suite gate is RED: 13,134 tests / 13,130 pass / 1 fail / 3 skipped'));
   assert.ok(dossier.includes('r2 is also RED: 13,134 / 13,130 / 1 / 3'));
   assert.ok(dossier.includes('r3 is currently running; no verdict is available yet'));
   assert.ok(dossier.includes('Remaining land queue: #46 → #47 → #49 → #50 → #60 → #61 → #63 → #64 → #65 → #66'));
