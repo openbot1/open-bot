@@ -21,7 +21,7 @@ The eleven snapshot-integrated PR records #38, #39, #40, #44 and #53–#59 remai
 
 Live GitHub read-back confirms PRs #38, #39, #40, #44 and #53–#59 remain Open/Draft/unmerged after the snapshot push. #45 is also Open/Draft/unmerged and is not yet landed. This author did not close or merge any PR. The previously closed PR records #41, #42, #43, #48, #51 and #52 remain separate from the eleven snapshot-integrated PR records.
 
-PR #62 at the start of this cycle is Open/Draft/unmerged, based on remote main `798d69ce226f12377131e2d7b37f3c7f45e89f5a`, with head `69b6670f7359b28205c0c65dea0240d61ed302d5`. The final head created by this update must be read back from live GitHub metadata; its CI status must be checked on that exact SHA. The updated dossier guard source contains 28 top-level test groups and 147 assertion calls / 147 literal `dossier.includes(...)` checks; static source comparison reports 147/147 literal matches, but the updated guard has not been executed by this author. No CI success, production GO, release-owner approval, signing, notarization or native acceptance is claimed.
+PR #62 at the start of this cycle is Open/Draft/unmerged, based on remote main `798d69ce226f12377131e2d7b37f3c7f45e89f5a`, with head `893af7bb5c9f825c71373cb94481a41a40599bbd`. The final head created by this update must be read back from live GitHub metadata; its CI status must be checked on that exact SHA. The updated dossier guard source contains 29 top-level test groups and 157 assertion calls / 157 literal `dossier.includes(...)` checks; static source comparison reports 157/157 literal matches, but the updated guard has not been executed by this author. No CI success, production GO, release-owner approval, signing, notarization or native acceptance is claimed.
 
 ## 2. Evidence vocabulary and decision rules
 
@@ -132,37 +132,37 @@ The eleven earlier local landings #38, #39, #40, #44 and #53–#59 are represent
 |---|---|---|---|---|
 | #40 | Linux AppImage cosign | be6cd6457c67b45302ae71e3cb125adc651fc114 | LOCAL-LANDED at local commit `39bc2a43` | Included in local source HEAD; GitHub PR remains Open/Draft until authorized snapshot reconciliation |
 | #44 | Windows Authenticode verification | eb5a9f3bafc8c81d60949c0a064ffd49a266f9c9 | LOCAL-LANDED at local commit `bf89e113` | Latest full-suite gate r2 GREEN: 13,125 tests / 13,121 pass / 0 fail / 4 skipped; GitHub PR remains Open/Draft pending snapshot reconciliation |
-| #45 | macOS notarization and Gatekeeper | 73c0bfa024f7f9c2d317a44e2c061c194d65dc55 | Included in 71/71 /tmp-copy re-verification | Dynamic verification on current local head before landing |
-| #46 | Release attestation provenance | ae065c71c2bce1755a62abcb15b8ae3f7a54eddb | Included in 71/71 /tmp-copy re-verification | Dynamic verification on current local head before landing |
-| #47 | Windows ARM64 release verification | 8dcaed5f6b9d35192ad460c7dc301f57c005389b | Included in 71/71 /tmp-copy re-verification | Dynamic verification on current local head before landing |
-| #49 | Local data migration and rollback | 817a42547f4b51601821e322c937239f581464ad | Included in 71/71 /tmp-copy re-verification | Dynamic verification on current local head before landing |
-| #50 | Crash consistency fault injection | a665caf162316a046f07b53634a0b2dc9461c6ab | Included in 71/71 /tmp-copy re-verification | Dynamic verification on current local head before landing |
+| #45 | macOS notarization and Gatekeeper | 73c0bfa024f7f9c2d317a44e2c061c194d65dc55 | Local cherry-pick range is three commits ahead at local prefix `c40465b7`; not landed | r1 RED (PKCE flake, isolated 10/10); r2 RED (Ollama RPC timeout flake, isolated 27/27); r3 running, no verdict |
+| #46 | Release attestation provenance | ae065c71c2bce1755a62abcb15b8ae3f7a54eddb | Operator-reported DYNAMIC-READY | Full-suite gate required at land time |
+| #47 | Windows ARM64 release verification | 8dcaed5f6b9d35192ad460c7dc301f57c005389b | Operator-reported DYNAMIC-READY | Full-suite gate required at land time |
+| #49 | Local data migration and rollback | 817a42547f4b51601821e322c937239f581464ad | Operator-reported DYNAMIC-READY | Full-suite gate required at land time |
+| #50 | Crash consistency fault injection | a665caf162316a046f07b53634a0b2dc9461c6ab | Operator-reported DYNAMIC-READY | Full-suite gate required at land time |
 
 The historical 71/71 /tmp-copy result is superseded. PR #45 is undergoing full-suite gate r3 after two RED attempts: r1 PKCE flake (isolated 10/10 retest) and r2 Ollama RPC timeout flake (isolated 27/27 retest); neither RED full-suite verdict is erased by its isolated retest. r3 has no verdict yet. The remaining land queue is #46 → #47 → #49 → #50 → #60 → #61 → #63 → #64 → #65 → #66; operator reports these as DYNAMIC-READY, but each requires its own full-suite gate at land time. #63–#66 are operator-reported DYNAMIC-READY (21/21, 20/20, 16/16, 21/21 respectively), not full-suite gates.
 
-### 4.5 Dynamic-ready queue and static-only slices — Draft/HOLD
+### 4.5 Dynamic-ready queue and subsequent evidence slices — Draft/HOLD
 
 | Slice / PR | Scope | Current GitHub head SHA | Evidence boundary |
 |---|---|---|---|
 | #60 | Provider and integration acceptance | 9c922cf3df3f68d13024bf8f7c750fe4e780d411 | Operator-reported DYNAMIC-READY; full-suite gate required at land time; Draft/HOLD |
 | #61 | Runtime stability and shutdown | b8ddfe80be8b39606ea6e73ea96ccde487bf3bba | Operator-reported DYNAMIC-READY; full-suite gate required at land time; Draft/HOLD |
-| 1/5 #63 | Release candidate preparation | 4bc52e659253bff681e10afc40c4e636995bdcda | Static PASS only; dynamic verification in progress; Draft/HOLD |
-| 2/5 #64 | Candidate evidence checklist | e4626e8d6262ff531854322278c72221a7b1c0bc | Static PASS only; dynamic verification in progress; Draft/HOLD |
-| 3/5 #65 | CI unblock and verification | c2560e110254665008bb965befd76f4f19cc00c3 | Static PASS only; dynamic verification in progress; Draft/HOLD |
-| 4/5 #66 | Native acceptance evidence | ef7c85399b2b73dba8f5044b6817c06a2e98b6d7 | Static PASS only; dynamic verification in progress; Draft/HOLD |
-| 5/5 #62 | Final go-live acceptance dossier | `69b6670f7359b28205c0c65dea0240d61ed302d5` (head at cycle start) | Existing PR updated in place; 28 documentation-guard groups in source after this update; CI verdict pending; Draft/HOLD |
+| 1/5 #63 | Release candidate preparation | 4bc52e659253bff681e10afc40c4e636995bdcda | Operator-reported DYNAMIC-READY 21/21; full-suite gate required at land time; Draft/HOLD |
+| 2/5 #64 | Candidate evidence checklist | e4626e8d6262ff531854322278c72221a7b1c0bc | Operator-reported DYNAMIC-READY 20/20; full-suite gate required at land time; Draft/HOLD |
+| 3/5 #65 | CI unblock and verification | c2560e110254665008bb965befd76f4f19cc00c3 | Operator-reported DYNAMIC-READY 16/16; full-suite gate required at land time; Draft/HOLD |
+| 4/5 #66 | Native acceptance evidence | ef7c85399b2b73dba8f5044b6817c06a2e98b6d7 | Operator-reported DYNAMIC-READY 21/21; full-suite gate required at land time; Draft/HOLD |
+| Snapshot #67 | Snapshot reconciliation | `82df4ee39d5a4b79ee59612920d57ed639ad5230` | Draft/HOLD; static review PASS per operator, guard execution and exact-head CI pending |\n| Immutable RC #68 | Immutable release candidate freeze register | `68ca757fe4d75bdbd6e99ae6402d8d1477ae769a` | New Draft/HOLD slice; static source comparison 70/70; CI queued |\n| GO dossier #62 | Final go-live acceptance dossier | Current head recorded in PR metadata | Existing PR updated in place; 29 documentation-guard groups / 157 assertions; CI queued; Draft/HOLD |
 
-Static-review counts are operator-reported except the previously recorded static inspection of the current #62 source; none of these statements represents a successful CI run or author-executed test. No slice is LAND-READY solely because its documentation guard is static PASS.
+Static-review and DYNAMIC-READY counts are attributed to their respective operator reports or source-only audit. None of these statements represents a successful CI run or assistant-executed test. No slice is LAND-READY solely because its documentation guard is static PASS.
 
 ### 4.6 Live GitHub queue summary
 
-The live GitHub `GET /pulls?state=open&per_page=100` response contained exactly 23 open PRs, and every returned PR was Draft. The open numbers were: #38, #39, #40, #44, #45, #46, #47, #49, #50, #53, #54, #55, #56, #57, #58, #59, #60, #61, #62, #63, #64, #65 and #66. #41 and #42/#43/#48/#51/#52 were separately read back as closed with `merged=false`.
+The live GitHub `GET /pulls?state=open&per_page=100` response contained exactly 25 open PRs, and every returned PR was Draft. The open numbers were: #38, #39, #40, #44, #45, #46, #47, #49, #50, #53, #54, #55, #56, #57, #58, #59, #60, #61, #62, #63, #64, #65, #66, #67 and #68. #41 and #42/#43/#48/#51/#52 were separately read back as closed with `merged=false`.
 
-PR #62 live metadata at the start of this cycle: Open, Draft, unmerged; base main at `798d69ce226f12377131e2d7b37f3c7f45e89f5a`; head `69b6670f7359b28205c0c65dea0240d61ed302d5`.
+PR #62 live metadata at the start of this cycle: Open, Draft, unmerged; base main at `798d69ce226f12377131e2d7b37f3c7f45e89f5a`; head `893af7bb5c9f825c71373cb94481a41a40599bbd`.
 
-PR #62 head at the start of this update: `69b6670f7359b28205c0c65dea0240d61ed302d5`. This is the exact prior self-head and is asserted by the documentation guard. The final head created by this update must be read back from live GitHub metadata and its checks inspected on that exact SHA.
+PR #62 head at the start of this update: `893af7bb5c9f825c71373cb94481a41a40599bbd`. This is the exact prior self-head and is asserted by the documentation guard. The final head created by this update must be read back from live GitHub metadata and its checks inspected on that exact SHA.
 
-A new dossier commit invalidates prior-head CI evidence. Read back the final head's check runs and workflow runs separately; queued, missing or pending checks are NOT PASS.
+PR #62 final update head is `db54a8455865c4c0abb8563df250f30f16eb0bd7`; exact-head read-back: 12 check runs queued and two workflow runs queued (pull_request 46119074448; push 46119069419). PR #67 exact head `82df4ee39d5a4b79ee59612920d57ed639ad5230`: 12 check runs queued and workflow runs 46103365218 / 46103361000 queued. PR #68 exact head `68ca757fe4d75bdbd6e99ae6402d8d1477ae769a`: 12 check runs queued and workflow runs 46119317681 / 46119290954 queued. Queued, missing or pending checks are NOT PASS.
 
 ## 5. Final candidate evidence gates
 
