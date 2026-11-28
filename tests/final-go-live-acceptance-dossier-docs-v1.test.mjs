@@ -18,11 +18,11 @@ test('1. Slice 5/5 is identified and the decision defaults to HOLD', () => {
 });
 
 test('2. Local source SHA and remote snapshot SHA remain distinct', () => {
-  assert.ok(dossier.includes('8dc29d67'));
+  assert.ok(dossier.includes('snapshot of local `bf89e113`'));
   assert.ok(dossier.includes('798d69ce226f12377131e2d7b37f3c7f45e89f5a'));
-  assert.ok(dossier.includes('The reported local HEAD `bf89e113fde085f491cab6df708e15ec1d256053` and remote snapshot SHA `798d69ce...` are distinct identities.'));
+  assert.ok(dossier.includes('The current local main prefix `c40465b7` is three commits ahead of remote snapshot `05f38baeab3af91d6db30f14f2026d93dfa6e9ab` due to the not-yet-landed PR #45 range.'));
   assert.ok(dossier.includes('69b6670f7359b28205c0c65dea0240d61ed302d5'));
-  assert.ok(dossier.includes('Distinct from remote main until snapshot push and read-back'));
+  assert.ok(dossier.includes('three commits ahead of remote for PR #45'));
 });
 
 test('3. Local tree and test counts are attributed to the operator', () => {
@@ -30,12 +30,12 @@ test('3. Local tree and test counts are attributed to the operator', () => {
   assert.ok(dossier.includes('12,904 pass / 0 fail / 19 skipped'));
   assert.ok(dossier.includes('12,910 pass / 0 fail / 19 skipped'));
   assert.ok(dossier.includes('12,944 pass / 0 fail / 4 skipped'));
-  assert.ok(dossier.includes('The full local SHA and local filesystem counts are OPERATOR-REPORTED, not GITHUB-VERIFIED'));
+  assert.ok(dossier.includes('the current full local SHA and line count were not supplied'));
   assert.ok(dossier.includes('OPERATOR-REPORTED'));
 });
 
 test('4. Snapshot identity and snapshot-integrated state are explicit', () => {
-  assert.ok(dossier.includes('snapshot: local main 8dc29d67 (PRs #42, #43, #48, #51, #52)'));
+  assert.ok(dossier.includes('snapshot of local `bf89e113`'));
   assert.ok(dossier.includes('SNAPSHOT-INTEGRATED'));
   assert.ok(dossier.includes('CLOSED-UNMERGED'));
   assert.ok(dossier.includes('closed with merged=false'));
@@ -44,8 +44,8 @@ test('4. Snapshot identity and snapshot-integrated state are explicit', () => {
 test('5. The current open queue is recorded without claiming snapshot PRs are closed', () => {
   assert.ok(dossier.includes('exactly 23 open PRs'));
   assert.ok(dossier.includes('every returned PR was Draft'));
-  assert.ok(dossier.includes('#42, #43, #48, #51 and #52 are Closed with `merged=false`'));
-  assert.ok(dossier.includes('23 open PRs, all Draft'));
+  assert.ok(dossier.includes('all eleven PR records remain Open/Draft/unmerged pending separately authorized closure'));
+  assert.ok(dossier.includes('PR #45 remains Open/Draft/unmerged and is not in the snapshot'));
 });
 
 test('6. Evidence vocabulary contains every allowed disposition', () => {
@@ -68,9 +68,9 @@ test('7. The GO rule requires exact candidate evidence and release-owner authori
 });
 
 test('8. Repository identity table records remote and local roles separately', () => {
-  assert.ok(dossier.includes('Local source HEAD'));
+  assert.ok(dossier.includes('Current local source HEAD'));
   assert.ok(dossier.includes('GitHub main snapshot'));
-  assert.ok(dossier.includes('local HEAD `bf89e113fde085f491cab6df708e15ec1d256053` and remote snapshot SHA'));
+  assert.ok(dossier.includes('current local main prefix `c40465b7`'));
   assert.ok(dossier.includes('OPERATOR-REPORTED'));
   assert.ok(dossier.includes('GITHUB-READ-BACK'));
 });
@@ -171,7 +171,7 @@ test('19. Local landings remain distinct from live GitHub PR state', () => {
   assert.ok(dossier.includes('Local landing reported'));
   assert.ok(dossier.includes('Open / Draft / unmerged'));
   assert.ok(dossier.includes('Do not close or merge these PR records until the next authorized snapshot push is read back'));
-  assert.ok(dossier.includes('local main is operator-reported at full SHA `bf89e113fde085f491cab6df708e15ec1d256053`'));
+  assert.ok(dossier.includes('Current local main is `c40465b7`, clean, 3,988 tracked files'));
 });
 
 test('20. DYNAMIC-READY and fixpack results are attributed to the operator', () => {
@@ -190,8 +190,8 @@ test('21. The post-GO operational assurance phase is explicitly deferred', () =>
 
 
 test('22. Current local main and eleven local landings are recorded distinctly', () => {
-  assert.ok(dossier.includes('Full SHA `bf89e113fde085f491cab6df708e15ec1d256053`'));
-  assert.ok(dossier.includes('The ten other local landings #38, #39, #40, #44 and #53–#58, plus #59'));
+  assert.ok(dossier.includes('local source `bf89e113`'));
+  assert.ok(dossier.includes('The eleven earlier local landings #38, #39, #40, #44 and #53–#59'));
   assert.ok(dossier.includes('OPERATOR-REPORTED'));
 });
 
@@ -211,7 +211,7 @@ test('24. Current local identity and metrics are explicitly not GitHub-verified'
   assert.ok(dossier.includes('The full local SHA and local filesystem counts are OPERATOR-REPORTED, not GITHUB-VERIFIED'));
   assert.ok(dossier.includes('Local tree size / line count'));
   assert.ok(dossier.includes('3,986 tracked files / 1,531,721 lines; clean tree (0 changes)'));
-  assert.ok(dossier.includes('Remote main remains behind reported local HEAD'));
+  assert.ok(dossier.includes('current local main is three commits ahead of remote for #45'));
 });
 
 test('25. Exactly eight ordered GO blockers are enumerated', () => {
@@ -242,4 +242,18 @@ test('28. The current local source identity, clean tree and manifest are recorde
   assert.ok(dossier.includes('3,986 tracked files / 1,531,721 lines; clean tree (0 changes)'));
   assert.ok(dossier.includes('push-paths-bf89e113.nul'));
   assert.ok(dossier.includes('24 paths (23 added, one modified: `docs/RELEASING.md`), +3,780 lines, 257,636 bytes'));
+});
+
+
+test('29. Successful snapshot push, open PR reconciliation and #45 gate state are current', () => {
+  assert.ok(dossier.includes('05f38baeab3af91d6db30f14f2026d93dfa6e9ab'));
+  assert.ok(dossier.includes('successful 10:01 +07 snapshot push'));
+  assert.ok(dossier.includes('sync record: 109 entries'));
+  assert.ok(dossier.includes('3,988 tracked files'));
+  assert.ok(dossier.includes('three commits ahead of remote for PR #45'));
+  assert.ok(dossier.includes('r1 RED: 13,134 tests / 13,130 pass / 1 fail / 3 skipped'));
+  assert.ok(dossier.includes('r2 is also RED: 13,134 / 13,130 / 1 / 3'));
+  assert.ok(dossier.includes('r3 is currently running; no verdict is available yet'));
+  assert.ok(dossier.includes('Remaining land queue: #46 → #47 → #49 → #50 → #60 → #61 → #63 → #64 → #65 → #66'));
+  assert.ok(dossier.includes('PR #45 remains Open/Draft/unmerged and is not in the snapshot'));
 });
