@@ -45,6 +45,8 @@ test('5. The current open queue is recorded without claiming snapshot PRs are cl
   assert.ok(dossier.includes('exactly 25 open PRs'));
   assert.ok(dossier.includes('every returned PR was Draft'));
   assert.ok(dossier.includes('all eleven PR records remain Open/Draft/unmerged pending separately authorized closure'));
+  assert.ok(dossier.includes('PR #62 final head at update 7 is `ef6fd1da3a2875399b8625be3a638ad940a42457`; the preceding source commit `5f3d716a363234c97569b521f92ef88889d663cf` has two queued workflow runs (pull_request `46119649057`; push `46119646487`), and both runs report that exact preceding source SHA. Queued runs are NOT PASS.'));
+  assert.ok(dossier.includes('PR #62 final head at update 7 is `ef6fd1da3a2875399b8625be3a638ad940a42457`; the two workflow run IDs for preceding source commit `5f3d716a363234c97569b521f92ef88889d663cf` are pull_request `46119649057` and push `46119646487`, both queued and not a completed verdict.'));
   assert.ok(dossier.includes('PR #45 remains Open/Draft/unmerged and is not in the snapshot'));
 });
 
@@ -243,8 +245,6 @@ test('28. The current local source identity, clean tree and manifest are recorde
   assert.ok(dossier.includes('push-paths-bf89e113.nul'));
   assert.ok(dossier.includes('24 paths (23 added, one modified: `docs/RELEASING.md`), +3,780 lines, 257,636 bytes'));
 });
-
-
 test('29. Successful snapshot push, open PR reconciliation and #45 gate state are current', () => {
   assert.ok(dossier.includes('05f38baeab3af91d6db30f14f2026d93dfa6e9ab'));
   assert.ok(dossier.includes('successful 10:01 +07 snapshot push'));
