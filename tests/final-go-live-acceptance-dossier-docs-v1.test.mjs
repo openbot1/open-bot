@@ -190,7 +190,7 @@ test('21. The post-GO operational assurance phase is explicitly deferred', () =>
 });
 
 
-test('22. Current local main and eight local landings are recorded distinctly', () => {
+test('22. Current local main and eleven local landings are recorded distinctly', () => {
   assert.ok(dossier.includes('Full SHA `bf89e113fde085f491cab6df708e15ec1d256053`'));
   assert.ok(dossier.includes('The ten other local landings #38, #39, #40, #44 and #53–#58, plus #59'));
   assert.ok(dossier.includes('OPERATOR-REPORTED'));
