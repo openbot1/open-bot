@@ -126,12 +126,12 @@ PR #59 is reported locally cherry-picked. Preserve the r1 full-gate failure (13,
 
 The ten other local landings #38, #39, #40, #44 and #53–#58, plus #59, remain Open/Draft/unmerged on GitHub. No remote PR is closed or merged in this cycle. The next authorized snapshot must be read back at full SHA and compared to the reported local source lineage before PR records are reconciled.
 
-### 4.4 Fixpack re-verified on copy — dynamic verification still required
+### 4.4 Fixpack disposition — local landings and dynamic-ready queue
 
 | PR | Scope | Current GitHub head SHA | Operator-reported result | Remaining gate |
 |---|---|---|---|---|
-| #40 | Linux AppImage cosign | be6cd6457c67b45302ae71e3cb125adc651fc114 | Included in 71/71 /tmp-copy re-verification | Dynamic verification on current local head before landing |
-| #44 | Windows Authenticode verification | eb5a9f3bafc8c81d60949c0a064ffd49a266f9c9 | Included in 71/71 /tmp-copy re-verification | Dynamic verification on current local head before landing |
+| #40 | Linux AppImage cosign | be6cd6457c67b45302ae71e3cb125adc651fc114 | LOCAL-LANDED at local commit `39bc2a43` | Included in local source HEAD; GitHub PR remains Open/Draft until authorized snapshot reconciliation |
+| #44 | Windows Authenticode verification | eb5a9f3bafc8c81d60949c0a064ffd49a266f9c9 | LOCAL-LANDED at local commit `bf89e113` | Latest full-suite gate r2 GREEN: 13,125 tests / 13,121 pass / 0 fail / 4 skipped; GitHub PR remains Open/Draft pending snapshot reconciliation |
 | #45 | macOS notarization and Gatekeeper | 73c0bfa024f7f9c2d317a44e2c061c194d65dc55 | Included in 71/71 /tmp-copy re-verification | Dynamic verification on current local head before landing |
 | #46 | Release attestation provenance | ae065c71c2bce1755a62abcb15b8ae3f7a54eddb | Included in 71/71 /tmp-copy re-verification | Dynamic verification on current local head before landing |
 | #47 | Windows ARM64 release verification | 8dcaed5f6b9d35192ad460c7dc301f57c005389b | Included in 71/71 /tmp-copy re-verification | Dynamic verification on current local head before landing |
@@ -247,7 +247,7 @@ Only the accountable release owner may record GO. A PR approval, static review, 
 7. **Complete operational/security acceptance and independent review.** Close security, credential compromise, incident response, migration, crash consistency, backup/restore, runtime stability, rollback/forward-fix and provider acceptance. Preserve all failures, skips and exceptions with owners/dispositions; obtain independent reviewer sign-off and name rollback authority.
 8. **Obtain explicit release-owner GO/HOLD decision.** Only after blockers 1–7 are evidenced may the accountable release owner record a dated decision naming the exact full candidate SHA and artifact manifest. No production publication before explicit GO; otherwise remain HOLD.
 
-Current state against these blockers: (1) eleven local landings are reported; #59 r4 is operator-reported green (13,105 pass / 0 fail / 4 skipped), while r1 retains its original CLI timeout failure, r2 timed out and r3 was interrupted by VM restart; (2) 23 PRs remain Open/Draft and the seven fixpack PRs #40/#44–#47/#49/#50 still need dynamic verification on current local main; #60/#61/#63–#66 remain static-only and not LAND-READY; (3) local/remote divergence remains; (4) no final immutable candidate; (5) PR #62's old head had 12 queued checks and two queued workflows, and the new head requires fresh checks; (6) artifact/native evidence is incomplete; (7) operational/security acceptance and independent sign-off are incomplete; (8) no release-owner GO record exists.
+Current state against these blockers: (1) eleven local landings are reported; #59 r4 is operator-reported green (13,105 pass / 0 fail / 4 skipped), while r1 retains its original CLI timeout failure, r2 timed out and r3 was interrupted by VM restart; (2) #40 and #44 are locally landed, while #45/#46/#47/#49/#50/#60/#61 are DYNAMIC-READY and require an individual full-suite gate at land time; #63–#66 are static PASS only with dynamic verification in progress; (3) local/remote divergence remains; (4) no final immutable candidate; (5) PR #62's updated head has 12 queued checks and two queued workflows, with no completed verdict; (6) artifact/native evidence is incomplete; (7) operational/security acceptance and independent sign-off are incomplete; (8) no release-owner GO record exists.
 
 ## 8.1 Work explicitly deferred until AFTER GO
 
