@@ -163,7 +163,7 @@ test('18. No assistant test execution or production GO is claimed', () => {
   assert.ok(dossier.includes('did not run tests, build, typecheck, CI'));
   assert.ok(dossier.includes('This dossier records no production GO.'));
   assert.ok(dossier.includes('no production GO'));
-  assert.ok(dossier.includes('12 check runs queued and two workflow runs queued'));
+  assert.ok(dossier.includes('12 check runs queued and zero completed'));
   assert.ok(dossier.includes('No CI success, production GO'));
 });
 
