@@ -15,7 +15,7 @@ Operator reports local main at short HEAD `11c23e87`. Eight earlier local landin
 
 GitHub main was read back at full SHA `798d69ce226f12377131e2d7b37f3c7f45e89f5a`, message `snapshot: local main 8dc29d67 (PRs #42, #43, #48, #51, #52)`. Remote main has not advanced to the reported local HEAD.
 
-Operator reports #59 was cherry-picked as three commits from PR #59 source head `6e788fc4`, adding two files and 275 lines, with local main now at `11c23e87`. Its gate history must retain the initial failure: r1 reported 13,109 tests, 13,104 passed and one failure, a 60-second timeout in the CLI `--help` test. The isolated retest of that CLI test group reportedly passed 7/7; this does not erase the original full-gate failure. The r1 aggregate leaves four test outcomes unaccounted for by the supplied pass/fail figures; do not infer whether these were skipped, cancelled or another disposition without the raw runner summary. Gate r2 was cut off when the coordinator timed out and has NO verdict. Gate r3 is reported running; no result is claimed here. The reported suite size is approximately 13,109 tests.
+Operator reports #59 was cherry-picked as three commits from PR #59 source head `6e788fc4`, adding two files and 275 lines, with local main now at `11c23e87`. Its gate history must retain the initial failure: r1 reported 13,109 tests, 13,104 passed and one failure, a 60-second timeout in the CLI `--help` test. The isolated retest of that CLI test group reportedly passed 7/7; this does not erase the original full-gate failure. r1: 13,109 tests / 13,104 pass / 1 fail; the raw runner summary resolves the remaining outcomes as 0 cancelled + 4 skipped (not unexplained). The sole failure was the CLI `--help` test timing out at 60 seconds; the isolated CLI retest reportedly passed 7/7, which does not erase the original full-gate failure. r2 was cut off by coordinator timeout (NO VERDICT); r3 was cut off by VM restart (NO VERDICT). r4 is reported GREEN: 13,109 tests / 13,105 pass / 0 fail / 4 skipped. The reported suite size is 13,109 tests.
 
 The eight earlier local landings (#38, #39, #53–#58), plus the #59 cherry-pick, and all local gate outcomes remain OPERATOR-REPORTED. In particular, do not turn #57/#58 prior static or verifier counts into a current-head full-suite PASS. GitHub still shows their individual PR records as open Drafts.
 
@@ -52,10 +52,11 @@ GO may be recorded only by the accountable release owner, with a dated decision 
 | Local tree size / line count | Not supplied for this cycle | NOT VERIFIED | Reconfirm locally on final candidate; do not reuse prior-cycle counts |
 | Local landed PRs | #38, #39, #53, #54, #55, #56, #57, #58, #59 | OPERATOR-REPORTED; GitHub PR records remain open | Await authorized snapshot push and reconciliation |
 | #59 cherry-pick | Three commits from source head `6e788fc4`; two files, +275 lines; local HEAD `11c23e87` | OPERATOR-REPORTED | Not independently visible on remote main |
-| #59 gate r1 | 13,109 tests; 13,104 pass; 1 fail (CLI `--help` 60-second timeout); four outcomes unaccounted in supplied aggregate | OPERATOR-REPORTED / FAIL | Preserve original failure and reconcile raw summary |
+| #59 gate r1 | 13,109 tests = 13,104 pass + 1 fail + 0 cancelled + 4 skipped; summary form: 13,109 tests / 13,104 pass / 1 fail; sole failure was CLI `--help` 60-second timeout | OPERATOR-REPORTED / FAIL | Four skips are accounted for; preserve initial failure |
 | #59 isolated retest | CLI test group reportedly 7/7 pass | OPERATOR-REPORTED | Supplemental retest; does not convert r1 full gate to PASS |
 | #59 gate r2 | Coordinator timeout; no verdict | OPERATOR-REPORTED / NO VERDICT | Not PASS; do not count partial run as green |
-| #59 gate r3 | Running at cycle start | OPERATOR-REPORTED / IN PROGRESS | Await complete exit code, summary and SUITE_EXIT |
+| #59 gate r4 | 13,109 tests; 13,105 pass; 0 fail; 4 skipped | OPERATOR-REPORTED / PASS | Latest reported full-suite green result on local main `11c23e87` |
+| #59 gate r3 | VM restart interrupted run; no verdict | OPERATOR-REPORTED / NO VERDICT | Do not treat interrupted run as PASS |
 | Full-suite size | Approximately 13,109 tests | OPERATOR-REPORTED | Approximate suite size, not a completed gate verdict |
 | GitHub open PR queue | Exactly 23 open, all Draft | GITHUB-READ-BACK | Includes eight locally landed PR records still open |
 | PR #62 at cycle start | Head `a677db50dceb5d669654710efbbb6432542ecd29`; base `798d69ce226f12377131e2d7b37f3c7f45e89f5a` | GITHUB-READ-BACK | New dossier commit requires fresh CI read-back |
@@ -93,13 +94,13 @@ The live GitHub PR records are closed but not merged. Their presence in the earl
 | #56 | Included in local main `11c23e87` | `35cdce02aadb733eee13ff915893e070a44e397d` | Open / Draft / unmerged | Earlier record: 13,030 pass / 0 fail / 4 skipped; reported first-run green |
 | #57 | Included in local main `11c23e87` | `2d14ddbfc288e60675632240caf37bb0fc9a1667` | Open / Draft / unmerged | Local landing reported; final gate summary not supplied in this cycle |
 | #58 | Included in local main `11c23e87` | `4369feba884727818bffb1109101db096798f374` | Open / Draft / unmerged | Earlier 18/18 readiness result reported; not a full-suite verdict |
-| #59 | Three commits cherry-picked from source head `6e788fc4`; two files, +275 lines; included in local main `11c23e87` | `6e788fc4d91d1a94487bad0493f3c945e57eab39` | Open / Draft / unmerged | r1: 13,109 tests / 13,104 pass / 1 fail (CLI `--help` timeout); isolated CLI retest 7/7; four outcomes unaccounted; r2 coordinator timeout/no verdict; r3 running |
+| #59 | Three commits cherry-picked from source head `6e788fc4`; two files, +275 lines; included in local main `11c23e87` | `6e788fc4d91d1a94487bad0493f3c945e57eab39` | Open / Draft / unmerged | r1: 13,109 = 13,104 pass + 1 fail + 0 cancelled + 4 skipped; sole failure CLI `--help` timeout; isolated retest 7/7; r2 coordinator timeout/no verdict; r3 VM restart/no verdict; r4 13,105 pass / 0 fail / 4 skipped |
 
 The GitHub PR head SHAs are remote branch heads, not local landing commit SHAs. The local landing state and gate results are operator-reported. Do not close or merge these PR records until the next authorized snapshot push is read back and the coordinator reconciles the records. The initial #59 failure remains part of the evidence record even after its isolated 7/7 retest.
 
 ### 4.3 Cherry-pick and gate disposition — #59 is not a completed gate
 
-PR #59 is reported locally cherry-picked, but its verification is not complete. Preserve the r1 failure, record the isolated 7/7 retest only as supplemental evidence, treat r2 as NO VERDICT because the coordinator timed out, and await the complete r3 result. The suite's approximate 13,109-test size is not itself a gate result. Do not mark #59 fully accepted or infer the four unaccounted r1 outcomes.
+PR #59 is reported locally cherry-picked. Preserve the r1 full-gate failure (13,104 pass + 1 fail + 0 cancelled + 4 skipped); the four skips are explicitly accounted for. The sole failure was the CLI `--help` 60-second timeout; its isolated CLI retest passed 7/7 but does not erase r1. r2 ended by coordinator timeout and r3 by VM restart; neither has a verdict. r4 is reported green at 13,109 tests / 13,105 pass / 0 fail / 4 skipped. This is operator-reported local evidence, not GitHub CI evidence.
 
 ### 4.3.1 Remaining local/remote reconciliation
 
@@ -129,7 +130,7 @@ The 71/71 result is operator-reported and applies to a /tmp copy. It does not sa
 | 2/5 #64 | Candidate evidence checklist | e4626e8d6262ff531854322278c72221a7b1c0bc | Operator-reported static PASS 20/20; Draft/HOLD |
 | 3/5 #65 | CI unblock and verification | c2560e110254665008bb965befd76f4f19cc00c3 | Operator-reported static PASS 16/16; Draft/HOLD |
 | 4/5 #66 | Native acceptance evidence | ef7c85399b2b73dba8f5044b6817c06a2e98b6d7 | Operator-reported static PASS 21/21 and 102/102 literal matches; Draft/HOLD |
-| 5/5 #62 | Final go-live acceptance dossier | `a677db50dceb5d669654710efbbb6432542ecd29` (GitHub head at cycle start) | Existing PR updated in place; 26 documentation-guard groups; operator reports 26/26 pass; Draft/HOLD |
+| 5/5 #62 | Final go-live acceptance dossier | `a677db50dceb5d669654710efbbb6432542ecd29` (head at prior cycle start); `9bf5c2f2f18748541893136b12bb3fec054f443c` (head immediately before this update) | Existing PR updated in place; 26 documentation-guard groups; operator reports 26/26 pass for this pre-update revision; Draft/HOLD |
 
 Static-review counts are operator-reported except the previously recorded static inspection of the current #62 source; none of these statements represents a successful CI run or author-executed test. No slice is LAND-READY solely because its documentation guard is static PASS.
 
@@ -138,6 +139,8 @@ Static-review counts are operator-reported except the previously recorded static
 The live GitHub `GET /pulls?state=open&per_page=100` response contained exactly 23 open PRs, and every returned PR was Draft. The open numbers were: #38, #39, #40, #44, #45, #46, #47, #49, #50, #53, #54, #55, #56, #57, #58, #59, #60, #61, #62, #63, #64, #65 and #66. #41 and #42/#43/#48/#51/#52 were separately read back as closed with `merged=false`.
 
 PR #62 live metadata at the start of this cycle: Open, Draft, unmerged; base main at `798d69ce226f12377131e2d7b37f3c7f45e89f5a`; head `a677db50dceb5d669654710efbbb6432542ecd29`; two files changed, +485 / −0.
+
+PR #62 head immediately before this dossier correction: `9bf5c2f2f18748541893136b12bb3fec054f443c`. This was the exact branch/PR self-head at the start of the present update. The final head created by this correction is recorded in the live PR body and must be read back from GitHub.
 
 CI read-back for PR #62 head at cycle start `a677db50dceb5d669654710efbbb6432542ecd29`: workflow runs #46051949895 (pull_request) and #46051944834 (push) were both queued; all 12 check runs were queued and zero completed. This is NOT PASS. The dossier update creates a new head and therefore requires a fresh CI read-back; queued checks on the old head do not validate the new head.
 
@@ -224,7 +227,7 @@ Only the accountable release owner may record GO. A PR approval, static review, 
 7. **Complete operational/security acceptance and independent review.** Close security, credential compromise, incident response, migration, crash consistency, backup/restore, runtime stability, rollback/forward-fix and provider acceptance. Preserve all failures, skips and exceptions with owners/dispositions; obtain independent reviewer sign-off and name rollback authority.
 8. **Obtain explicit release-owner GO/HOLD decision.** Only after blockers 1–7 are evidenced may the accountable release owner record a dated decision naming the exact full candidate SHA and artifact manifest. No production publication before explicit GO; otherwise remain HOLD.
 
-Current state against these blockers: (1) eight earlier local landings plus #59 are reported, but #59 r3 is still running and r1/r2 remain non-green or inconclusive; (2) 23 PRs remain Open/Draft and the seven fixpack PRs #40/#44–#47/#49/#50 still need dynamic verification on current local main; #60/#61/#63–#66 remain static-only and not LAND-READY; (3) local/remote divergence remains; (4) no final immutable candidate; (5) PR #62's old head had 12 queued checks and two queued workflows, and the new head requires fresh checks; (6) artifact/native evidence is incomplete; (7) operational/security acceptance and independent sign-off are incomplete; (8) no release-owner GO record exists.
+Current state against these blockers: (1) nine local landings are reported; #59 r4 is operator-reported green (13,105 pass / 0 fail / 4 skipped), while r1 retains its original CLI timeout failure, r2 timed out and r3 was interrupted by VM restart; (2) 23 PRs remain Open/Draft and the seven fixpack PRs #40/#44–#47/#49/#50 still need dynamic verification on current local main; #60/#61/#63–#66 remain static-only and not LAND-READY; (3) local/remote divergence remains; (4) no final immutable candidate; (5) PR #62's old head had 12 queued checks and two queued workflows, and the new head requires fresh checks; (6) artifact/native evidence is incomplete; (7) operational/security acceptance and independent sign-off are incomplete; (8) no release-owner GO record exists.
 
 ## 8.1 Work explicitly deferred until AFTER GO
 
@@ -232,7 +235,7 @@ The separate phase Production Rollout & Post-Go-Live Operational Assurance remai
 
 ## 9. Current disposition
 
-**HOLD remains in force.** GitHub main remains `798d69ce226f12377131e2d7b37f3c7f45e89f5a`; local main is operator-reported at short HEAD `11c23e87`, but GitHub could not resolve that short SHA and local file/line counts were not supplied for this cycle. Nine PRs (#38, #39, #53, #54, #55, #56, #57, #58, #59) are reported locally included/cherry-picked; all nine remain Open/Draft/unmerged on GitHub. #59's r1 full-gate failure is retained, its 7/7 isolated CLI retest is supplemental, r2 has no verdict and r3 is running. The live GitHub queue is exactly 23 Open/Draft PRs. PR #62's head at cycle start was `a677db50dceb5d669654710efbbb6432542ecd29`; its 12 check runs and two workflow runs were queued. The new dossier head requires its own CI read-back.
+**HOLD remains in force.** GitHub main remains `798d69ce226f12377131e2d7b37f3c7f45e89f5a`; local main is operator-reported at short HEAD `11c23e87`, but GitHub could not resolve that short SHA and local main metrics are operator-reported: 3,981 tracked files and 1,531,207 lines (wc count with duplicate `total` row excluded); GitHub cannot verify local filesystem counts. Nine PRs (#38, #39, #53, #54, #55, #56, #57, #58, #59) are reported locally included/cherry-picked; all nine remain Open/Draft/unmerged on GitHub. #59's r1 full-gate failure is retained, its 7/7 isolated CLI retest is supplemental, r2 has no verdict and r3 is running. The live GitHub queue is exactly 23 Open/Draft PRs. PR #62's head at cycle start was `a677db50dceb5d669654710efbbb6432542ecd29`; its 12 check runs and two workflow runs were queued. Immediately before this update, its head was `9bf5c2f2f18748541893136b12bb3fec054f443c`. The final dossier head requires its own CI read-back.
 
 The eight GO blockers in Section 8 remain open. The Production Rollout & Post-Go-Live Operational Assurance phase remains explicitly deferred until after GO; no PR for that phase is created or requested here.
 
