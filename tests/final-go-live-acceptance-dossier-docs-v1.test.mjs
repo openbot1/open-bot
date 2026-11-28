@@ -21,7 +21,7 @@ test('2. Local source SHA and remote snapshot SHA remain distinct', () => {
   assert.ok(dossier.includes('snapshot of local `bf89e113`'));
   assert.ok(dossier.includes('798d69ce226f12377131e2d7b37f3c7f45e89f5a'));
   assert.ok(dossier.includes('The current local main prefix `c40465b7` is three commits ahead of remote snapshot `05f38baeab3af91d6db30f14f2026d93dfa6e9ab` due to the not-yet-landed PR #45 range.'));
-  assert.ok(dossier.includes('69b6670f7359b28205c0c65dea0240d61ed302d5'));
+  assert.ok(dossier.includes('893af7bb5c9f825c71373cb94481a41a40599bbd'));
   assert.ok(dossier.includes('three commits ahead of remote for PR #45'));
 });
 
@@ -203,7 +203,7 @@ test('23. PR 59 preserves failure, retest and inconclusive gate history', () => 
   assert.ok(dossier.includes('r3 VM restart/no verdict'));
   assert.ok(dossier.includes('0 cancelled + 4 skipped'));
   assert.ok(dossier.includes('13,105 pass / 0 fail / 4 skipped'));
-  assert.ok(dossier.includes('69b6670f7359b28205c0c65dea0240d61ed302d5'));
+  assert.ok(dossier.includes('893af7bb5c9f825c71373cb94481a41a40599bbd'));
 });
 
 test('24. Current local identity and metrics are explicitly not GitHub-verified', () => {
@@ -234,7 +234,7 @@ test('26. The post-GO rollout phase remains deferred', () => {
 
 
 test('27. The exact PR #62 self-head at the start of this update is recorded', () => {
-  assert.ok(dossier.includes('69b6670f7359b28205c0c65dea0240d61ed302d5'));
+  assert.ok(dossier.includes('893af7bb5c9f825c71373cb94481a41a40599bbd'));
 });
 
 test('28. The current local source identity, clean tree and manifest are recorded', () => {
