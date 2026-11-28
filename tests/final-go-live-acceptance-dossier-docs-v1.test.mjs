@@ -23,7 +23,7 @@ test('2. Local source SHA and remote snapshot SHA remain distinct', () => {
   assert.ok(dossier.includes('The reported local HEAD `bf89e113fde085f491cab6df708e15ec1d256053` and remote snapshot SHA `798d69ce...` are distinct identities.'));
   assert.ok(dossier.includes('69b6670f7359b28205c0c65dea0240d61ed302d5'));
   assert.ok(dossier.includes('80fff27d17c697e0122ef5d9aefa42e97b97b348'));
-  assert.ok(dossier.includes('Do not infer a full SHA or equate it with remote main'));
+  assert.ok(dossier.includes('Distinct from remote main until snapshot push and read-back'));
 });
 
 test('3. Local tree and test counts are attributed to the operator', () => {
@@ -31,7 +31,7 @@ test('3. Local tree and test counts are attributed to the operator', () => {
   assert.ok(dossier.includes('12,904 pass / 0 fail / 19 skipped'));
   assert.ok(dossier.includes('12,910 pass / 0 fail / 19 skipped'));
   assert.ok(dossier.includes('12,944 pass / 0 fail / 4 skipped'));
-  assert.ok(dossier.includes('OPERATOR-REPORTED full local SHA; not independently visible on remote'));
+  assert.ok(dossier.includes('The full local SHA and local filesystem counts are OPERATOR-REPORTED, not GITHUB-VERIFIED'));
   assert.ok(dossier.includes('OPERATOR-REPORTED'));
 });
 
@@ -163,7 +163,7 @@ test('18. No assistant test execution or production GO is claimed', () => {
   assert.ok(dossier.includes('did not run tests, build, typecheck, CI'));
   assert.ok(dossier.includes('This dossier records no production GO.'));
   assert.ok(dossier.includes('no production GO'));
-  assert.ok(dossier.includes('12 check runs and two workflow runs were queued'));
+  assert.ok(dossier.includes('12 check runs queued and two workflow runs queued'));
   assert.ok(dossier.includes('No CI success, production GO'));
 });
 
@@ -172,7 +172,7 @@ test('19. Local landings remain distinct from live GitHub PR state', () => {
   assert.ok(dossier.includes('Local landing reported'));
   assert.ok(dossier.includes('Open / Draft / unmerged'));
   assert.ok(dossier.includes('Do not close or merge these PR records until the next authorized snapshot push is read back'));
-  assert.ok(dossier.includes('current local main `bf89e113fde085f491cab6df708e15ec1d256053`'));
+  assert.ok(dossier.includes('local main is operator-reported at full SHA `bf89e113fde085f491cab6df708e15ec1d256053`'));
 });
 
 test('20. DYNAMIC-READY and fixpack results are attributed to the operator', () => {
@@ -209,7 +209,7 @@ test('23. PR 59 preserves failure, retest and inconclusive gate history', () => 
 
 test('24. Current local identity and metrics are explicitly not GitHub-verified', () => {
   assert.ok(dossier.includes('bf89e113fde085f491cab6df708e15ec1d256053'));
-  assert.ok(dossier.includes('OPERATOR-REPORTED full local SHA, clean tree, tracked-file count and line count'));
+  assert.ok(dossier.includes('The full local SHA and local filesystem counts are OPERATOR-REPORTED, not GITHUB-VERIFIED'));
   assert.ok(dossier.includes('Local tree size / line count'));
   assert.ok(dossier.includes('3,986 tracked files / 1,531,721 lines; clean tree (0 changes)'));
   assert.ok(dossier.includes('Remote main remains behind reported local HEAD'));
