@@ -21,6 +21,8 @@ test('2. Local source SHA and remote snapshot SHA remain distinct', () => {
   assert.ok(dossier.includes('8dc29d67'));
   assert.ok(dossier.includes('798d69ce226f12377131e2d7b37f3c7f45e89f5a'));
   assert.ok(dossier.includes('The reported local HEAD `bf89e113fde085f491cab6df708e15ec1d256053` and remote snapshot SHA `798d69ce...` are distinct identities.'));
+  assert.ok(dossier.includes('69b6670f7359b28205c0c65dea0240d61ed302d5'));
+  assert.ok(dossier.includes('80fff27d17c697e0122ef5d9aefa42e97b97b348'));
   assert.ok(dossier.includes('Do not infer a full SHA or equate it with remote main'));
 });
 
