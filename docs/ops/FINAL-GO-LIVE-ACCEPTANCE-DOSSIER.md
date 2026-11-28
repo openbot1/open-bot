@@ -21,7 +21,7 @@ The ten other local landings (#38, #39, #40, #44 and #53–#58), plus #59, and a
 
 Live GitHub read-back confirms exactly 23 open PRs, all Draft. The eleven locally landed PR records #38, #39, #40, #44 and #53–#59 remain Open/Draft/unmerged. #42, #43, #48, #51 and #52 are Closed with `merged=false`; #41 is also Closed with `merged=false`.
 
-PR #62 at the start of this cycle is Open/Draft/unmerged, based on remote main `798d69ce226f12377131e2d7b37f3c7f45e89f5a`, with head `69b6670f7359b28205c0c65dea0240d61ed302d5`. The final head created by this update must be read back from live GitHub metadata; its CI status must be checked on that exact SHA. The updated dossier guard source contains 28 top-level test groups and 148 assertion calls / 148 literal `dossier.includes(...)` checks; static source comparison reports 148/148 literal matches, but the updated guard has not been executed by this author. No CI success, production GO, release-owner approval, signing, notarization or native acceptance is claimed.
+PR #62 at the start of this cycle is Open/Draft/unmerged, based on remote main `798d69ce226f12377131e2d7b37f3c7f45e89f5a`, with head `69b6670f7359b28205c0c65dea0240d61ed302d5`. The final head created by this update must be read back from live GitHub metadata; its CI status must be checked on that exact SHA. The updated dossier guard source contains 28 top-level test groups and 147 assertion calls / 147 literal `dossier.includes(...)` checks; static source comparison reports 147/147 literal matches, but the updated guard has not been executed by this author. No CI success, production GO, release-owner approval, signing, notarization or native acceptance is claimed.
 
 ## 2. Evidence vocabulary and decision rules
 
