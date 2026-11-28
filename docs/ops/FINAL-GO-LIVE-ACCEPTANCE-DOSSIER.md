@@ -21,7 +21,7 @@ The ten other local landings (#38, #39, #40, #44 and #53–#58), plus #59, and a
 
 Live GitHub read-back confirms exactly 23 open PRs, all Draft. The eleven locally landed PR records #38, #39, #40, #44 and #53–#59 remain Open/Draft/unmerged. #42, #43, #48, #51 and #52 are Closed with `merged=false`; #41 is also Closed with `merged=false`.
 
-PR #62 at the start of this cycle is Open/Draft/unmerged, based on remote main `798d69ce226f12377131e2d7b37f3c7f45e89f5a`, with head `69b6670f7359b28205c0c65dea0240d61ed302d5`. The current updated head is `73cf0c35a7ba379ed2408474fe6fc74a2bc7a80`; its 12 check runs are queued and zero have completed. The workflow-runs endpoint returned zero workflow-run records for this exact head. The updated dossier guard source contains 28 top-level test groups and 148 assertion calls / 148 literal `dossier.includes(...)` checks; static source comparison reports 148/148 literal matches, but the updated guard has not been executed by this author. No CI success, production GO, release-owner approval, signing, notarization or native acceptance is claimed.
+PR #62 at the start of this cycle is Open/Draft/unmerged, based on remote main `798d69ce226f12377131e2d7b37f3c7f45e89f5a`, with head `69b6670f7359b28205c0c65dea0240d61ed302d5`. The final head created by this update must be read back from live GitHub metadata; its CI status must be checked on that exact SHA. The updated dossier guard source contains 28 top-level test groups and 148 assertion calls / 148 literal `dossier.includes(...)` checks; static source comparison reports 148/148 literal matches, but the updated guard has not been executed by this author. No CI success, production GO, release-owner approval, signing, notarization or native acceptance is claimed.
 
 ## 2. Evidence vocabulary and decision rules
 
@@ -160,9 +160,9 @@ The live GitHub `GET /pulls?state=open&per_page=100` response contained exactly 
 
 PR #62 live metadata at the start of this cycle: Open, Draft, unmerged; base main at `798d69ce226f12377131e2d7b37f3c7f45e89f5a`; head `69b6670f7359b28205c0c65dea0240d61ed302d5`.
 
-PR #62 head at the start of this update: `69b6670f7359b28205c0c65dea0240d61ed302d5`. This is the exact prior self-head and is asserted by the documentation guard. The updated head is `73cf0c35a7ba379ed2408474fe6fc74a2bc7a80`; its 12 check runs are queued, with no completed verdict; the workflow-runs endpoint returned zero records for this exact SHA.
+PR #62 head at the start of this update: `69b6670f7359b28205c0c65dea0240d61ed302d5`. This is the exact prior self-head and is asserted by the documentation guard. The final head created by this update must be read back from live GitHub metadata and its checks inspected on that exact SHA.
 
-CI read-back for updated PR #62 head `73cf0c35a7ba379ed2408474fe6fc74a2bc7a80`: 12 check runs queued and zero completed; the workflow-runs endpoint returned zero records for this exact SHA. Queued is NOT PASS.
+A new dossier commit invalidates prior-head CI evidence. Read back the final head's check runs and workflow runs separately; queued, missing or pending checks are NOT PASS.
 
 ## 5. Final candidate evidence gates
 
