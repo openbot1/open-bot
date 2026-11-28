@@ -60,7 +60,7 @@ GO may be recorded only by the accountable release owner, with a dated decision 
 | Full-suite size | Approximately 13,109 tests | OPERATOR-REPORTED | Approximate suite size, not a completed gate verdict |
 | GitHub open PR queue | Prior cycle read-back: 23 open, all Draft | GITHUB-READ-BACK (prior read) | Re-read current inventory before using as a current-cycle count |
 | PR #62 at cycle start | Head `69b6670f7359b28205c0c65dea0240d61ed302d5`; base `798d69ce226f12377131e2d7b37f3c7f45e89f5a` | GITHUB-READ-BACK | New dossier commit requires fresh CI read-back |
-| PR #62 CI at cycle start | 12 check runs queued; two workflow runs queued | GITHUB-READ-BACK / PENDING | Queued is not PASS |
+| PR #62 CI at cycle start | Not re-read for the exact cycle-start head in this update | PENDING | Do not transfer CI state between SHAs |
 | Dossier documentation guard | 27 top-level groups after this update; source assertion inventory is static-only until exact-head CI completes | GitHub source inspection; NOT EXECUTED BY THIS AUTHOR | Static/documentation guard only; not product/full-suite acceptance |
 | Release decision | Candidate evidence and release-owner GO approval incomplete | HOLD | No production GO authorized |
 
@@ -160,9 +160,9 @@ The live GitHub `GET /pulls?state=open&per_page=100` response contained exactly 
 
 PR #62 live metadata at the start of this cycle: Open, Draft, unmerged; base main at `798d69ce226f12377131e2d7b37f3c7f45e89f5a`; head `69b6670f7359b28205c0c65dea0240d61ed302d5`.
 
-PR #62 head at the start of this update: `69b6670f7359b28205c0c65dea0240d61ed302d5`. This is the exact prior self-head and is asserted by the documentation guard. The updated head is `80fff27d17c697e0122ef5d9aefa42e97b97b348`; its 12 check runs and two workflow runs are queued, with no completed verdict.
+PR #62 head at the start of this update: `69b6670f7359b28205c0c65dea0240d61ed302d5`. This is the exact prior self-head and is asserted by the documentation guard. The updated head is `73cf0c35a7ba379ed2408474fe6fc74a2bc7a80`; its 12 check runs are queued, with no completed verdict; the workflow-runs endpoint returned zero records for this exact SHA.
 
-CI read-back for updated PR #62 head `80fff27d17c697e0122ef5d9aefa42e97b97b348`: 12 check runs queued and two workflow runs queued; no completed verdict. Queued is NOT PASS.
+CI read-back for updated PR #62 head `73cf0c35a7ba379ed2408474fe6fc74a2bc7a80`: 12 check runs queued and zero completed; the workflow-runs endpoint returned zero records for this exact SHA. Queued is NOT PASS.
 
 ## 5. Final candidate evidence gates
 
@@ -247,7 +247,7 @@ Only the accountable release owner may record GO. A PR approval, static review, 
 7. **Complete operational/security acceptance and independent review.** Close security, credential compromise, incident response, migration, crash consistency, backup/restore, runtime stability, rollback/forward-fix and provider acceptance. Preserve all failures, skips and exceptions with owners/dispositions; obtain independent reviewer sign-off and name rollback authority.
 8. **Obtain explicit release-owner GO/HOLD decision.** Only after blockers 1–7 are evidenced may the accountable release owner record a dated decision naming the exact full candidate SHA and artifact manifest. No production publication before explicit GO; otherwise remain HOLD.
 
-Current state against these blockers: (1) eleven local landings are reported; #59 r4 is operator-reported green (13,105 pass / 0 fail / 4 skipped), while r1 retains its original CLI timeout failure, r2 timed out and r3 was interrupted by VM restart; (2) #40 and #44 are locally landed, while #45/#46/#47/#49/#50/#60/#61 are DYNAMIC-READY and require an individual full-suite gate at land time; #63–#66 are static PASS only with dynamic verification in progress; (3) local/remote divergence remains; (4) no final immutable candidate; (5) PR #62's updated head has 12 queued checks and two queued workflows, with no completed verdict; (6) artifact/native evidence is incomplete; (7) operational/security acceptance and independent sign-off are incomplete; (8) no release-owner GO record exists.
+Current state against these blockers: (1) eleven local landings are reported; #59 r4 is operator-reported green (13,105 pass / 0 fail / 4 skipped), while r1 retains its original CLI timeout failure, r2 timed out and r3 was interrupted by VM restart; (2) #40 and #44 are locally landed, while #45/#46/#47/#49/#50/#60/#61 are DYNAMIC-READY and require an individual full-suite gate at land time; #63–#66 are static PASS only with dynamic verification in progress; (3) local/remote divergence remains; (4) no final immutable candidate; (5) PR #62's updated head has 12 queued checks and no workflow-run records returned for that exact SHA, with no completed verdict; (6) artifact/native evidence is incomplete; (7) operational/security acceptance and independent sign-off are incomplete; (8) no release-owner GO record exists.
 
 ## 8.1 Work explicitly deferred until AFTER GO
 
