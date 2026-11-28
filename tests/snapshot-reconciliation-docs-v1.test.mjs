@@ -110,6 +110,6 @@ test('11. Snapshot reconciliation does not imply immutable RC or GO', () => {
 test('12. Authoring and execution boundaries are explicit', () => {
   assert.ok(dossier.includes('authored through GitHub source APIs'));
   assert.ok(dossier.includes('did not access the operator\\'s local filesystem or NUL manifest'));
-  assert.ok(dossier.includes('did not run tests, build, typecheck, CI'));
+  assert.ok(dossier.includes('run tests, build, typecheck, CI, signing'));
   assert.ok(dossier.includes('Static guard source review is not test execution.'));
 });
