@@ -207,9 +207,9 @@ test('23. PR 59 preserves failure, retest and inconclusive gate history', () => 
 
 test('24. Current local identity and metrics are explicitly not GitHub-verified', () => {
   assert.ok(dossier.includes('bf89e113fde085f491cab6df708e15ec1d256053'));
-  assert.ok(dossier.includes('GitHub lookup of this short SHA returned no commit'));
+  assert.ok(dossier.includes('OPERATOR-REPORTED full local SHA, clean tree, tracked-file count and line count'));
   assert.ok(dossier.includes('Local tree size / line count'));
-  assert.ok(dossier.includes('Not supplied for this cycle'));
+  assert.ok(dossier.includes('3,986 tracked files / 1,531,721 lines; clean tree (0 changes)'));
   assert.ok(dossier.includes('Remote main remains behind reported local HEAD'));
 });
 
@@ -234,4 +234,11 @@ test('26. The post-GO rollout phase remains deferred', () => {
 
 test('27. The exact PR #62 self-head at the start of this update is recorded', () => {
   assert.ok(dossier.includes('69b6670f7359b28205c0c65dea0240d61ed302d5'));
+});
+
+test('28. The current local source identity, clean tree and manifest are recorded', () => {
+  assert.ok(dossier.includes('bf89e113fde085f491cab6df708e15ec1d256053'));
+  assert.ok(dossier.includes('3,986 tracked files / 1,531,721 lines; clean tree (0 changes)'));
+  assert.ok(dossier.includes('push-paths-bf89e113.nul'));
+  assert.ok(dossier.includes('24 paths (23 added, one modified: `docs/RELEASING.md`), +3,780 lines, 257,636 bytes'));
 });
