@@ -42,7 +42,7 @@ test('4. Snapshot identity and snapshot-integrated state are explicit', () => {
 });
 
 test('5. The current open queue is recorded without claiming snapshot PRs are closed', () => {
-  assert.ok(dossier.includes('exactly 23 open PRs'));
+  assert.ok(dossier.includes('exactly 25 open PRs'));
   assert.ok(dossier.includes('every returned PR was Draft'));
   assert.ok(dossier.includes('all eleven PR records remain Open/Draft/unmerged pending separately authorized closure'));
   assert.ok(dossier.includes('PR #45 remains Open/Draft/unmerged and is not in the snapshot'));
