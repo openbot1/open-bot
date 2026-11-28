@@ -157,6 +157,48 @@ References: [Apple code-signature verification and Gatekeeper assessment](https:
 
 For each candidate version, copy [`docs/RELEASE-APPROVAL-RECORD.md`](RELEASE-APPROVAL-RECORD.md) into the release evidence bundle or approval issue and fill it using the exact source commit and final uploaded files. The record captures the build/test gate, per-artifact hashes, native signing/notarization evidence, GitHub asset state and independent uploaded-file comparison. Do not put certificate files, passwords, API keys or other secrets in the record. Keep the GitHub Release in draft until every required row is complete and approved.
 
+
+### Reconcile the exact uploaded bytes
+
+After all platform artifacts have been built and uploaded to the **draft** GitHub Release, compare three independent values for every installer: the local final-file SHA-256, the SHA-256 of the independently downloaded release asset, and the digest returned by the GitHub Releases API. The helper below performs that byte comparison without publishing the release or changing any files.
+
+Stage only the exact final installer files in `artifacts/local`. Download the uploaded assets separately into `artifacts/uploaded`, and save the authenticated API response for the same tag:
+
+```bash
+TAG=v1.2.3  # replace with the exact tag being verified
+mkdir -p artifacts/local artifacts/uploaded
+gh api "repos/openbot1/open-bot/releases/tags/$TAG" > artifacts/release.json
+gh release download "$TAG" --repo openbot1/open-bot --dir artifacts/uploaded
+node scripts/verify-release-assets.mjs artifacts/release.json artifacts/local artifacts/uploaded
+```
+
+The helper requires the Release to remain a draft, requires uploaded assets for Linux AppImage, macOS DMG and Windows NSIS (including any additional architecture-specific installers), and checks each matching filename, API size, canonical download URL and SHA-256 digest. A success means the local and independently downloaded bytes match the GitHub API digest for every configured installer. It does **not** establish publisher identity or replace native macOS code-signature/Gatekeeper/notarization checks or Windows Authenticode verification. It also does not make the GitHub API digest an independent trust anchor: the downloaded-file hash comparison is essential.
+
+Run the regression test with:
+
+```bash
+node --test tests/release-asset-bytes-v1.test.mjs
+```
+
+Keep the Release in draft if the helper fails, any platform asset is missing, or any local file has changed since the native verification step. The helper is a local maintainer gate; it does not run signing, notarization, upload or publication.
+
+
+
+## Native draft release workflow (manual, one platform per run)
+
+After the exact source tag has passed the release gate, the maintainer can use the **Native draft release** GitHub Actions workflow to build and upload one platform at a time. The workflow is manual-only, must be dispatched from `main`, checks that the requested tag points to the exact checked-out commit and matches the root `package.json` version, then builds/tests on the native runner before calling the existing `release:mac`, `release:win` or `release:linux` command.
+
+Before enabling it, create a GitHub Environment named `release` and configure required reviewers / deployment protection. Store these values as **environment secrets**, never repository files:
+
+- All targets: `GH_TOKEN` with permission to create/update draft releases in `openbot1/open-bot`.
+- macOS: `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_API_KEY`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`.
+- Windows: `WIN_CSC_LINK`, `WIN_CSC_KEY_PASSWORD`.
+
+Run the workflow sequentially for `mac`, `win`, and `linux` using the same exact `release_tag`. A per-tag concurrency lock prevents overlapping upload jobs. Each job reruns version-check, build, typecheck, the full suite and platform tests on the tag's immutable commit SHA. It then confirms that the GitHub Release remains a draft and the target's installer assets are uploaded with positive sizes and SHA-256 metadata.
+
+The workflow never publishes the Release automatically, does not replace the native artifact verification steps above, and does not make Linux AppImage signed. After all targets finish, complete the macOS Gatekeeper/notarization/stapler checks, Windows Authenticode publisher-identity check, Linux unsigned acknowledgement, and the local-vs-downloaded byte reconciliation step. Keep the Release in draft until the approval record is complete.
+
+
 ## Release order
 
 1. Merge the release-gate and other approved hardening work only after the independent checks described in `docs/TESTING.md` are green on the intended source snapshot.
