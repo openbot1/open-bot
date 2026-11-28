@@ -15,13 +15,13 @@ Operator reports local main at full HEAD `bf89e113fde085f491cab6df708e15ec1d2560
 
 GitHub main was read back at full SHA `798d69ce226f12377131e2d7b37f3c7f45e89f5a`, message `snapshot: local main 8dc29d67 (PRs #42, #43, #48, #51, #52)`. Remote main has not advanced to the reported local HEAD.
 
-Operator reports #59 was cherry-picked as three commits from PR #59 source head `6e788fc4`, adding two files and 275 lines, with local main now at `bf89e113fde085f491cab6df708e15ec1d256053`. Its gate history must retain the initial failure: r1 reported 13,109 tests, 13,104 passed and one failure, a 60-second timeout in the CLI `--help` test. The isolated retest of that CLI test group reportedly passed 7/7; this does not erase the original full-gate failure. r1: 13,109 tests = 13,104 pass + 1 fail + 0 cancelled + 4 skipped; all four skips are accounted for. The sole failure was the CLI `--help` test timing out at 60 seconds; the isolated CLI retest reportedly passed 7/7, which does not erase the original full-gate failure. r2 was cut off by coordinator timeout (NO VERDICT); r3 was cut off by VM restart (NO VERDICT). r4 is reported GREEN: 13,109 tests = 13,105 pass + 0 fail + 4 skipped. The reported suite size is 13,109 tests.
+Operator reports #59 was cherry-picked as three commits from PR #59 source head `6e788fc4`, adding two files and 275 lines, with local main now at `bf89e113fde085f491cab6df708e15ec1d256053`. Its gate history must retain the initial failure: r1 reported 13,109 tests, 13,104 passed and one failure, a 60-second timeout in the CLI `--help` test. The isolated retest of that CLI test group reportedly passed 7/7; this does not erase the original full-gate failure. r1: 13,109 tests = 13,104 pass + 1 fail + 0 cancelled + 4 skipped; all four skips are accounted for. The sole failure was the CLI `--help` test timing out at 60 seconds; the isolated CLI retest reportedly passed 7/7, which does not erase the original full-gate failure. r2 was cut off by coordinator timeout (NO VERDICT); r3 was cut off by VM restart (NO VERDICT). r4 is reported GREEN: 13,109 tests = 13,105 pass + 0 fail + 4 skipped. The reported suite size for #59 r4 is 13,109 tests. The latest full-suite gate on this local HEAD is PR #44 r2 GREEN: 13,125 tests / 13,121 pass / 0 fail / 4 skipped; r1 was interrupted by VM restart before environment recovery and rerun.
 
 The ten other local landings (#38, #39, #40, #44 and #53–#58), plus #59, and all local gate outcomes remain OPERATOR-REPORTED. In particular, do not turn #57/#58 prior static or verifier counts into a current-head full-suite PASS. GitHub still shows their individual PR records as open Drafts.
 
 Live GitHub read-back confirms exactly 23 open PRs, all Draft. The eleven locally landed PR records #38, #39, #40, #44 and #53–#59 remain Open/Draft/unmerged. #42, #43, #48, #51 and #52 are Closed with `merged=false`; #41 is also Closed with `merged=false`.
 
-PR #62 at the start of this cycle is Open/Draft/unmerged, based on remote main `798d69ce226f12377131e2d7b37f3c7f45e89f5a`, with head `a677db50dceb5d669654710efbbb6432542ecd29`. The currently read-back CI for that pre-update head has 12 queued check runs and two queued workflow runs; this is NOT PASS. The dossier guard source contains 26 top-level test groups, 139 assertion calls and 139 literal `dossier.includes(...)` checks; the operator reports 26/26 passing on the pre-update guard revision; the updated guard has not been executed by this author. No CI success, production GO, release-owner approval, signing, notarization or native acceptance is claimed.
+PR #62 at the start of this cycle is Open/Draft/unmerged, based on remote main `798d69ce226f12377131e2d7b37f3c7f45e89f5a`, with head `a677db50dceb5d669654710efbbb6432542ecd29`. The current updated head has 12 queued check runs and two queued workflow runs; this is NOT PASS. The dossier guard source contains 26 top-level test groups, 139 assertion calls and 139 literal `dossier.includes(...)` checks; the operator reports 26/26 passing on the pre-update guard revision; the updated guard has not been executed by this author. No CI success, production GO, release-owner approval, signing, notarization or native acceptance is claimed.
 
 ## 2. Evidence vocabulary and decision rules
 
@@ -106,6 +106,8 @@ The live GitHub PR records are closed but not merged. Their presence in the earl
 |---|---|---|---|---|
 | #38 | Included in local main `bf89e113fde085f491cab6df708e15ec1d256053` | `e65bda54f599fb48dc16b9d5ba3fd486389b0488` | Open / Draft / unmerged | Earlier gate record: r1 had 3 failures diagnosed as flakes; r2 12,904 pass / 0 fail / 19 skipped |
 | #39 | Included in local main `bf89e113fde085f491cab6df708e15ec1d256053` | `6ba8de831c6b4a21267e243e9aabb40c73e7bc0f` | Open / Draft / unmerged | Earlier first-run record: 12,910 pass / 0 fail / 19 skipped |
+| #40 | Included in local main `bf89e113fde085f491cab6df708e15ec1d256053` | `be6cd6457c67b45302ae71e3cb125adc651fc114` | Open / Draft / unmerged | Local landing commit `39bc2a43`; included in operator-reported local source head |
+| #44 | Included in local main `bf89e113fde085f491cab6df708e15ec1d256053` | `eb5a9f3bafc8c81d60949c0a064ffd49a266f9c9` | Open / Draft / unmerged | Local landing commit `bf89e113`; latest full-suite gate r2 GREEN: 13,125 tests / 13,121 pass / 0 fail / 4 skipped |
 | #53 | Included in local main `bf89e113fde085f491cab6df708e15ec1d256053` | `8a1239e2bc114ed42843b921def8f9f4e772326f` | Open / Draft / unmerged | Earlier r4 record: 12,944 pass / 0 fail / 4 skipped |
 | #54 | Included in local main `bf89e113fde085f491cab6df708e15ec1d256053` | `064bf8c11510d0183a3a8c2c30c7b457d5e2a5c7` | Open / Draft / unmerged | Earlier record: 12,971 pass / 0 fail / 4 skipped |
 | #55 | Included in local main `bf89e113fde085f491cab6df708e15ec1d256053` | `2cf14e2baeee4475db3efebde444a5aaf3ac6ec4` | Open / Draft / unmerged | Earlier r2 record: 13,002 pass / 0 fail / 4 skipped |
@@ -158,9 +160,9 @@ The live GitHub `GET /pulls?state=open&per_page=100` response contained exactly 
 
 PR #62 live metadata at the start of this cycle: Open, Draft, unmerged; base main at `798d69ce226f12377131e2d7b37f3c7f45e89f5a`; head `69b6670f7359b28205c0c65dea0240d61ed302d5`.
 
-PR #62 head at the start of this update: `69b6670f7359b28205c0c65dea0240d61ed302d5`. This is the exact prior self-head and is asserted by the documentation guard. The new head created by this update must be read back from GitHub.
+PR #62 head at the start of this update: `69b6670f7359b28205c0c65dea0240d61ed302d5`. This is the exact prior self-head and is asserted by the documentation guard. The updated head is `80fff27d17c697e0122ef5d9aefa42e97b97b348`; its 12 check runs and two workflow runs are queued, with no completed verdict.
 
-CI read-back for the prior PR #62 head `69b6670f7359b28205c0c65dea0240d61ed302d5` must not be carried forward to the updated head. Read back the new head's checks and workflow runs separately; queued is NOT PASS.
+CI read-back for updated PR #62 head `80fff27d17c697e0122ef5d9aefa42e97b97b348`: 12 check runs queued and two workflow runs queued; no completed verdict. Queued is NOT PASS.
 
 ## 5. Final candidate evidence gates
 
