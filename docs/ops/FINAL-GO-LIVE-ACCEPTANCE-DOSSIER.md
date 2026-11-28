@@ -21,7 +21,7 @@ The ten other local landings (#38, #39, #40, #44 and #53–#58), plus #59, and a
 
 Live GitHub read-back confirms exactly 23 open PRs, all Draft. The eleven locally landed PR records #38, #39, #40, #44 and #53–#59 remain Open/Draft/unmerged. #42, #43, #48, #51 and #52 are Closed with `merged=false`; #41 is also Closed with `merged=false`.
 
-PR #62 at the start of this cycle is Open/Draft/unmerged, based on remote main `798d69ce226f12377131e2d7b37f3c7f45e89f5a`, with head `a677db50dceb5d669654710efbbb6432542ecd29`. The current updated head has 12 queued check runs and two queued workflow runs; this is NOT PASS. The dossier guard source contains 26 top-level test groups, 139 assertion calls and 139 literal `dossier.includes(...)` checks; the operator reports 26/26 passing on the pre-update guard revision; the updated guard has not been executed by this author. No CI success, production GO, release-owner approval, signing, notarization or native acceptance is claimed.
+PR #62 at the start of this cycle is Open/Draft/unmerged, based on remote main `798d69ce226f12377131e2d7b37f3c7f45e89f5a`, with head `69b6670f7359b28205c0c65dea0240d61ed302d5`. The current updated head is `73cf0c35a7ba379ed2408474fe6fc74a2bc7a80`; its 12 check runs are queued and zero have completed. The workflow-runs endpoint returned zero workflow-run records for this exact head. The updated dossier guard source contains 28 top-level test groups and 148 assertion calls / 148 literal `dossier.includes(...)` checks; static source comparison reports 148/148 literal matches, but the updated guard has not been executed by this author. No CI success, production GO, release-owner approval, signing, notarization or native acceptance is claimed.
 
 ## 2. Evidence vocabulary and decision rules
 
