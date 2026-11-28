@@ -89,7 +89,7 @@ test('10. Drift-26 is the next downstream gate', () => {
 test('11. Current local and remote state are not conflated', () => {
   assert.ok(dossier.includes('local main `5ee33a1c`'));
   assert.ok(dossier.includes('PR #45 and #46 have landed locally'));
-  assert.ok(dossier.includes('PR #47 is present on local main but its gate r2 is still running'));
+  assert.ok(dossier.includes('and #47 is present on local main but its gate r2 is still running'));
   assert.ok(dossier.includes('remote GitHub main remains'));
   assert.ok(dossier.includes('No final full source SHA/tree SHA'));
 });
