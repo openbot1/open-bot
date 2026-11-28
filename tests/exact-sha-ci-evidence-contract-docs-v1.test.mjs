@@ -96,7 +96,7 @@ test('11. Current local and remote state are not conflated', () => {
 
 test('12. No CI execution or candidate creation is claimed', () => {
   assert.ok(dossier.includes('EXACT-SHA CI NOT STARTED'));
-  assert.ok(dossier.includes('No approved candidate exists'));
+  assert.ok(dossier.includes('NO APPROVED CANDIDATE EXISTS'));
   assert.ok(dossier.includes('did not access the operator\'s local filesystem'));
   assert.ok(dossier.includes('dispatch CI'));
   assert.ok(dossier.includes('Static source inspection is not CI execution'));
