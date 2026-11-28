@@ -175,7 +175,7 @@ test('19. Local landings remain distinct from live GitHub PR state', () => {
 
 test('20. DYNAMIC-READY and fixpack results are attributed to the operator', () => {
   assert.ok(dossier.includes('r2 coordinator timeout/no verdict'));
-  assert.ok(dossier.includes('r3 running'));
+  assert.ok(dossier.includes('r3 VM restart/no verdict'));
   assert.ok(dossier.includes('18/18'));
   assert.ok(dossier.includes('71/71'));
   assert.ok(dossier.includes('OPERATOR-REPORTED'));
@@ -197,10 +197,12 @@ test('22. Current local main and eight local landings are recorded distinctly', 
 test('23. PR 59 preserves failure, retest and inconclusive gate history', () => {
   assert.ok(dossier.includes('PR #59 is reported locally cherry-picked'));
   assert.ok(dossier.includes('13,109 tests / 13,104 pass / 1 fail'));
-  assert.ok(dossier.includes('isolated CLI retest 7/7'));
+  assert.ok(dossier.includes('isolated CLI retest passed 7/7'));
   assert.ok(dossier.includes('r2 coordinator timeout/no verdict'));
-  assert.ok(dossier.includes('r3 running'));
-  assert.ok(dossier.includes('four outcomes unaccounted'));
+  assert.ok(dossier.includes('r3 VM restart/no verdict'));
+  assert.ok(dossier.includes('0 cancelled + 4 skipped'));
+  assert.ok(dossier.includes('13,105 pass / 0 fail / 4 skipped'));
+  assert.ok(dossier.includes('9bf5c2f2f18748541893136b12bb3fec054f443c'));
 });
 
 test('24. Current local identity and metrics are explicitly not GitHub-verified', () => {
