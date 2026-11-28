@@ -209,14 +209,14 @@ test('23. PR 59 preserves failure, retest and inconclusive gate history', () => 
 test('24. Current local identity and metrics are explicitly not GitHub-verified', () => {
   assert.ok(dossier.includes('bf89e113fde085f491cab6df708e15ec1d256053'));
   assert.ok(dossier.includes('the current full local SHA and line count were not supplied'));
-  assert.ok(dossier.includes('Local tree size / line count'));
+  assert.ok(dossier.includes('Previous snapshot source tree size / line count'));
   assert.ok(dossier.includes('3,986 tracked files / 1,531,721 lines; clean tree (0 changes)'));
   assert.ok(dossier.includes('Current local main is `c40465b7`, clean, 3,988 tracked files, three commits ahead of remote for PR #45'));
 });
 
 test('25. Exactly eight ordered GO blockers are enumerated', () => {
   assert.ok(dossier.includes('## 8. Ordered GO blockers — all must be closed before a GO decision'));
-  assert.ok(dossier.includes('1. **Complete the #59 gate and reconcile the ten other local landings plus #59.**'));
+  assert.ok(dossier.includes('1. **Preserve #59 gate history and complete PR-record reconciliation for the eleven snapshot-integrated landings.**'));
   assert.ok(dossier.includes('2. **Finish the remaining PR queue and reconcile dependencies.**'));
   assert.ok(dossier.includes('3. **Reconcile local and remote source lineage.**'));
   assert.ok(dossier.includes('4. **Produce one immutable final candidate.**'));
